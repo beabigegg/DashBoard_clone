@@ -26,6 +26,10 @@ class TestTenNewEndpointRowsPresent:
 
     def test_all_ten_new_endpoint_rows_present_in_api_contract(self):
         content = _API_CONTRACT_PATH.read_text(encoding="utf-8")
+        # NOTE: production-achievement-oracle-plan-source removed the 2
+        # daily-plans rows this list originally had (10 -> 8) -- targets are
+        # now Oracle-sourced (business-rules.md PA-11), see api-contract.md
+        # Compatibility Notes.
         expected_rows = [
             ("GET", "/api/production-achievement/package-lf-map"),
             ("PUT", "/api/production-achievement/package-lf-map"),
@@ -33,8 +37,6 @@ class TestTenNewEndpointRowsPresent:
             ("GET", "/api/production-achievement/workcenter-merge-map"),
             ("PUT", "/api/production-achievement/workcenter-merge-map"),
             ("DELETE", "/api/production-achievement/workcenter-merge-map/{raw}"),
-            ("GET", "/api/production-achievement/daily-plans"),
-            ("PUT", "/api/production-achievement/daily-plans"),
             ("GET", "/api/production-achievement/known-package-lf-values"),
             ("GET", "/api/production-achievement/known-workcenter-groups"),
         ]
@@ -57,8 +59,6 @@ class TestTenNewEndpointRowsPresent:
             ("get", "/api/production-achievement/workcenter-merge-map"),
             ("put", "/api/production-achievement/workcenter-merge-map"),
             ("delete", "/api/production-achievement/workcenter-merge-map/{raw}"),
-            ("get", "/api/production-achievement/daily-plans"),
-            ("put", "/api/production-achievement/daily-plans"),
             ("get", "/api/production-achievement/known-package-lf-values"),
             ("get", "/api/production-achievement/known-workcenter-groups"),
         ]
@@ -87,7 +87,7 @@ class TestReportResponseFiveInlineArrays:
             "targets_map",
             "package_lf_map",
             "workcenter_merge_map",
-            "daily_plan_map",
+            "plan_map",
         ):
             assert f'"{array_name}"' in block, (
                 f"{array_name!r} missing from ProductionAchievementReportResponse "
@@ -117,7 +117,7 @@ class TestReportResponseFiveInlineArrays:
         data_props = schema.get("properties", {}).get("data", {}).get("properties", {})
         for array_name in (
             "spec_workcenter_map", "targets_map", "package_lf_map",
-            "workcenter_merge_map", "daily_plan_map",
+            "workcenter_merge_map", "plan_map",
         ):
             assert array_name in data_props, f"{array_name!r} missing from openapi.json's data properties"
 
@@ -140,12 +140,14 @@ class TestSixNewResponseSchemas:
     """AC-6: the 6 new response schemas referenced by design.md are defined
     as typed (not prose) schema sections in api-contract.md."""
 
+    # NOTE: ProductionAchievementDailyPlanRow (originally in this list) was
+    # removed by production-achievement-oracle-plan-source alongside the
+    # daily-plans endpoints it backed -- see api-contract.md Compatibility Notes.
     @pytest.mark.parametrize(
         "schema_name",
         [
             "ProductionAchievementPackageLfMapRow",
             "ProductionAchievementWorkcenterMergeMapRow",
-            "ProductionAchievementDailyPlanRow",
             "ProductionAchievementKnownPackageLfValuesResponse",
             "ProductionAchievementKnownWorkcenterGroupsResponse",
         ]

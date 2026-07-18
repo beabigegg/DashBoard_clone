@@ -7,6 +7,11 @@
  * FIRST 403 from ANY panel (shared fail-closed state); OD-5 propagation
  * -delay note shown after a successful save; OD-6 no unsaved-edit navigation
  * guard (no beforeunload/route-leave listener is ever registered).
+ *
+ * Change: production-achievement-oracle-plan-source removed the 3rd panel
+ * (DailyPlanPanel, 每日計畫 Excel-import — targets are now Oracle-sourced,
+ * business-rules.md PA-11) — this file now covers exactly 2 panels
+ * (PackageLfMappingPanel, WorkcenterMergeMappingPanel).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -31,8 +36,7 @@ function envelope(data: unknown) {
 }
 
 const PKG_ROWS = [{ raw_package_lf: 'SOD-123FL OP1', merged_group: 'SOD-123FL', updated_at: 't', updated_by: 'admin' }];
-const WC_ROWS = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', updated_at: 't', updated_by: 'admin' }];
-const PLAN_ROWS = [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 500, updated_at: 't', updated_by: 'admin' }];
+const WC_ROWS = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input', updated_at: 't', updated_by: 'admin' }];
 
 function setupFetchMock(overrides: Record<string, () => Response> = {}) {
   const fetchMock = vi.fn((url: string, options?: RequestInit) => {
@@ -46,7 +50,6 @@ function setupFetchMock(overrides: Record<string, () => Response> = {}) {
     if (u.includes('/api/production-achievement/known-package-lf-values')) return Promise.resolve(envelope({ package_lf_values: ['NEW-VAL'] }));
     if (u.includes('/api/production-achievement/workcenter-merge-map')) return Promise.resolve(envelope(WC_ROWS));
     if (u.includes('/api/production-achievement/known-workcenter-groups')) return Promise.resolve(envelope({ raw_workcenter_groups: ['焊接_DB', '切割'] }));
-    if (u.includes('/api/production-achievement/daily-plans')) return Promise.resolve(envelope(PLAN_ROWS));
     return Promise.resolve(envelope(null));
   });
   global.fetch = fetchMock as unknown as typeof fetch;
@@ -70,14 +73,13 @@ describe('production-achievement-settings App.vue', () => {
     vi.restoreAllMocks();
   });
 
-  it('fetches all 5 endpoints on mount and renders each panel with its data', async () => {
+  it('fetches all 4 endpoints on mount and renders each panel with its data', async () => {
     setupFetchMock();
     const wrapper = mount(App, { attachTo: document.body });
     await flushPromises();
 
     expect(wrapper.text()).toContain('SOD-123FL OP1');
     expect(wrapper.text()).toContain('焊接_DB');
-    expect(wrapper.text()).toContain('500');
     // OD-8: the full raw universe includes 切割 (currently excluded), not just the included row.
     expect(wrapper.text()).toContain('切割');
     wrapper.unmount();
@@ -103,6 +105,30 @@ describe('production-achievement-settings App.vue', () => {
     wrapper.unmount();
   });
 
+  it('a workcenter-merge-map rename PUTs parent_group and plan_source_side together (PA-20)', async () => {
+    const fetchMock = setupFetchMock();
+    const wrapper = mount(App, { attachTo: document.body });
+    await flushPromises();
+
+    await wrapper.find('[data-testid="pa-wc-rename-btn"]').trigger('click');
+    await wrapper.vm.$nextTick();
+    await wrapper.find('[data-testid="pa-wc-parent-input"]').setValue('焊接_DB');
+    await wrapper.find('[data-testid="pa-wc-plan-source-side-select"]').setValue('output');
+    await wrapper.find('[data-testid="pa-wc-rename-save"]').trigger('click');
+    await flushPromises();
+
+    const putCall = fetchMock.mock.calls.find(
+      ([url, opts]) => String(url).includes('/api/production-achievement/workcenter-merge-map') && (opts as RequestInit | undefined)?.method === 'PUT',
+    );
+    expect(putCall).toBeDefined();
+    const [, options] = putCall!;
+    const body = JSON.parse((options as RequestInit).body as string);
+    expect(body.raw_workcenter_group).toBe('焊接_DB');
+    expect(body.parent_group).toBe('焊接_DB');
+    expect(body.plan_source_side).toBe('output');
+    wrapper.unmount();
+  });
+
   it('OD-5: shows the propagation-delay note after a successful save', async () => {
     setupFetchMock();
     const wrapper = mount(App, { attachTo: document.body });
@@ -125,7 +151,7 @@ describe('production-achievement-settings App.vue', () => {
     wrapper.unmount();
   });
 
-  it('a 403 on ANY panel write flips editForbidden SHARED across all 3 panels (fail-closed)', async () => {
+  it('a 403 on ANY panel write flips editForbidden SHARED across both panels (fail-closed)', async () => {
     setupFetchMock({
       'PUT /api/production-achievement/package-lf-map': () =>
         jsonResponse({ success: false, error: { code: 'FORBIDDEN', message: '無權限' }, meta: {} }, 403),
@@ -140,9 +166,8 @@ describe('production-achievement-settings App.vue', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="pa-pkg-readonly-note"]').exists()).toBe(true);
-    // The SAME shared flag disables the OTHER two panels too — one language everywhere.
+    // The SAME shared flag disables the OTHER panel too — one language everywhere.
     expect(wrapper.find('[data-testid="pa-wc-readonly-note"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="pa-plan-readonly-note"]').exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -192,23 +217,27 @@ describe('production-achievement-settings App.vue', () => {
   // monkey-test-engineer, production-achievement-overhaul. Task-specific
   // domain probe: "race conditions between two settings panels being edited
   // concurrently." useProductionAchievementSettings.ts's savePackageLf() /
-  // saveWorkcenterMerge() / saveDailyPlan() all set the ONE SHARED
-  // `editSaving` ref true/false around their own fetch, but NONE of them
-  // checks `if (editSaving.value) return` first (unlike useProductionAchievement
-  // .ts's runQuery(), which DOES guard with `if (loading.value) return`). The
-  // per-row BUTTONS that open a NEW edit are gated by :disabled="editSaving",
-  // but an inline-edit <input>'s own @keydown.enter handler is NOT gated —
-  // only the buttons shown while NOT editing are. So two edits opened BEFORE
-  // either save starts (an ordinary admin workflow: open edit on panel A, get
+  // saveWorkcenterMerge() both set the ONE SHARED `editSaving` ref true/false
+  // around their own fetch, but NEITHER checks `if (editSaving.value) return`
+  // first (unlike useProductionAchievement.ts's runQuery(), which DOES guard
+  // with `if (loading.value) return`). The per-row BUTTONS that open/confirm
+  // an edit are gated by :disabled="editSaving", but an inline-edit
+  // <input>'s own @keydown.enter handler is NOT gated — only the buttons
+  // shown while NOT editing are. So two edits opened BEFORE either save
+  // starts (an ordinary admin workflow: open edit on panel A, get
   // distracted, open edit on panel B) can both be submitted with editSaving
-  // providing no real mutual exclusion between them.
+  // providing no real mutual exclusion between them. Originally reproduced
+  // against the now-removed DailyPlanPanel; re-targeted at
+  // WorkcenterMergeMappingPanel (the other panel with an open-edit-then-
+  // confirm flow) since the defect is in the SHARED editSaving design, not
+  // specific to which panel.
   describe('FINDING: concurrent saves across two different panels race on the shared editSaving flag', () => {
-    it('opening edits on PackageLfMappingPanel AND DailyPlanPanel BEFORE either submits, then submitting both in quick succession, fires BOTH PUT requests concurrently', async () => {
+    it('opening edits on PackageLfMappingPanel AND WorkcenterMergeMappingPanel BEFORE either submits, then submitting both in quick succession, fires BOTH PUT requests concurrently', async () => {
       let resolvePkgPut!: (v: Response) => void;
       const pkgPutPromise = new Promise<Response>((resolve) => {
         resolvePkgPut = resolve;
       });
-      let dailyPlanPutCalled = false;
+      let wcPutCalled = false;
 
       setupFetchMock({
         // package-lf-map's PUT is deliberately SLOW (a deferred promise this
@@ -221,11 +250,11 @@ describe('production-achievement-settings App.vue', () => {
       // Open BOTH edits first, while editSaving is still false for both.
       await wrapper.find('[data-testid="pa-pkg-edit-btn"]').trigger('click');
       await wrapper.vm.$nextTick();
-      await wrapper.find('[data-testid="pa-plan-edit-btn"]').trigger('click');
+      await wrapper.find('[data-testid="pa-wc-rename-btn"]').trigger('click');
       await wrapper.vm.$nextTick();
 
       await wrapper.find('[data-testid="pa-pkg-edit-input"]').setValue('SOD-123FL-RACE');
-      await wrapper.find('[data-testid="pa-plan-edit-input"]').setValue('999');
+      await wrapper.find('[data-testid="pa-wc-name-input"]').setValue('焊接_DB_RACE');
 
       // Submit PackageLfMappingPanel's edit first — its PUT will hang on the
       // deferred promise above (savePackageLf() sets editSaving=true, no
@@ -235,25 +264,27 @@ describe('production-achievement-settings App.vue', () => {
       // At this point the package-lf-map PUT is deliberately still pending
       // (the deferred promise above has not been resolved) — editSaving is
       // now true, and per the "one language everywhere" shared-flag design,
-      // every panel's NOT-currently-editing buttons should be disabled.
-      expect((wrapper.find('[data-testid="pa-plan-new-btn"]').element as HTMLButtonElement).disabled).toBe(true);
+      // every panel's editSaving-gated buttons should be disabled — including
+      // the 焊接_DB row's OWN toggle button (a separate column from the
+      // in-progress rename, still rendered while editing).
+      expect((wrapper.find('[data-testid="pa-wc-toggle"]').element as HTMLButtonElement).disabled).toBe(true);
 
       // WITHOUT waiting for the first PUT to resolve, submit the
-      // ALREADY-OPEN DailyPlanPanel edit too — its input's own keydown.enter
-      // handler has no editSaving gate.
+      // ALREADY-OPEN WorkcenterMergeMappingPanel edit too — its input's own
+      // keydown.enter handler has no editSaving gate.
       const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
       const callsBeforeSecondSubmit = fetchMock.mock.calls.length;
-      await wrapper.find('[data-testid="pa-plan-edit-input"]').trigger('keydown.enter');
+      await wrapper.find('[data-testid="pa-wc-name-input"]').trigger('keydown.enter');
       await wrapper.vm.$nextTick();
 
       // CONFIRMS the finding: a second panel's PUT fires concurrently, while
       // the first panel's PUT is STILL unresolved — the shared editSaving
       // flag provided no mutual exclusion for an edit that was already open.
-      const dailyPlanPutFired = fetchMock.mock.calls
+      const wcPutFired = fetchMock.mock.calls
         .slice(callsBeforeSecondSubmit)
-        .some(([url, opts]) => String(url).includes('/api/production-achievement/daily-plans') && (opts as RequestInit)?.method === 'PUT');
-      dailyPlanPutCalled = dailyPlanPutFired;
-      expect(dailyPlanPutCalled).toBe(true);
+        .some(([url, opts]) => String(url).includes('/api/production-achievement/workcenter-merge-map') && (opts as RequestInit)?.method === 'PUT');
+      wcPutCalled = wcPutFired;
+      expect(wcPutCalled).toBe(true);
 
       // Resolve the slow package-lf-map PUT now; the safe-outcome floor is
       // that everything settles cleanly afterwards (no crash, no
@@ -262,7 +293,7 @@ describe('production-achievement-settings App.vue', () => {
       await flushPromises();
 
       expect(wrapper.find('[data-testid="pa-pkg-edit-input"]').exists()).toBe(false);
-      expect(wrapper.find('[data-testid="pa-plan-edit-input"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="pa-wc-name-input"]').exists()).toBe(false);
       wrapper.unmount();
     });
   });

@@ -9,11 +9,17 @@
  * GET /known-workcenter-groups, cross-referenced against the ~12
  * currently-included rows) so an admin can switch a currently-excluded raw
  * group on, not just edit the ones already included.
+ *
+ * plan_source_side (PA-20, production-achievement-oracle-plan-source): which
+ * Oracle plan column (投入/產出) the 大項 sources its target from. ALWAYS
+ * edited and submitted together with parent_group in the SAME rename form —
+ * never independently — so a 大項 reassignment can never silently leave a
+ * stale input/output routing.
  */
 import { computed, ref } from 'vue';
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
-import type { WorkcenterFullListRow } from '../composables/useProductionAchievementSettings';
+import type { PlanSourceSide, WorkcenterFullListRow } from '../composables/useProductionAchievementSettings';
 
 interface Props {
   fullList?: WorkcenterFullListRow[];
@@ -32,9 +38,9 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  include: [payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group: string }];
+  include: [payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group: string; plan_source_side: PlanSourceSide }];
   exclude: [raw_workcenter_group: string];
-  rename: [payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group: string }];
+  rename: [payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group: string; plan_source_side: PlanSourceSide }];
 }>();
 
 const editingRaw = ref<string | null>(null);
@@ -42,6 +48,9 @@ const draftMergedName = ref('');
 // PA-19: the 大項 this子站 rolls up under (電鍍/切割 for their sub-stations;
 // otherwise === merged name).
 const draftParentName = ref('');
+// PA-20: which Oracle plan column (投入/產出) draftParentName sources its
+// target from — edited together with draftParentName, never separately.
+const draftPlanSourceSide = ref<PlanSourceSide>('input');
 
 function toggleInclude(row: WorkcenterFullListRow): void {
   if (props.editForbidden) return;
@@ -49,11 +58,13 @@ function toggleInclude(row: WorkcenterFullListRow): void {
     emit('exclude', row.raw_workcenter_group);
   } else {
     // Including a previously-excluded raw group defaults its merged name AND
-    // its大項 to itself (1:1, single-layer) — the admin can edit both afterwards.
+    // its大項 to itself (1:1, single-layer), plan_source_side to 'input' (the
+    // column DDL default) — the admin can edit all three afterwards.
     emit('include', {
       raw_workcenter_group: row.raw_workcenter_group,
       merged_workcenter_group: row.raw_workcenter_group,
       parent_group: row.raw_workcenter_group,
+      plan_source_side: 'input',
     });
   }
 }
@@ -63,12 +74,14 @@ function startRename(row: WorkcenterFullListRow): void {
   editingRaw.value = row.raw_workcenter_group;
   draftMergedName.value = row.merged_workcenter_group || row.raw_workcenter_group;
   draftParentName.value = row.parent_group || row.merged_workcenter_group || row.raw_workcenter_group;
+  draftPlanSourceSide.value = row.plan_source_side || 'input';
 }
 
 function cancelRename(): void {
   editingRaw.value = null;
   draftMergedName.value = '';
   draftParentName.value = '';
+  draftPlanSourceSide.value = 'input';
 }
 
 function confirmRename(row: WorkcenterFullListRow): void {
@@ -76,7 +89,12 @@ function confirmRename(row: WorkcenterFullListRow): void {
   if (!merged) return;
   // Blank 大項 falls back to the merged name (single-layer station).
   const parent = draftParentName.value.trim() || merged;
-  emit('rename', { raw_workcenter_group: row.raw_workcenter_group, merged_workcenter_group: merged, parent_group: parent });
+  emit('rename', {
+    raw_workcenter_group: row.raw_workcenter_group,
+    merged_workcenter_group: merged,
+    parent_group: parent,
+    plan_source_side: draftPlanSourceSide.value,
+  });
   editingRaw.value = null;
 }
 
@@ -99,6 +117,7 @@ const isEmpty = computed(() => !props.loading && props.fullList.length === 0);
       <DataTableColumn column-key="included" label="納入報表" align="center" />
       <DataTableColumn column-key="merged_workcenter_group" label="合併名稱(子站)" />
       <DataTableColumn column-key="parent_group" label="大項" />
+      <DataTableColumn column-key="plan_source_side" label="目標來源" align="center" />
       <DataTableColumn column-key="actions" label="操作" align="center" />
       <template #cell="{ columnKey, row }">
         <template v-if="columnKey === 'included'">
@@ -140,6 +159,21 @@ const isEmpty = computed(() => !props.loading && props.fullList.length === 0);
             @keydown.enter="confirmRename(row as unknown as WorkcenterFullListRow)"
             @keydown.escape="cancelRename"
           />
+        </template>
+        <template v-else-if="columnKey === 'plan_source_side'">
+          <span v-if="!(row as unknown as WorkcenterFullListRow).included" class="pa-settings-panel__muted">—</span>
+          <span v-else-if="editingRaw !== (row as unknown as WorkcenterFullListRow).raw_workcenter_group">
+            {{ (row as unknown as WorkcenterFullListRow).plan_source_side === 'output' ? '產出' : '投入' }}
+          </span>
+          <select
+            v-else
+            v-model="draftPlanSourceSide"
+            class="pa-settings-panel__input pa-settings-panel__input--sm"
+            data-testid="pa-wc-plan-source-side-select"
+          >
+            <option value="input">投入 (前中段)</option>
+            <option value="output">產出 (TMTT後)</option>
+          </select>
         </template>
         <template v-else-if="columnKey === 'actions'">
           <template v-if="!editForbidden && (row as unknown as WorkcenterFullListRow).included">

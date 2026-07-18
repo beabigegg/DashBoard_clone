@@ -185,8 +185,6 @@
   "GET /api/production-achievement/workcenter-merge-map": "samples/get_production_achievement_workcenter_merge_map.json",
   "PUT /api/production-achievement/workcenter-merge-map": "samples/put_production_achievement_workcenter_merge_map_forbidden.json",
   "DELETE /api/production-achievement/workcenter-merge-map/{raw}": "samples/delete_production_achievement_workcenter_merge_map_forbidden.json",
-  "GET /api/production-achievement/daily-plans": "samples/get_production_achievement_daily_plans.json",
-  "PUT /api/production-achievement/daily-plans": "samples/put_production_achievement_daily_plans_forbidden.json",
   "GET /api/production-achievement/known-package-lf-values": "samples/get_production_achievement_known_package_lf_values.json",
   "GET /api/production-achievement/known-workcenter-groups": "samples/get_production_achievement_known_workcenter_groups.json"
 }

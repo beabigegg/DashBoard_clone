@@ -1,11 +1,21 @@
 {
-  "error": {
-    "code": "SERVICE_UNAVAILABLE",
-    "message": "服務暫時無法使用，請稍後再試"
-  },
+  "data": [
+    {
+      "can_edit_targets": true,
+      "granted_at": "Mon, 13 Jul 2026 06:24:38 GMT",
+      "granted_by": "92367",
+      "user_identifier": "92367"
+    },
+    {
+      "can_edit_targets": true,
+      "granted_at": "Thu, 16 Jul 2026 08:00:25 GMT",
+      "granted_by": "testuser",
+      "user_identifier": "testuser"
+    }
+  ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-07-02T07:54:44.512195"
+    "timestamp": "2026-07-16T16:28:24.602572"
   },
-  "success": false
+  "success": true
 }

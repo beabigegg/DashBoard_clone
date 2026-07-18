@@ -24,7 +24,9 @@ from mes_dashboard.services.production_achievement_workcenter_merge_service impo
     get_workcenter_merge_map,
     upsert_workcenter_merge,
     delete_workcenter_merge,
+    validate_plan_source_side,
     MySQLUnavailableError,
+    WorkcenterMergeValidationError,
 )
 
 _DDL_PATH = (
@@ -57,6 +59,10 @@ _SEEDED = [
     ("BANDL", "委外", "電鍍"),
     ("TOTAI", "委外", "電鍍"),
 ]
+
+# PA-20: parent_group -> expected plan_source_side ('output' for TMTT-and-after,
+# 'input' for everything else -- derived from 025.txt's station column order).
+_OUTPUT_SIDE_PARENTS = {"TMTT", "品檢", "FQC", "成品入庫"}
 
 # Raw workcenters intentionally NOT seeded (D2 default-deny). 切割/成品入庫 were
 # previously excluded but are now INCLUDED (PA-19), so they left this list.
@@ -150,6 +156,24 @@ class TestSeedDataInDDLScript:
         assert by_raw["TOTAI"] == ("委外", "電鍍")
         assert by_raw["切割"] == ("切割", "切割")
 
+    def test_seeded_plan_source_side_matches_025txt_derived_classification(self):
+        """PA-20: TMTT-and-after (TMTT/品檢/FQC/成品入庫) seed 'output';
+        every other seeded raw row seeds 'input' -- derived from 025.txt's
+        station column order and confirmed with the user."""
+        sql_text = _DDL_PATH.read_text(encoding="utf-8")
+        start = sql_text.index("INSERT IGNORE INTO production_achievement_workcenter_merge_map")
+        end = sql_text.index(";", start)
+        seed_block = sql_text[start:end]
+        for raw, _merged, parent in _SEEDED:
+            expected_side = "output" if parent in _OUTPUT_SIDE_PARENTS else "input"
+            row_start = seed_block.index(f"'{raw}'")
+            row_end = seed_block.index(")", row_start)
+            row_text = seed_block[row_start:row_end]
+            assert f"'{expected_side}'" in row_text, (
+                f"seed row for {raw!r} (parent={parent!r}) expected "
+                f"plan_source_side={expected_side!r}, not found in: {row_text!r}"
+            )
+
 
 class TestGetWorkcenterMergeEntries:
     @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", True)
@@ -161,6 +185,7 @@ class TestGetWorkcenterMergeEntries:
             "raw_workcenter_group": "焊接_DW",
             "merged_workcenter_group": "焊接_WB",
             "parent_group": "焊接_WB",
+            "plan_source_side": "input",
             "updated_at": "2026-07-01T00:00:00",
             "updated_by": "tester",
         }
@@ -175,6 +200,7 @@ class TestGetWorkcenterMergeEntries:
                 "raw_workcenter_group": "焊接_DW",
                 "merged_workcenter_group": "焊接_WB",
                 "parent_group": "焊接_WB",
+                "plan_source_side": "input",
                 "updated_at": "2026-07-01T00:00:00",
                 "updated_by": "tester",
             }
@@ -191,6 +217,7 @@ class TestGetWorkcenterMergeEntries:
             "raw_workcenter_group": "去膠",
             "merged_workcenter_group": "去膠",
             "parent_group": None,
+            "plan_source_side": "input",
             "updated_at": "2026-07-01T00:00:00",
             "updated_by": "tester",
         }
@@ -201,6 +228,30 @@ class TestGetWorkcenterMergeEntries:
 
         rows = get_workcenter_merge_entries()
         assert rows[0]["parent_group"] == "去膠"
+
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.get_mysql_connection")
+    def test_null_plan_source_side_falls_back_to_input(self, mock_conn_ctx):
+        """PA-20: a legacy row with NULL/blank plan_source_side (pre-migration
+        install) must fall back to 'input', same as the column's own DDL
+        default -- never crash, never surface None to the client."""
+        conn = MagicMock()
+        row = MagicMock()
+        row._mapping = {
+            "raw_workcenter_group": "TMTT",
+            "merged_workcenter_group": "TMTT",
+            "parent_group": "TMTT",
+            "plan_source_side": None,
+            "updated_at": "2026-07-01T00:00:00",
+            "updated_by": "tester",
+        }
+        result = MagicMock()
+        result.fetchall.return_value = [row]
+        conn.execute.return_value = result
+        mock_conn_ctx.return_value.__enter__.return_value = conn
+
+        rows = get_workcenter_merge_entries()
+        assert rows[0]["plan_source_side"] == "input"
 
     @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", False)
     def test_read_degrades_empty_when_ops_disabled(self):
@@ -228,6 +279,7 @@ class TestGetWorkcenterMergeMap:
             "raw_workcenter_group": "焊接_DW",
             "merged_workcenter_group": "焊接_WB",
             "parent_group": "焊接_WB",
+            "plan_source_side": "input",
             "updated_at": "2026-07-01T00:00:00",
             "updated_by": "tester",
         }
@@ -248,7 +300,8 @@ class TestUpsertWorkcenterMerge:
         mock_conn_ctx.return_value.__enter__.return_value = conn
 
         upsert_workcenter_merge(
-            raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB", updated_by="tester"
+            raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB",
+            plan_source_side="output", updated_by="tester",
         )
 
         assert conn.execute.called
@@ -259,13 +312,32 @@ class TestUpsertWorkcenterMerge:
         params = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs.get("parameters")
         assert params["raw_workcenter_group"] == "焊接_DW"
         assert params["merged_workcenter_group"] == "焊接_WB"
+        assert params["plan_source_side"] == "output"
         assert params["updated_by"] == "tester"
+
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.get_mysql_connection")
+    def test_upsert_defaults_plan_source_side_to_input_when_omitted(self, mock_conn_ctx):
+        """Service-level default only protects internal/test callers that
+        don't care about PA-20 -- routes must always pass an explicit,
+        already-validated value (see TestValidatePlanSourceSide)."""
+        conn = MagicMock()
+        mock_conn_ctx.return_value.__enter__.return_value = conn
+
+        upsert_workcenter_merge(
+            raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB", updated_by="tester"
+        )
+
+        call_args = conn.execute.call_args
+        params = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs.get("parameters")
+        assert params["plan_source_side"] == "input"
 
     @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", False)
     def test_write_raises_mysqlunavailableerror_when_ops_disabled(self):
         with pytest.raises(MySQLUnavailableError):
             upsert_workcenter_merge(
-                raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB", updated_by="tester"
+                raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB",
+                plan_source_side="input", updated_by="tester",
             )
 
 
@@ -300,3 +372,21 @@ class TestDeleteWorkcenterMerge:
     def test_delete_raises_mysqlunavailableerror_when_ops_disabled(self):
         with pytest.raises(MySQLUnavailableError):
             delete_workcenter_merge(raw_workcenter_group="焊接_DW")
+
+
+class TestValidatePlanSourceSide:
+    """PA-20: enum validation, mirrors validate_target_qty's "never touch
+    MySQL" contract -- routes call this BEFORE any MySQL round-trip."""
+
+    @pytest.mark.parametrize("value", ["input", "output"])
+    def test_valid_values_pass_through(self, value):
+        assert validate_plan_source_side(value) == value
+
+    def test_case_and_whitespace_normalized(self):
+        assert validate_plan_source_side(" Output ") == "output"
+        assert validate_plan_source_side("INPUT") == "input"
+
+    @pytest.mark.parametrize("value", [None, "", "sideways", "in put", "INOUT"])
+    def test_invalid_values_raise(self, value):
+        with pytest.raises(WorkcenterMergeValidationError):
+            validate_plan_source_side(value)

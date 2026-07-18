@@ -25,6 +25,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import App from '../App.vue';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
+import PlanAchievementStackedChart from '../components/PlanAchievementStackedChart.vue';
 
 const navigateMock = vi.fn();
 vi.mock('../../core/shell-navigation', () => ({
@@ -66,15 +67,19 @@ const SPOOL_HIT_BODY = {
     spec_workcenter_map: [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }],
     targets_map: [],
     package_lf_map: [],
-    workcenter_merge_map: [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }],
-    daily_plan_map: [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 400 }],
+    workcenter_merge_map: [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input' }],
+    plan_map: [{ output_date: '2026-07-14', plan_package_group: 'SOD-123FL', planqty_input: 400, planqty_output: 350 }],
   },
   meta: {},
 };
 
+// PA-21: shift_plan_qty = CEIL(daily_plan_qty / 2); d_/n_achievement_rate =
+// each shift's own actual / shift_plan_qty. Row 1 deliberately illustrates
+// the fixed bug: the OLD (buggy) chart formula d_output_qty/daily_plan_qty
+// would read 200/400=0.5, HALF of the correct 200/200=1.0.
 const DAILY_ROWS = [
-  { package_lf_group: 'SOD-123FL', d_output_qty: 200, n_output_qty: 100, daily_output_qty: 300, daily_plan_qty: 400, achievement_rate: 0.75 },
-  { package_lf_group: 'TO-277(B)', d_output_qty: 50, n_output_qty: 50, daily_output_qty: 100, daily_plan_qty: 100, achievement_rate: 1.0 },
+  { package_lf_group: 'SOD-123FL', d_output_qty: 200, n_output_qty: 100, daily_output_qty: 300, daily_plan_qty: 400, achievement_rate: 0.75, shift_plan_qty: 200, d_achievement_rate: 1.0, n_achievement_rate: 0.5 },
+  { package_lf_group: 'TO-277(B)', d_output_qty: 50, n_output_qty: 50, daily_output_qty: 100, daily_plan_qty: 100, achievement_rate: 1.0, shift_plan_qty: 50, d_achievement_rate: 1.0, n_achievement_rate: 1.0 },
 ];
 
 async function getDuckClient() {
@@ -327,9 +332,53 @@ describe('production-achievement App.vue', () => {
     expect(wrapper.find('[data-testid="pa-kpi-cards"]').exists()).toBe(true);
     const kpiCards = wrapper.findAllComponents(SummaryCard);
     const byLabel = Object.fromEntries(kpiCards.map((c) => [c.props('label'), c.props('value')]));
-    expect(byLabel['實際產出合計']).toBe(400);
-    expect(byLabel['計畫合計']).toBe(500);
+    expect(byLabel['實際產出合計 (K)']).toBe(400);
+    expect(byLabel['計畫合計 (K)']).toBe(500);
     expect(byLabel['整體達成率']).toBeCloseTo(80.0, 5);
+    wrapper.unmount();
+  });
+
+  it('PA-21: D/N shift chart series divide each shift by its OWN shift_plan_qty, never the full daily_plan_qty (regression for the fixed under-reporting bug)', async () => {
+    const client = await getDuckClient();
+    client.sendQuery
+      .mockResolvedValueOnce([]) // spec map
+      .mockResolvedValueOnce([]) // targets map
+      .mockResolvedValueOnce([]) // package_lf map
+      .mockResolvedValueOnce([]) // workcenter_merge map
+      .mockResolvedValueOnce([]) // plan map
+      .mockResolvedValueOnce([]) // rollup_raw create
+      .mockResolvedValueOnce([]) // rollup create
+      .mockResolvedValueOnce(DAILY_ROWS); // computeDailyView SELECT
+
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/filter-options')) {
+        return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['焊接_DB'] }, meta: {} }));
+      }
+      if (u.includes('/api/production-achievement/report')) {
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    const wrapper = mountApp();
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+
+    const chart = wrapper.findComponent(PlanAchievementStackedChart);
+    expect(chart.exists()).toBe(true);
+    const series = chart.props('series') as { name: string; data: number[] }[];
+    const dSeries = series.find((s) => s.name === 'D班')!;
+    const nSeries = series.find((s) => s.name === 'N班')!;
+    // Row 1 (SOD-123FL): d_achievement_rate=1.0, n_achievement_rate=0.5 — the
+    // pre-fix formula (d_output_qty/daily_plan_qty = 200/400) would have read
+    // 0.5 here instead of the correct 1.0.
+    expect(dSeries.data[0]).toBeCloseTo(100.0, 5); // achievementRateForChart returns a percent
+    expect(nSeries.data[0]).toBeCloseTo(50.0, 5);
+    // Row 2 (TO-277(B)): both shifts hit exactly their per-shift target.
+    expect(dSeries.data[1]).toBeCloseTo(100.0, 5);
+    expect(nSeries.data[1]).toBeCloseTo(100.0, 5);
     wrapper.unmount();
   });
 
@@ -364,10 +413,10 @@ describe('production-achievement App.vue', () => {
         targets_map: [],
         package_lf_map: [],
         workcenter_merge_map: [
-          { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' },
-          { raw_workcenter_group: '條鍍', merged_workcenter_group: '條鍍', parent_group: '電鍍' },
+          { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍', plan_source_side: 'input' },
+          { raw_workcenter_group: '條鍍', merged_workcenter_group: '條鍍', parent_group: '電鍍', plan_source_side: 'input' },
         ],
-        daily_plan_map: [{ workcenter_group: '電鍍', package_lf_group: 'PKG-1', daily_plan_qty: 500 }],
+        plan_map: [{ output_date: '2026-07-14', plan_package_group: 'PKG-1', planqty_input: 500, planqty_output: 450 }],
         source: 'moveout',
       },
       meta: {},
@@ -391,9 +440,9 @@ describe('production-achievement App.vue', () => {
     const kpiCards = wrapper.findAllComponents(SummaryCard);
     const byLabel = Object.fromEntries(kpiCards.map((c) => [c.props('label'), c.props('value')]));
     // LEAF sum only: 300 + 100 = 400 (NOT 800 with the 大項小計 double-counted).
-    expect(byLabel['實際轉出合計']).toBe(400);
+    expect(byLabel['實際轉出合計 (K)']).toBe(400);
     // Only the 大項小計 row carries a plan, so 計畫合計 = its plan (no leaf plans).
-    expect(byLabel['計畫合計']).toBe(500);
+    expect(byLabel['計畫合計 (K)']).toBe(500);
     expect(byLabel['整體達成率']).toBeCloseTo(80.0, 5);
     wrapper.unmount();
   });

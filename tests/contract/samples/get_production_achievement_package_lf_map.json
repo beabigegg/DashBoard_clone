@@ -1,8 +1,81 @@
 {
-  "data": [],
+  "data": [
+    {
+      "merged_group": "DFN2510/0603",
+      "raw_package_lf": "DFN2510-10L",
+      "updated_at": "Wed, 15 Jul 2026 05:02:48 GMT",
+      "updated_by": "92367"
+    },
+    {
+      "merged_group": "SOD-123FL",
+      "raw_package_lf": "SOD-123FL",
+      "updated_at": "Tue, 14 Jul 2026 08:26:40 GMT",
+      "updated_by": "system-seed"
+    },
+    {
+      "merged_group": "SOD-123FL",
+      "raw_package_lf": "SOD-123FL OP1",
+      "updated_at": "Tue, 14 Jul 2026 08:26:40 GMT",
+      "updated_by": "system-seed"
+    },
+    {
+      "merged_group": "SOD-323 HD",
+      "raw_package_lf": "SOD-323 HD",
+      "updated_at": "Wed, 15 Jul 2026 05:03:54 GMT",
+      "updated_by": "92367"
+    },
+    {
+      "merged_group": "SOT-323 HD",
+      "raw_package_lf": "SOT-323 HD",
+      "updated_at": "Wed, 15 Jul 2026 05:03:38 GMT",
+      "updated_by": "92367"
+    },
+    {
+      "merged_group": "SOT-543/553/563",
+      "raw_package_lf": "SOT-543",
+      "updated_at": "Tue, 14 Jul 2026 08:26:40 GMT",
+      "updated_by": "system-seed"
+    },
+    {
+      "merged_group": "SOT-543/553/563",
+      "raw_package_lf": "SOT-553",
+      "updated_at": "Tue, 14 Jul 2026 08:26:40 GMT",
+      "updated_by": "system-seed"
+    },
+    {
+      "merged_group": "SOT-543/553/563",
+      "raw_package_lf": "SOT-563",
+      "updated_at": "Tue, 14 Jul 2026 08:26:40 GMT",
+      "updated_by": "system-seed"
+    },
+    {
+      "merged_group": "SOT23-5L/6L",
+      "raw_package_lf": "SOT23-5L",
+      "updated_at": "Thu, 16 Jul 2026 08:00:25 GMT",
+      "updated_by": "testuser"
+    },
+    {
+      "merged_group": "SOT-23-5L/6L",
+      "raw_package_lf": "SOT23-6L",
+      "updated_at": "Wed, 15 Jul 2026 05:05:53 GMT",
+      "updated_by": "92367"
+    },
+    {
+      "merged_group": "TO-277(B)",
+      "raw_package_lf": "TO-277",
+      "updated_at": "Tue, 14 Jul 2026 08:26:40 GMT",
+      "updated_by": "system-seed"
+    },
+    {
+      "merged_group": "TO-277(B)",
+      "raw_package_lf": "TO-277B",
+      "updated_at": "Tue, 14 Jul 2026 08:26:40 GMT",
+      "updated_by": "system-seed"
+    }
+  ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-07-14T12:10:49.706066"
+    "timestamp": "2026-07-16T16:28:24.612880"
   },
   "success": true
 }

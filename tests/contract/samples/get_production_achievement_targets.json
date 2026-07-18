@@ -1,8 +1,23 @@
 {
-  "data": [],
+  "data": [
+    {
+      "shift_code": "D",
+      "target_qty": 1000,
+      "updated_at": "Thu, 16 Jul 2026 08:00:25 GMT",
+      "updated_by": "testuser",
+      "workcenter_group": "切割"
+    },
+    {
+      "shift_code": "D",
+      "target_qty": 7200,
+      "updated_at": "Mon, 13 Jul 2026 06:25:02 GMT",
+      "updated_by": "92367",
+      "workcenter_group": "焊接_DB"
+    }
+  ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-07-02T07:54:44.511037"
+    "timestamp": "2026-07-16T16:28:24.588059"
   },
   "success": true
 }

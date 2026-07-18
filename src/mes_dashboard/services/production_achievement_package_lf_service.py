@@ -12,18 +12,41 @@ D1 vs D2 (business-rules.md PA-09/PA-10): this table's default-on-absence is
 fallback-to-self (a raw PACKAGE_LF with no row here groups under itself) --
 the OPPOSITE default from ``production_achievement_workcenter_merge_service``
 (D2, exclude-by-absence). Do NOT normalize the two to the same join kind.
+
+Oracle default layer (production-achievement-oracle-plan-source, PA-09
+amendment): ``DWH.MES_WIP_OUTPUTPLAN_DETAIL`` (the same table PA-11's plan
+targets resolve their Package Group names through) is now consulted as the
+DEFAULT source for the raw->merged mapping -- this table's manual rows are a
+sparse OVERRIDE layer on top of it, not the primary source anymore. Merge
+order in ``get_package_lf_map()``: Oracle defaults, then manual D1 rows
+overwrite any Oracle value for the same raw code, then absence of both falls
+back to the raw value itself (client-side COALESCE, unchanged). This keeps
+D1 genuinely sparse/exceptions-only instead of requiring a manual row for
+every one of the ~46 Oracle-known codes.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from typing import Any, Dict, List, Optional
 
+from mes_dashboard.config.constants import (
+    CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE,
+)
+from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED, get_mysql_connection
+from mes_dashboard.sql import SQLLoader
 
 logger = logging.getLogger("mes_dashboard.production_achievement_package_lf_service")
 
 _UNCLASSIFIED_SENTINEL = "(未分類)"
+
+_ORACLE_CACHE_TTL_SECONDS = CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE
+# {"map": {raw: oracle_group}, "loaded_at": epoch_seconds} once populated
+_ORACLE_CACHE: Dict[str, Any] = {}
+_ORACLE_CACHE_LOCK = threading.Lock()
 
 
 class MySQLUnavailableError(RuntimeError):
@@ -85,15 +108,72 @@ def get_package_lf_entries() -> List[Dict[str, Any]]:
         return []
 
 
-def get_package_lf_map() -> Dict[str, str]:
-    """Return {raw_package_lf: merged_group} for all rows (data-shape §3.30).
+def _query_oracle_package_lf_map() -> Dict[str, str]:
+    sql = SQLLoader.load("production_achievement_package_lf_oracle")
+    df = read_sql_df(sql, caller="production_achievement_package_lf_service")
+    return {
+        row["RAW_PACKAGE_LF"]: row["ORACLE_MERGED_GROUP"]
+        for _, row in df.iterrows()
+    }
+
+
+def get_oracle_package_lf_map(force_refresh: bool = False) -> Dict[str, str]:
+    """Return {raw_package_lf: oracle_merged_group} straight from
+    ``DWH.MES_WIP_OUTPUTPLAN_DETAIL`` (the D1 default layer, PA-09).
+
+    Cached globally (this is a static ~46-row reference table, not date-
+    partitioned like PA-11's plan rows) with TTL
+    ``CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE``. Degrades to {}
+    on Oracle failure (or to the last-known-good cached value if one exists)
+    -- never raises, matching every other Oracle-sourced cache in this
+    feature.
+    """
+    with _ORACLE_CACHE_LOCK:
+        if (
+            not force_refresh
+            and _ORACLE_CACHE.get("map") is not None
+            and time.time() - _ORACLE_CACHE["loaded_at"] < _ORACLE_CACHE_TTL_SECONDS
+        ):
+            return _ORACLE_CACHE["map"]
+
+    try:
+        oracle_map = _query_oracle_package_lf_map()
+    except Exception as exc:
+        logger.warning(
+            "production_achievement_package_lf_service: Oracle read failed, "
+            "degrading to {} (or last-known-good): %s",
+            exc,
+        )
+        with _ORACLE_CACHE_LOCK:
+            if _ORACLE_CACHE.get("map") is not None:
+                return _ORACLE_CACHE["map"]
+        return {}
+
+    with _ORACLE_CACHE_LOCK:
+        _ORACLE_CACHE["map"] = oracle_map
+        _ORACLE_CACHE["loaded_at"] = time.time()
+    return oracle_map
+
+
+def get_package_lf_map(force_refresh: bool = False) -> Dict[str, str]:
+    """Return {raw_package_lf: merged_group} (data-shape §3.30), merging the
+    Oracle default layer with D1's manual override rows on top.
 
     Sourced for the inline ``package_lf_map`` array injected in the
     ``GET /report`` 200 spool-hit envelope (data-shape-contract.md §3.33).
-    Degrades to {} when unavailable -- D1's own fallback-to-self default
-    (every raw value groups under itself), not an error state.
+    Merge order: start from ``get_oracle_package_lf_map()`` (the default),
+    then overwrite with every manual ``production_achievement_package_lf_map``
+    row for the same raw code -- a manual row always wins over Oracle's
+    value, which is exactly what makes D1 an exceptions-only OVERRIDE layer
+    rather than a duplicate of Oracle's own mapping. Degrades gracefully when
+    either source is unavailable -- a raw value present in neither still
+    falls back to itself client-side (COALESCE, unchanged).
     """
-    return {row["raw_package_lf"]: row["merged_group"] for row in get_package_lf_entries()}
+    merged = dict(get_oracle_package_lf_map(force_refresh=force_refresh))
+    merged.update(
+        {row["raw_package_lf"]: row["merged_group"] for row in get_package_lf_entries()}
+    )
+    return merged
 
 
 def upsert_package_lf(*, raw_package_lf: str, merged_group: str, updated_by: str) -> None:

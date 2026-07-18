@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.43.0
-last-changed: 2026-07-15
+schema-version: 1.44.0
+last-changed: 2026-07-16
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -253,7 +253,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
 | GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
-| GET | /api/production-achievement/report | required | ?start_date=&end_date=&shift_code=(opt)&workcenter_group=(opt)&source=(opt,output/moveout,default output) | ProductionAchievementReportResponse | 202/400/500/503 | route tests |
+| GET | /api/production-achievement/report | required | ?start_date=&end_date=&shift_code=(opt)&workcenter_group=(opt)&source=(opt,output/moveout,default output)&force_refresh=(opt,bool,clears+re-enqueues the actual-output spool)&refresh_plan=(opt,bool,bypasses the Oracle plan/target cache independently; implied by force_refresh=true) | ProductionAchievementReportResponse | 202/400/500/503 | route tests |
 | GET | /api/production-achievement/filter-options | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/production-achievement/targets | required | ?shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementTargetsResponse | 500 | route tests |
 | PUT | /api/production-achievement/targets | required | body {shift_code, workcenter_group, target_qty}; also gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
@@ -274,14 +274,10 @@ breaking-change-policy: deprecate-2-minors
 | PUT | /api/production-achievement/package-lf-map | required | body {raw_package_lf, merged_group}; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
 | DELETE | /api/production-achievement/package-lf-map/{raw} | required | path segment {raw} URL-encoded; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/404/500/503 | route tests |
 | GET | /api/production-achievement/workcenter-merge-map | required | - | ProductionAchievementWorkcenterMergeMapResponse | 500 | route tests |
-| PUT | /api/production-achievement/workcenter-merge-map | required | body {raw_workcenter_group, merged_workcenter_group}; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
+| PUT | /api/production-achievement/workcenter-merge-map | required | body {raw_workcenter_group, merged_workcenter_group, parent_group(opt), plan_source_side(required, input/output)}; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
 | DELETE | /api/production-achievement/workcenter-merge-map/{raw} | required | path segment {raw} URL-encoded; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/404/500/503 | route tests |
-| GET | /api/production-achievement/daily-plans | required | - | ProductionAchievementDailyPlanResponse | 500 | route tests |
-| PUT | /api/production-achievement/daily-plans | required | body {workcenter_group, package_lf_group, daily_plan_qty}; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
 | GET | /api/production-achievement/known-package-lf-values | required | - | ProductionAchievementKnownPackageLfValuesResponse | 500 | route tests |
 | GET | /api/production-achievement/known-workcenter-groups | required | - | ProductionAchievementKnownWorkcenterGroupsResponse | 500 | route tests |
-| POST | /api/production-achievement/daily-plans/import/preview | required | multipart/form-data field file (.xlsx only); parses PJMES052-生產達成率 report, categorizes rows against live legal-value/current-plan state, writes nothing; gated by can_edit_targets permission (403 if not whitelisted) | ProductionAchievementDailyPlanImportPreviewResponse | 400/403/500/503 | route tests |
-| POST | /api/production-achievement/daily-plans/import/confirm | required | body {rows: [{workcenter_group, package_lf_group, daily_plan_qty}]}; server re-validates every row against legal-value sets (never trusts client selection) and bulk-upserts in a single transaction (all-or-nothing); gated by can_edit_targets permission (403 if not whitelisted) | ProductionAchievementDailyPlanImportConfirmResponse | 400/403/500/503 | route tests |
 | GET | /api/production-achievement/permissions/me | required | - | ProductionAchievementOwnPermissionResponse | 500 | route tests |
 
 ## 5. Routing & Naming
@@ -474,7 +470,6 @@ breaking-change-policy: deprecate-2-minors
   - Additive; existing paginated callers that do not send `export` receive identical responses. No existing fields removed or renamed. No new error codes.
   - Sole consumer: `frontend/src/hold-overview/`. No external partners or mobile consumers known.
 
-
 - **eap-alarm-analysis (2026-06-18)**: New endpoint family `/api/eap-alarm/*` (7 endpoints). All auth required; Type B async (POST /spool → 202 → poll /api/job/<id>?prefix=eap-alarm). Spool key: `eap_alarm:{date_from}:{date_to}:{sorted_eqp_types_hash}`; namespace `eap_alarm` added to `_ALLOWED_NAMESPACES`. Fine-filter options (alarm_text, alarm_category, equipment_id) derived from DuckDB spool only — no Oracle re-query (EA-02). AlarmCategory decoded server-side per EA-05 decode table. Navigation: new "EAP" top-level category in portal shell. Additive; no existing endpoints changed.
 - **yield-alert-filter-expansion (2026-07-01):** `POST /api/yield-alert/query` `process_type` accepted-value enum expands from `{GA%, GC%}` to `{GA%, GC%, GD%, F%, W%, D%}` (additive for existing callers sending GA%/GC%; new values unlock previously-invisible ~1.65% of `ERP_WIP_MOVETXN_DETAIL` transactions). `process_type` remains a `query_id` hash input, so each of the 6 values produces its own spool file — GA/GC spool behavior is unchanged. BREAKING (shape semantics, not JSON key): `GET /api/yield-alert/view` (`data.filter_options.workcenter_groups`) and `GET /api/yield-alert/cross-filter-options` (`data.workcenter_groups`) now compute `workcenter_groups` as `SELECT DISTINCT DEPARTMENT_NAME` (raw spool column) against the query_id spool — same mechanism as `lines`/`packages`/`types`/`functions` — instead of the global, query-independent `filter_cache.get_workcenter_groups()` (`DWH.DW_MES_SPEC_WORKCENTER_V`) with `_YIELD_WORKCENTER_GROUP_ORDER`/`_DEPT_SEQ_MAP` grouping. Values now vary by query_id/process_type and are no longer grouped/ordered display names. `GET /api/yield-alert/filter-options` (separate endpoint, initial dropdown seed) and the shared `filter_cache` path used by other pages are unchanged. See data-shape-contract.md §3.16.4/§3.16.5 and business-rules.md YA-01/YA-02/YA-10/YA-11. Sole consumer: `frontend/src/yield-alert-center/`. No external partners or mobile consumers known.
 
@@ -482,9 +477,15 @@ breaking-change-policy: deprecate-2-minors
 
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
-
 ## Compatibility Notes
 
+- **production-achievement-oracle-plan-source (2026-07-16):** `GET /api/production-achievement/report` `ProductionAchievementReportResponse` redefined in place again (third breaking redefinition of the same schema name). BREAKING response-shape change under the same endpoint/schema name — no deprecate-2-minors window (same exception precedent as every prior `production-achievement-*` breaking change: sole consumer `frontend/src/production-achievement/` ships in the same atomic PR):
+  - Targets are now sourced from Oracle `DWH.MES_WIP_OUTPUTPLAN`/`MES_WIP_OUTPUTPLAN_DETAIL` (business-rules.md PA-11), replacing the Excel-imported `production_achievement_daily_plans` MySQL table (§3.32, deprecated not dropped — existing rollback policy).
+  - **Removed endpoints**: `GET/PUT /api/production-achievement/daily-plans`, `POST /api/production-achievement/daily-plans/import/preview`, `POST /api/production-achievement/daily-plans/import/confirm` (4 method+path rows) — all return 404. Removed schemas: `ProductionAchievementDailyPlanRow`/`Response`, `ProductionAchievementDailyPlanMapEntry`, `ProductionAchievementDailyPlanImportRow`/`MissingRow`/`Summary`/`PreviewData`/`PreviewResponse`/`ConfirmData`/`ConfirmResponse`.
+  - **Spool-hit (HTTP 200)**: `data.daily_plan_map` renamed to `data.plan_map`, shape changed from static `(workcenter_group, package_lf_group) -> daily_plan_qty` to date-indexed `(output_date, plan_package_group) -> {planqty_input, planqty_output}` (new schema `ProductionAchievementPlanMapEntry`, data-shape-contract.md §3.34) — no station dimension at all (the Oracle source broadcasts the same target to every station for a package/day). `data.workcenter_merge_map` entries gain `parent_group`/`plan_source_side` fields (business-rules.md PA-19/PA-20; `ProductionAchievementWorkcenterMergeMapRow`/`Entry` updated in place).
+  - **Changed endpoint**: `PUT /api/production-achievement/workcenter-merge-map` body gains a REQUIRED `plan_source_side` field (`input`\|`output`, PA-20) — always submitted together with `parent_group`, never independently.
+  - `GET /filter-options`, `GET/PUT /targets` (shift-based), the admin permission endpoints, `package-lf-map[/{raw}]`, `known-package-lf-values`, `known-workcenter-groups` are unchanged.
+  - Sole consumer: `frontend/src/production-achievement/` + `frontend/src/production-achievement-settings/` (Excel-import UI/`DailyPlanPanel`/`DailyPlanImportDialog` removed). No external partners or mobile consumers known.
 - **fix-equipment-lots-trim (2026-07-09):** Two changes, both backward-compatible:
   - Bug fix: `equipment_lots.sql` now selects `TRIM(c.CONTAINERNAME) AS CONTAINERNAME` (previously untrimmed Oracle CHAR-padded value), matching the sibling `TRIM(c.PRODUCTLINENAME)` treatment already present. Value-only fix — no column added/removed, no row-shape change (data-shape-contract.md §3.6 unaffected). Fixes a client-side exact-match filter defect that silently zeroed out the 生產紀錄 sub-tab.
   - Additive: `POST /api/query-tool/equipment-period` (`query_type=lots`) gains an optional JSON body field `container_names: string[]`. When provided, narrows results server-side via `UPPER(TRIM(c.CONTAINERNAME)) IN (...)` before the `QUERY_TOOL_DETAIL_MAX_PER_PAGE` (500) pagination clamp, applied identically on the sync route and the async RQ job path. Absent/empty array → unchanged behavior (existing callers unaffected). No new error codes.
@@ -1296,7 +1297,7 @@ See data-shape-contract.md §3.25 for field semantics (nullable `target_qty`/`ac
 
 ### ProductionAchievementReportResponse
 
-Tier-B — `GET /api/production-achievement/report`. Redefined by `production-achievement-async-spool`, then extended in place again by `production-achievement-overhaul` (originally an already-aggregated row array; then a 2-array async spool-hit envelope; now a 5-array spool-hit envelope — see data-shape-contract.md §3.28). Describes the HTTP 200 spool-hit shape only; the HTTP 202 spool-miss shape is `ProductionAchievementJobAccepted`. Only `success` is required (matching `ProductionAchievementPermissionsResponse`'s pattern) — contract error codes 400/500/503 mean an error-envelope capture (`success:false`, no `data`) is a valid sample.
+Tier-B — `GET /api/production-achievement/report`. Redefined by `production-achievement-async-spool`, extended in place by `production-achievement-overhaul` (2-array → 5-array spool-hit envelope), and revised again in place by `production-achievement-oracle-plan-source` (`daily_plan_map` → `plan_map`, Oracle-sourced date-indexed shape replacing the old static per-workcenter shape; `workcenter_merge_map` entries gain `parent_group`/`plan_source_side` — see data-shape-contract.md §3.28/§3.34). Describes the HTTP 200 spool-hit shape only; the HTTP 202 spool-miss shape is `ProductionAchievementJobAccepted`. Only `success` is required (matching `ProductionAchievementPermissionsResponse`'s pattern) — contract error codes 400/500/503 mean an error-envelope capture (`success:false`, no `data`) is a valid sample.
 
 ```json-schema
 {
@@ -1347,22 +1348,25 @@ Tier-B — `GET /api/production-achievement/report`. Redefined by `production-ac
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["raw_workcenter_group", "merged_workcenter_group"],
+            "required": ["raw_workcenter_group", "merged_workcenter_group", "parent_group", "plan_source_side"],
             "properties": {
               "raw_workcenter_group": { "type": "string" },
-              "merged_workcenter_group": { "type": "string" }
+              "merged_workcenter_group": { "type": "string" },
+              "parent_group": { "type": "string" },
+              "plan_source_side": { "type": "string", "enum": ["input", "output"] }
             }
           }
         },
-        "daily_plan_map": {
+        "plan_map": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["workcenter_group", "package_lf_group", "daily_plan_qty"],
+            "required": ["output_date", "plan_package_group", "planqty_input", "planqty_output"],
             "properties": {
-              "workcenter_group": { "type": "string" },
-              "package_lf_group": { "type": "string" },
-              "daily_plan_qty": { "type": ["integer", "null"] }
+              "output_date": { "type": "string" },
+              "plan_package_group": { "type": "string" },
+              "planqty_input": { "type": "integer" },
+              "planqty_output": { "type": "integer" }
             }
           }
         }
@@ -1486,7 +1490,6 @@ Tier-B — cross-filter cached options returned by `GET /api/mid-section-defect/
   }
 }
 ```
-
 
 ### MsdForwardAnalysisResponse
 
@@ -1703,15 +1706,8 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 |---|---|---|---|---|
 | raw_workcenter_group | string | yes |  |  |
 | merged_workcenter_group | string | yes |  |  |
-| updated_at | string | yes |  |  |
-| updated_by | string | yes |  |  |
-
-### ProductionAchievementDailyPlanRow
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| workcenter_group | string | yes |  |  |
-| package_lf_group | string | yes |  |  |
-| daily_plan_qty | integer | yes |  |  |
+| parent_group | string | yes |  |  |
+| plan_source_side | string | yes |  |  |
 | updated_at | string | yes |  |  |
 | updated_by | string | yes |  |  |
 
@@ -1746,13 +1742,8 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 |---|---|---|---|---|
 | raw_workcenter_group | string | yes |  |  |
 | merged_workcenter_group | string | yes |  |  |
-
-### ProductionAchievementDailyPlanMapEntry
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| workcenter_group | string | yes |  |  |
-| package_lf_group | string | yes |  |  |
-| daily_plan_qty | integer | yes |  |  |
+| parent_group | string | yes |  |  |
+| plan_source_side | string | yes |  |  |
 
 ### ProductionAchievementKnownWorkcenterGroupsResponse
 | field | type | required | format | notes |
@@ -1775,13 +1766,6 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 | data | ProductionAchievementWorkcenterMergeMapRow[] | yes |  |  |
 | meta | ProductionAchievementResponseMeta | no |  |  |
 
-### ProductionAchievementDailyPlanResponse
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| success | boolean | yes |  |  |
-| data | ProductionAchievementDailyPlanRow[] | yes |  |  |
-| meta | ProductionAchievementResponseMeta | no |  |  |
-
 ### ProductionAchievementKnownPackageLfValuesData
 | field | type | required | format | notes |
 |---|---|---|---|---|
@@ -1798,64 +1782,6 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 | timestamp | string | no |  |  |
 | app_version | string | no |  |  |
 
-### ProductionAchievementDailyPlanImportRow
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| workcenter_group | string | yes |  |  |
-| package_lf_group | string | yes |  |  |
-| daily_plan_qty | integer | no |  | null when status=invalid_qty |
-| current_qty | integer | no |  | existing daily_plan_qty for this combo, null if new |
-| status | string | yes |  | enum new/update/unchanged/invalid_workcenter/invalid_package/invalid_qty |
-| source_sheet | string | yes |  |  |
-| source_block | string | yes |  |  |
-| importable | boolean | yes |  |  |
-| default_selected | boolean | yes |  |  |
-| warning | string | no |  |  |
-
-### ProductionAchievementDailyPlanImportMissingRow
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| workcenter_group | string | yes |  |  |
-| package_lf_group | string | yes |  |  |
-| daily_plan_qty | integer | yes |  |  |
-
-### ProductionAchievementDailyPlanImportSummary
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| total_parsed | integer | yes |  |  |
-| new | integer | yes |  |  |
-| update | integer | yes |  |  |
-| unchanged | integer | yes |  |  |
-| invalid | integer | yes |  |  |
-| missing_from_file | integer | yes |  |  |
-
-### ProductionAchievementDailyPlanImportPreviewData
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| rows | ProductionAchievementDailyPlanImportRow[] | yes |  |  |
-| missing_from_file | ProductionAchievementDailyPlanImportMissingRow[] | yes |  |  |
-| summary | ProductionAchievementDailyPlanImportSummary | yes |  |  |
-
-### ProductionAchievementDailyPlanImportPreviewResponse
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| success | boolean | yes |  |  |
-| data | ProductionAchievementDailyPlanImportPreviewData | yes |  |  |
-| meta | ProductionAchievementResponseMeta | no |  |  |
-
-### ProductionAchievementDailyPlanImportConfirmData
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| acknowledged | boolean | yes |  |  |
-| upserted | integer | yes |  |  |
-
-### ProductionAchievementDailyPlanImportConfirmResponse
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| success | boolean | yes |  |  |
-| data | ProductionAchievementDailyPlanImportConfirmData | yes |  |  |
-| meta | ProductionAchievementResponseMeta | no |  |  |
-
 ### ProductionAchievementOwnPermissionResponse
 | field | type | required | format | notes |
 |---|---|---|---|---|
@@ -1867,3 +1793,11 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 | field | type | required | format | notes |
 |---|---|---|---|---|
 | can_edit_targets | boolean | yes |  | Whether the current session user is whitelisted to edit production-achievement targets/settings. |
+
+### ProductionAchievementPlanMapEntry
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| output_date | string | yes |  |  |
+| plan_package_group | string | yes |  |  |
+| planqty_input | integer | yes |  |  |
+| planqty_output | integer | yes |  |  |

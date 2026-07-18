@@ -58,7 +58,7 @@ import type {
   TargetsMapRow,
   PackageLfMapRow,
   WorkcenterMergeMapRow,
-  DailyPlanMapRow,
+  PlanMapRow,
   DailyViewRow,
   CumulativeViewRow,
   CumulativeTrendPoint,
@@ -86,7 +86,7 @@ interface ReportSpoolHit {
   targets_map: TargetsMapRow[];
   package_lf_map: PackageLfMapRow[];
   workcenter_merge_map: WorkcenterMergeMapRow[];
-  daily_plan_map: DailyPlanMapRow[];
+  plan_map: PlanMapRow[];
 }
 
 interface ReportAsyncEnqueued {
@@ -337,7 +337,20 @@ export function useProductionAchievement() {
     return { start_date: rawStart, end_date: end };
   }
 
-  async function _fetchReportOnce(snapshot: QuerySnapshot, forceRefresh = false): Promise<ReportSpoolHit | ReportAsyncEnqueued> {
+  /**
+   * @param forceRefresh clears the ACTUAL-output spool for this exact
+   *   query_id server-side (always takes the 202 enqueue branch — see
+   *   production_achievement_routes.py's api_get_report docstring).
+   * @param refreshPlan independently forces the Oracle plan/target cache
+   *   (PA-11, CACHE_TTL_PRODUCTION_ACHIEVEMENT_PLAN) to bypass its TTL and
+   *   re-query Oracle. Kept SEPARATE from forceRefresh: the tail re-fetch
+   *   inside _pollForCompletion below must never re-send force_refresh=true
+   *   (that would re-clear the spool THAT job just finished computing and
+   *   loop forever) but still needs to force a fresh plan_map so 重新查詢
+   *   never leaves 實際產出 fresh while the achievement-rate denominator
+   *   stays stale.
+   */
+  async function _fetchReportOnce(snapshot: QuerySnapshot, forceRefresh = false, refreshPlan = false): Promise<ReportSpoolHit | ReportAsyncEnqueued> {
     const params: Record<string, string> = {
       start_date: snapshot.start_date,
       end_date: snapshot.end_date,
@@ -345,6 +358,7 @@ export function useProductionAchievement() {
       source: snapshot.source,
     };
     if (forceRefresh) params.force_refresh = 'true';
+    if (refreshPlan) params.refresh_plan = 'true';
     const response = await apiGet<ReportSpoolHit | ReportAsyncEnqueued>('/api/production-achievement/report', {
       timeout: API_TIMEOUT,
       params,
@@ -366,6 +380,7 @@ export function useProductionAchievement() {
   async function _pollForCompletion(
     job: ReportAsyncEnqueued,
     snapshot: QuerySnapshot,
+    refreshPlan = false,
     attempt = 0,
   ): Promise<ReportSpoolHit | null> {
     asyncJobProgress.active = true;
@@ -411,7 +426,10 @@ export function useProductionAchievement() {
     asyncJobProgress.progress = '正在載入結果…';
     asyncJobProgress.pct = 100;
 
-    const data = await _fetchReportOnce(snapshot);
+    // Never re-send force_refresh=true here — the spool this job JUST
+    // computed would be immediately re-cleared, re-enqueuing forever.
+    // refreshPlan carries forward independently (see _fetchReportOnce's doc).
+    const data = await _fetchReportOnce(snapshot, false, refreshPlan);
 
     if (isAsyncEnqueued(data)) {
       if (attempt >= MAX_TAIL_REENQUEUE_ATTEMPTS) {
@@ -419,7 +437,7 @@ export function useProductionAchievement() {
         error.value = '查詢完成但結果尚未就緒，請稍後重試';
         return null;
       }
-      return _pollForCompletion(data, snapshot, attempt + 1);
+      return _pollForCompletion(data, snapshot, refreshPlan, attempt + 1);
     }
     return data as ReportSpoolHit;
   }
@@ -427,7 +445,9 @@ export function useProductionAchievement() {
   async function _fetchReport(snapshot: QuerySnapshot, forceRefresh = false): Promise<ReportSpoolHit | null> {
     const data = await _fetchReportOnce(snapshot, forceRefresh);
     if (isAsyncEnqueued(data)) {
-      return _pollForCompletion(data, snapshot);
+      // A force-refreshed request's tail re-fetch must still force a fresh
+      // plan_map once it lands on the 200 branch (see _pollForCompletion).
+      return _pollForCompletion(data, snapshot, forceRefresh);
     }
     return data as ReportSpoolHit;
   }
@@ -469,7 +489,7 @@ export function useProductionAchievement() {
       data.targets_map || [],
       data.package_lf_map || [],
       data.workcenter_merge_map || [],
-      data.daily_plan_map || [],
+      data.plan_map || [],
       snapshot.source,
     );
     await _recompute(snapshot.mode, snapshot.start_date, snapshot.end_date, snapshot.workcenter_group);

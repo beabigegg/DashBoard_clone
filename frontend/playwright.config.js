@@ -38,7 +38,13 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         // Point Playwright to the shared browser cache so we never call
         // `playwright install` in CI (browsers live in ~/.cache/ms-playwright).
-        executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+        // Must be under launchOptions, not top-level `use` -- a top-level
+        // `use.executablePath` is a no-op (verified against a real host
+        // browser-version mismatch: the driver still resolves its own
+        // default headless-shell build and ignores this field entirely).
+        launchOptions: {
+          executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+        },
       },
     },
   ],

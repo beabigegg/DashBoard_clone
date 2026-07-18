@@ -10,8 +10,8 @@ import { mount, flushPromises } from '@vue/test-utils';
 import WorkcenterMergeMappingPanel from '../WorkcenterMergeMappingPanel.vue';
 
 const FULL_LIST = [
-  { raw_workcenter_group: '焊接_DB', included: true, merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', updated_at: '2026-07-01T00:00:00Z', updated_by: 'admin' },
-  { raw_workcenter_group: '切割', included: false, merged_workcenter_group: null, parent_group: null, updated_at: null, updated_by: null },
+  { raw_workcenter_group: '焊接_DB', included: true, merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input', updated_at: '2026-07-01T00:00:00Z', updated_by: 'admin' },
+  { raw_workcenter_group: '切割', included: false, merged_workcenter_group: null, parent_group: null, plan_source_side: null, updated_at: null, updated_by: null },
 ];
 
 async function mountAndFlush(props: Record<string, unknown>) {
@@ -36,7 +36,7 @@ describe('WorkcenterMergeMappingPanel', () => {
     const wrapper = await mountAndFlush({ fullList: FULL_LIST });
     const toggles = wrapper.findAll('[data-testid="pa-wc-toggle"]');
     await toggles[1].trigger('click'); // 切割 row (excluded)
-    expect(wrapper.emitted('include')).toEqual([[{ raw_workcenter_group: '切割', merged_workcenter_group: '切割', parent_group: '切割' }]]);
+    expect(wrapper.emitted('include')).toEqual([[{ raw_workcenter_group: '切割', merged_workcenter_group: '切割', parent_group: '切割', plan_source_side: 'input' }]]);
   });
 
   it('toggling an INCLUDED row emits exclude with just the raw value', async () => {
@@ -53,7 +53,28 @@ describe('WorkcenterMergeMappingPanel', () => {
     const input = wrapper.find('[data-testid="pa-wc-name-input"]');
     await input.setValue('焊接_DB_RENAMED');
     await input.trigger('keydown.enter');
-    expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB_RENAMED', parent_group: '焊接_DB' }]]);
+    expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB_RENAMED', parent_group: '焊接_DB', plan_source_side: 'input' }]]);
+  });
+
+  it('PA-20: changing plan_source_side and confirming submits it together with parent_group in the SAME rename event', async () => {
+    const wrapper = await mountAndFlush({ fullList: FULL_LIST });
+    await wrapper.find('[data-testid="pa-wc-rename-btn"]').trigger('click');
+    await wrapper.vm.$nextTick();
+    await wrapper.find('[data-testid="pa-wc-plan-source-side-select"]').setValue('output');
+    await wrapper.find('[data-testid="pa-wc-rename-save"]').trigger('click');
+    expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'output' }]]);
+  });
+
+  it("PA-20: the plan_source_side select defaults to the row's current value when starting a rename", async () => {
+    const outputSideList = [
+      { raw_workcenter_group: 'TMTT', included: true, merged_workcenter_group: 'TMTT', parent_group: 'TMTT', plan_source_side: 'output', updated_at: 't', updated_by: 'admin' },
+    ];
+    const wrapper = await mountAndFlush({ fullList: outputSideList });
+    expect(wrapper.text()).toContain('產出');
+    await wrapper.find('[data-testid="pa-wc-rename-btn"]').trigger('click');
+    await wrapper.vm.$nextTick();
+    const select = wrapper.find('[data-testid="pa-wc-plan-source-side-select"]').element as HTMLSelectElement;
+    expect(select.value).toBe('output');
   });
 
   it('an excluded row shows no rename control and its merged name renders as "—"', async () => {
@@ -94,7 +115,7 @@ describe('WorkcenterMergeMappingPanel', () => {
         const input = wrapper.find('[data-testid="pa-wc-name-input"]');
         await input.setValue(adversarial.value);
         await input.trigger('keydown.enter');
-        expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: adversarial.value, parent_group: '焊接_DB' }]]);
+        expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: adversarial.value, parent_group: '焊接_DB', plan_source_side: 'input' }]]);
       });
     }
 

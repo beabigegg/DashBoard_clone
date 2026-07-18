@@ -1,11 +1,11 @@
 {
   "error": {
-    "code": "SERVICE_UNAVAILABLE",
-    "message": "服務暫時無法使用，請稍後再試"
+    "code": "NOT_FOUND",
+    "message": "找不到指定的 raw_package_lf"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-07-14T12:10:49.721440"
+    "timestamp": "2026-07-16T16:28:24.630258"
   },
   "success": false
 }

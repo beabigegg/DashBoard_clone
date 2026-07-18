@@ -64,12 +64,18 @@ const SPOOL_HIT_BODY = {
     spec_workcenter_map: [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }],
     targets_map: [],
     package_lf_map: [],
-    workcenter_merge_map: [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }],
-    daily_plan_map: [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 300 }],
+    workcenter_merge_map: [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input' }],
+    plan_map: [{ output_date: '2026-07-14', plan_package_group: 'SOD-123FL', planqty_input: 300, planqty_output: 250 }],
   },
   meta: {},
 };
 
+// Raw row returned by computeDailyView's SELECT — this same object is BOTH
+// the mocked client.sendQuery result AND the expected dailyRows.value entry
+// (the composable passes every SELECT column straight through PA-21's
+// nullableNumber/sf helpers, which are no-ops on already-well-typed values),
+// so it must be internally consistent: shift_plan_qty = CEIL(300/2) = 150;
+// d_achievement_rate = 200/150; n_achievement_rate = 100/150.
 const DAILY_ROW = {
   package_lf_group: 'SOD-123FL',
   d_output_qty: 200,
@@ -77,16 +83,19 @@ const DAILY_ROW = {
   daily_output_qty: 300,
   daily_plan_qty: 300,
   achievement_rate: 1.0,
+  shift_plan_qty: 150,
+  d_achievement_rate: 200 / 150,
+  n_achievement_rate: 100 / 150,
 };
 
-// Raw shape returned by computeCumulativeView's rowsSql query (composable
-// multiplies daily_plan_qty by elapsed_days in JS — see useProductionAchievementDuckDB.ts).
-// setMode('range') without an explicit setRangeDates() call defaults both
-// start/end to "today", so elapsed_days = 1 here.
+// Raw shape returned by computeCumulativeView's rowsSql query — cumulative_plan_qty
+// is now a REAL SQL SUM(planqty) over the requested range (production-achievement
+// -oracle-plan-source), not a daily_plan_qty*elapsed_days JS multiplication --
+// see useProductionAchievementDuckDB.ts.
 const RAW_CUMULATIVE_ROW = {
   package_lf_group: 'SOD-123FL',
   cumulative_actual_qty: 3000,
-  daily_plan_qty: 3000,
+  cumulative_plan_qty: 3000,
 };
 
 const EXPECTED_CUMULATIVE_ROW = {
@@ -223,6 +232,54 @@ describe('useProductionAchievement — runQuery mode branching + auto-run + asyn
     expect(reportUrls).toHaveLength(2);
     expect(reportUrls[0]).not.toContain('force_refresh');
     expect(reportUrls[1]).toContain('force_refresh=true');
+  });
+
+  it('refreshQuery on a spool-miss carries refresh_plan=true through the tail re-fetch WITHOUT resending force_refresh=true (avoids re-clearing the just-computed spool)', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    const JOB_ID = 'pa-job-refresh-tail';
+    const reportUrls: string[] = [];
+    let jobPollCount = 0;
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/report')) {
+        reportUrls.push(u);
+        if (reportUrls.length === 1) {
+          return Promise.resolve(
+            jsonResponse({
+              success: true,
+              data: { async: true, job_id: JOB_ID, status_url: `/api/job/${JOB_ID}?prefix=production-achievement` },
+              meta: {},
+            }),
+          );
+        }
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      if (u.includes(`/api/job/${JOB_ID}`)) {
+        jobPollCount++;
+        const payload =
+          jobPollCount <= 1
+            ? { status: 'started', job_id: JOB_ID, query_id: null, error: null, pct: 20, stage: 'querying', progress: '背景查詢中...' }
+            : { status: 'finished', job_id: JOB_ID, query_id: 'qid-refresh-tail', error: null, pct: 100, stage: 'complete', progress: '查詢完成' };
+        return Promise.resolve(jsonResponse(payload));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: [] }, meta: {} }));
+    });
+
+    const { refreshQuery } = useProductionAchievement();
+    await refreshQuery();
+
+    expect(reportUrls).toHaveLength(2);
+    // Original request: force_refresh=true (clears the spool, always 202s).
+    expect(reportUrls[0]).toContain('force_refresh=true');
+    // Tail re-fetch after job completion: must NOT resend force_refresh=true
+    // (would re-clear the spool the job just finished computing and loop
+    // forever) but MUST carry refresh_plan=true so the achievement-rate
+    // denominator (plan_map) refreshes together with the now-fresh actual
+    // output, instead of silently serving a stale plan cache.
+    expect(reportUrls[1]).not.toContain('force_refresh');
+    expect(reportUrls[1]).toContain('refresh_plan=true');
   });
 
   it('refreshQuery is ignored (OD-4 no-op) while a poll is already in flight', async () => {

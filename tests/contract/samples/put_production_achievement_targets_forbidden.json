@@ -1,11 +1,10 @@
 {
-  "error": {
-    "code": "FORBIDDEN",
-    "message": "無權限編輯目標值"
+  "data": {
+    "acknowledged": true
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-07-02T07:54:44.511633"
+    "timestamp": "2026-07-16T16:28:24.598580"
   },
-  "success": false
+  "success": true
 }

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """Production Achievement Rate (生產達成率) API routes.
 
-Endpoints per api-contract.md rows 256-261 and 273-282 (production-achievement-
-overhaul adds 10 new rows):
+Endpoints (production-achievement-oracle-plan-source removes the 3
+Excel-import/daily-plans endpoints previously listed here -- targets are now
+sourced from Oracle MES_WIP_OUTPUTPLAN via
+``services/production_achievement_plan_service.py``, injected as ``plan_map``
+in ``GET /report``, business-rules.md PA-11):
   GET  /api/production-achievement/report
   GET  /api/production-achievement/filter-options
   GET  /api/production-achievement/targets
@@ -12,16 +15,13 @@ overhaul adds 10 new rows):
   PUT  /admin/api/production-achievement/permissions/{user_identifier}
   GET/PUT/DELETE /api/production-achievement/package-lf-map[/{raw}]     (D1)
   GET/PUT/DELETE /api/production-achievement/workcenter-merge-map[/{raw}] (D2)
-  GET/PUT        /api/production-achievement/daily-plans
-  POST           /api/production-achievement/daily-plans/import/preview
-  POST           /api/production-achievement/daily-plans/import/confirm
   GET            /api/production-achievement/known-package-lf-values
   GET            /api/production-achievement/known-workcenter-groups
 
 Per-endpoint MySQL-failure behavior (design.md): report/targets/package-lf-map/
-workcenter-merge-map/daily-plans reads degrade (empty array / null values,
-HTTP 200, never 500) when MySQL OPS is off/unreachable. Writes return 503
-SERVICE_UNAVAILABLE in that case. All 3 new tables' write endpoints are
+workcenter-merge-map reads degrade (empty array / null values, HTTP 200,
+never 500) when MySQL OPS is off/unreachable. Writes return 503
+SERVICE_UNAVAILABLE in that case. All new tables' write endpoints are
 gated by the SAME verbatim can_edit_targets permission (widened scope, no
 new permission system) -- 403 FORBIDDEN when not whitelisted.
 """
@@ -59,20 +59,6 @@ from mes_dashboard.services.filter_cache import (
     get_known_package_lf_values,
     get_spec_workcenter_mapping,
 )
-from mes_dashboard.services.production_achievement_daily_plan_service import (
-    DailyPlanValidationError,
-    MySQLUnavailableError as DailyPlanMySQLUnavailableError,
-    bulk_upsert_daily_plans,
-    get_daily_plans,
-    get_daily_plans_map,
-    upsert_daily_plan,
-    validate_daily_plan_qty,
-)
-from mes_dashboard.services.production_achievement_import_service import (
-    ImportParseError,
-    categorize_import_rows,
-    parse_pjmes052_workbook,
-)
 from mes_dashboard.services.production_achievement_package_lf_service import (
     MySQLUnavailableError as PackageLfMySQLUnavailableError,
     delete_package_lf,
@@ -84,6 +70,9 @@ from mes_dashboard.services.production_achievement_permission_service import (
     MySQLUnavailableError as PermissionMySQLUnavailableError,
     get_permissions,
     upsert_permission,
+)
+from mes_dashboard.services.production_achievement_plan_service import (
+    get_oracle_plan_rows,
 )
 from mes_dashboard.services.production_achievement_service import (
     ProductionAchievementValidationError,
@@ -102,10 +91,11 @@ from mes_dashboard.services.production_achievement_target_service import (
 )
 from mes_dashboard.services.production_achievement_workcenter_merge_service import (
     MySQLUnavailableError as WorkcenterMergeMySQLUnavailableError,
+    WorkcenterMergeValidationError,
     delete_workcenter_merge,
     get_workcenter_merge_entries,
-    get_workcenter_parent_groups,
     upsert_workcenter_merge,
+    validate_plan_source_side,
 )
 
 logger = logging.getLogger("mes_dashboard.production_achievement_routes")
@@ -183,10 +173,28 @@ def api_get_report():
     gap between scheduled warmup cycles; this gives the user an explicit
     "I don't trust the cached snapshot right now" escape hatch instead of
     waiting for the next cycle.
+
+    ``refresh_plan=true`` independently bypasses the Oracle plan/target
+    caches -- PA-11's CACHE_TTL_PRODUCTION_ACHIEVEMENT_PLAN for `plan_map`,
+    AND PA-09's CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE for the
+    Oracle default layer folded into `package_lf_map` (D1). Kept SEPARATE
+    from `force_refresh` on purpose: `force_refresh=true` ALWAYS
+    takes the 202 enqueue branch below (spool_path is forced to None), so it
+    never itself reaches the plan_map computation in this same request --
+    the frontend's tail re-fetch after the job completes is what actually
+    lands on the 200 branch, and that tail request must NOT resend
+    `force_refresh=true` (it would re-clear the spool the job just finished
+    computing and re-enqueue forever). The frontend instead carries
+    `refresh_plan=true` through that tail request specifically so 重新查詢
+    never leaves 實際產出 fresh while the achievement-rate denominator stays
+    stale (useProductionAchievement.ts `_fetchReport`/`_pollForCompletion`).
+    A bare `force_refresh=true` also implies `refresh_plan=true` (covers any
+    other caller that never reaches the 202 branch, e.g. a warm-cache path).
     """
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
     force_refresh = request.args.get("force_refresh", "").strip().lower() in ("1", "true", "yes", "on")
+    refresh_plan = force_refresh or request.args.get("refresh_plan", "").strip().lower() in ("1", "true", "yes", "on")
 
     try:
         _validate_date_range(start_date, end_date)
@@ -204,10 +212,11 @@ def api_get_report():
         clear_spooled_df(spool_namespace, query_id)
 
     # ── Spool-hit: 200, inline maps injected unconditionally (Q1, not
-    # row-count gated like resource_history's threshold). Grows from 2 to 5
-    # inline arrays by production-achievement-overhaul (data-shape-contract.md
-    # §3.28.4): +package_lf_map (D1), +workcenter_merge_map (D2),
-    # +daily_plan_map. ─────────────────────────────────────────────────────
+    # row-count gated like resource_history's threshold). 5 inline arrays
+    # (data-shape-contract.md §3.28.4): +package_lf_map (D1),
+    # +workcenter_merge_map (D2, now carries plan_source_side per PA-20),
+    # +plan_map (Oracle-sourced, replaces the old daily_plan_map,
+    # production-achievement-oracle-plan-source). ────────────────────────────
     spool_path = None if force_refresh else get_spool_file_path(spool_namespace, query_id)
     if spool_path is not None:
         try:
@@ -227,23 +236,22 @@ def api_get_report():
             ]
             package_lf_map = [
                 {"raw_package_lf": raw, "merged_group": merged}
-                for raw, merged in get_package_lf_map().items()
+                for raw, merged in get_package_lf_map(force_refresh=refresh_plan).items()
             ]
-            # PA-19: carry parent_group in the inline array so the client can
-            # build both the raw->子站 (D2 INNER JOIN) and the子站->大項
-            # (detail-table expansion) mappings from one payload.
+            # PA-19/PA-20: carry parent_group + plan_source_side in the inline
+            # array so the client can build the raw->子站 (D2 INNER JOIN), the
+            # 子站->大項 (detail-table expansion), AND the 大項->input/output
+            # plan-column routing mappings from one payload.
             workcenter_merge_map = [
                 {
                     "raw_workcenter_group": e["raw_workcenter_group"],
                     "merged_workcenter_group": e["merged_workcenter_group"],
                     "parent_group": e["parent_group"],
+                    "plan_source_side": e["plan_source_side"],
                 }
                 for e in get_workcenter_merge_entries()
             ]
-            daily_plan_map = [
-                {"workcenter_group": wg, "package_lf_group": plg, "daily_plan_qty": qty}
-                for (wg, plg), qty in get_daily_plans_map().items()
-            ]
+            plan_map = get_oracle_plan_rows(start_date, end_date, force_refresh=refresh_plan)
         except Exception as exc:
             return internal_error(str(exc))
 
@@ -255,7 +263,7 @@ def api_get_report():
             "targets_map": targets_map,
             "package_lf_map": package_lf_map,
             "workcenter_merge_map": workcenter_merge_map,
-            "daily_plan_map": daily_plan_map,
+            "plan_map": plan_map,
         })
 
     # ── Spool-miss + no worker available: 503, no sync fallback ─────────────
@@ -550,11 +558,20 @@ def api_put_workcenter_merge_map():
     if not raw_workcenter_group or not merged_workcenter_group:
         return validation_error("必須提供 raw_workcenter_group 和 merged_workcenter_group")
 
+    # plan_source_side (PA-20) required, not defaulted -- always submitted
+    # together with parent_group by WorkcenterMergeMappingPanel.vue so a 大項
+    # reassignment can never silently leave a stale input/output routing.
+    try:
+        plan_source_side = validate_plan_source_side(body.get("plan_source_side"))
+    except WorkcenterMergeValidationError as exc:
+        return validation_error(str(exc))
+
     try:
         upsert_workcenter_merge(
             raw_workcenter_group=raw_workcenter_group,
             merged_workcenter_group=merged_workcenter_group,
             parent_group=parent_group,
+            plan_source_side=plan_source_side,
             updated_by=get_owner_token(),
         )
     except WorkcenterMergeMySQLUnavailableError as exc:
@@ -585,173 +602,6 @@ def api_delete_workcenter_merge_map(raw: str):
         return not_found_error("找不到指定的 raw_workcenter_group")
 
     return success_response({"acknowledged": True})
-
-
-# ============================================================
-# GET/PUT /api/production-achievement/daily-plans
-# ============================================================
-
-
-@production_achievement_bp.route("/daily-plans", methods=["GET"])
-@login_required
-def api_get_daily_plans():
-    try:
-        rows = get_daily_plans()
-    except Exception as exc:
-        return internal_error(str(exc))
-    return success_response(rows)
-
-
-@production_achievement_bp.route("/daily-plans", methods=["PUT"])
-@login_required
-def api_put_daily_plans():
-    if not can_edit_targets():
-        return forbidden_error("無權限編輯每日計畫")
-
-    if not MYSQL_OPS_ENABLED:
-        return service_unavailable_error("MySQL OPS 未啟用")
-
-    body = request.get_json(silent=True) or {}
-    workcenter_group = body.get("workcenter_group")
-    package_lf_group = body.get("package_lf_group")
-    daily_plan_qty = body.get("daily_plan_qty")
-
-    if not workcenter_group or not package_lf_group:
-        return validation_error("必須提供 workcenter_group 和 package_lf_group")
-
-    try:
-        validated_qty = validate_daily_plan_qty(daily_plan_qty)
-    except DailyPlanValidationError as exc:
-        return validation_error(str(exc))
-
-    try:
-        upsert_daily_plan(
-            workcenter_group=workcenter_group,
-            package_lf_group=package_lf_group,
-            daily_plan_qty=validated_qty,
-            updated_by=get_owner_token(),
-        )
-    except DailyPlanMySQLUnavailableError as exc:
-        return service_unavailable_error(str(exc))
-    except Exception as exc:
-        return internal_error(str(exc))
-
-    return success_response({"acknowledged": True})
-
-
-# ============================================================
-# POST /api/production-achievement/daily-plans/import/preview
-# POST /api/production-achievement/daily-plans/import/confirm
-# (Excel-import for 每日計畫量設定, business-rules.md PA-16)
-# ============================================================
-
-
-@production_achievement_bp.route("/daily-plans/import/preview", methods=["POST"])
-@login_required
-def api_post_daily_plans_import_preview():
-    if not can_edit_targets():
-        return forbidden_error("無權限編輯每日計畫")
-
-    if not MYSQL_OPS_ENABLED:
-        return service_unavailable_error("MySQL OPS 未啟用")
-
-    uploaded = request.files.get("file")
-    if uploaded is None or not uploaded.filename:
-        return validation_error("必須提供檔案")
-    if not uploaded.filename.lower().endswith(".xlsx"):
-        return validation_error("僅支援 .xlsx 檔案")
-
-    try:
-        parsed_rows = parse_pjmes052_workbook(uploaded.stream)
-    except ImportParseError as exc:
-        return validation_error(f"無法解析檔案：{exc}")
-    except Exception as exc:
-        return internal_error(str(exc))
-
-    try:
-        # PA-19: a daily plan keys on the 大項/parent_group (what the settings
-        # dropdown offers and what the report joins achievement on), NOT the
-        # merged 子站 value. The 電鍍 大項 has no "電鍍" merged 子站 (it splits
-        # into 掛鍍/條鍍/滾鍍/委外), so a merged-value legal set would reject the
-        # report's 電鍍 sheet outright — the parent set is the correct oracle.
-        legal_workcenter_groups = set(get_workcenter_parent_groups())
-        legal_package_lf_map = get_package_lf_map()
-        legal_package_lf_groups = set(legal_package_lf_map.values()) | (
-            set(get_known_package_lf_values()) - set(legal_package_lf_map.keys())
-        )
-        preview = categorize_import_rows(
-            parsed_rows,
-            legal_workcenter_groups=legal_workcenter_groups,
-            legal_package_lf_groups=legal_package_lf_groups,
-            current_plans=get_daily_plans_map(),
-        )
-    except Exception as exc:
-        return internal_error(str(exc))
-
-    return success_response(preview)
-
-
-@production_achievement_bp.route("/daily-plans/import/confirm", methods=["POST"])
-@login_required
-def api_post_daily_plans_import_confirm():
-    if not can_edit_targets():
-        return forbidden_error("無權限編輯每日計畫")
-
-    if not MYSQL_OPS_ENABLED:
-        return service_unavailable_error("MySQL OPS 未啟用")
-
-    body = request.get_json(silent=True) or {}
-    submitted_rows = body.get("rows")
-    if not isinstance(submitted_rows, list) or not submitted_rows:
-        return validation_error("必須提供 rows（至少一筆）")
-
-    try:
-        # PA-19: a daily plan keys on the 大項/parent_group (what the settings
-        # dropdown offers and what the report joins achievement on), NOT the
-        # merged 子站 value. The 電鍍 大項 has no "電鍍" merged 子站 (it splits
-        # into 掛鍍/條鍍/滾鍍/委外), so a merged-value legal set would reject the
-        # report's 電鍍 sheet outright — the parent set is the correct oracle.
-        legal_workcenter_groups = set(get_workcenter_parent_groups())
-        legal_package_lf_map = get_package_lf_map()
-        legal_package_lf_groups = set(legal_package_lf_map.values()) | (
-            set(get_known_package_lf_values()) - set(legal_package_lf_map.keys())
-        )
-    except Exception as exc:
-        return internal_error(str(exc))
-
-    # Never trust the client's own preview categorization -- re-validate
-    # every row server-side; reject the WHOLE batch on any failure so
-    # confirm's result is unambiguous (never a partial import).
-    validated_rows = []
-    for row in submitted_rows:
-        if not isinstance(row, dict):
-            return validation_error("rows 格式錯誤")
-        workcenter_group = row.get("workcenter_group")
-        package_lf_group = row.get("package_lf_group")
-        if not workcenter_group or not package_lf_group:
-            return validation_error("每筆 row 必須提供 workcenter_group 和 package_lf_group")
-        if workcenter_group not in legal_workcenter_groups:
-            return validation_error(f"站點群組「{workcenter_group}」不在系統合法清單中")
-        if package_lf_group not in legal_package_lf_groups:
-            return validation_error(f"Package「{package_lf_group}」無法對應到現有 package_lf_group")
-        try:
-            validated_qty = validate_daily_plan_qty(row.get("daily_plan_qty"))
-        except DailyPlanValidationError as exc:
-            return validation_error(str(exc))
-        validated_rows.append({
-            "workcenter_group": workcenter_group,
-            "package_lf_group": package_lf_group,
-            "daily_plan_qty": validated_qty,
-        })
-
-    try:
-        upserted = bulk_upsert_daily_plans(validated_rows, updated_by=get_owner_token())
-    except DailyPlanMySQLUnavailableError as exc:
-        return service_unavailable_error(str(exc))
-    except Exception as exc:
-        return internal_error(str(exc))
-
-    return success_response({"acknowledged": True, "upserted": upserted})
 
 
 # ============================================================

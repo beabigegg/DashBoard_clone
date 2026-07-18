@@ -74,6 +74,10 @@ CACHE_TTL_FILTER_GENERAL = 86400        # General filter options: 24 hours
 CACHE_TTL_PROCESS_L1 = 30              # Process-level L1 cache: 30 sec
 CACHE_TTL_HOLD_TODAY = int(             # Hold today snapshot cache: 60 sec (env-overridable)
     _os.getenv('HOLD_TODAY_CACHE_TTL_SECONDS', '60'))
+CACHE_TTL_PRODUCTION_ACHIEVEMENT_PLAN = int(  # Oracle plan/target rows, per-month: 10 min (env-overridable)
+    _os.getenv('PRODUCTION_ACHIEVEMENT_PLAN_CACHE_TTL_SECONDS', '600'))
+CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE = int(  # D1's Oracle default map (static ref table): 1 hr (env-overridable)
+    _os.getenv('PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE_CACHE_TTL_SECONDS', '3600'))
 
 # ── Hold Today Snapshot settings ──
 HOLD_TODAY_AUTO_REFRESH_SECONDS = int(_os.getenv('HOLD_TODAY_AUTO_REFRESH_SECONDS', '60'))

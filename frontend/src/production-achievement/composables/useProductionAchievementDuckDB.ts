@@ -25,6 +25,46 @@
  * package_lf_group; the cumulative view additionally builds a per-day trend
  * that aggregates ACROSS ALL package_lf_groups before dividing (D3 —
  * SUM(actual)/SUM(plan), never a mean of per-group percentages).
+ *
+ * Change: production-achievement-oracle-plan-source (PA-11/PA-20/PA-21)
+ * Replaces the old static (workcenter_group, package_lf_group) ->
+ * daily_plan_qty map (`pa_daily_plan_map`, Excel-imported) with the
+ * date-indexed Oracle-sourced `pa_plan_map` (output_date, plan_package_group,
+ * planqty_input, planqty_output) — see PlanMapRow. The plan is keyed on
+ * PACKAGE ONLY (no station dimension, confirmed against IT's own
+ * PROD_ACH.txt/025.txt reference SQL — the same Oracle target broadcasts to
+ * every station for that package/day); which COLUMN (input vs output) a
+ * given station reads is resolved ONCE per compute call from
+ * workcenter_merge_map's `plan_source_side` (PA-20) for the SELECTED
+ * station/大項, then embedded as a literal column name in the query text
+ * (never per-row — plan_source_side does not vary within one query). Every
+ * per-shift target (D/N achievement_rate) is derived client-side as
+ * `CEIL(daily_plan_qty / 2)` (PA-21) — there is no separate per-shift Oracle
+ * column. Cumulative plan is now a REAL SUM(planqty) over the requested date
+ * range (pa_plan_map has one row per package per day), replacing the old
+ * `daily_plan_qty * elapsed_days` approximation.
+ *
+ * Unit fix: production-achievement-oracle-plan-source (K-unit correction)
+ * Oracle's plan/target values (pa_plan_map.planqty_input/planqty_output,
+ * sourced from MES_WIP_OUTPUTPLAN) are natively in K (thousands of pcs) --
+ * confirmed both by IT's own legacy report (025.txt, which divides every
+ * actual-output column by 1000 before comparing to the un-divided PLANQTY
+ * figures) and by live data (a per-shift target compared 1:1 against raw
+ * actual pcs produced nonsensical >90000% rates; dividing actual by 1000
+ * produces a sane ~96%). The actual-output side (pa_rollup.actual_output_qty,
+ * sourced from DW_MES_LOTWIPHISTORY.TRACKOUTQTY / DW_MES_HM_LOTMOVEOUT.QTY)
+ * is raw pcs and always was. Every SUM(r.actual_output_qty) in
+ * computeDailyView/computeCumulativeView/the trend query below is therefore
+ * divided by 1000.0 at the exact point it becomes a named "*_output_qty"/
+ * "*_actual_qty" field -- NOT inside pa_rollup_raw/pa_rollup themselves,
+ * which stay raw pcs (Stage 1/Stage 2 only do SPECNAME/PACKAGE_LF grouping
+ * correctness, unrelated to this unit concern, and
+ * test_frontend_production_achievement_parity.py's dual-tier parity gate
+ * compares pa_rollup against a raw-pcs Python golden reference -- converting
+ * inside Stage 2 would break that parity test for a reason that has nothing
+ * to do with what it protects). No rounding is applied to the /1000.0
+ * division, matching 025.txt's own convention (fractional K values, e.g.
+ * 12.345, are expected and correct).
  */
 
 import { ref, readonly } from 'vue';
@@ -37,7 +77,7 @@ const SPEC_MAP_TABLE = 'pa_spec_workcenter_map';
 const TARGETS_TABLE = 'pa_targets_map';
 const PACKAGE_LF_MAP_TABLE = 'pa_package_lf_map';
 const WORKCENTER_MERGE_MAP_TABLE = 'pa_workcenter_merge_map';
-const DAILY_PLAN_MAP_TABLE = 'pa_daily_plan_map';
+const PLAN_MAP_TABLE = 'pa_plan_map';
 const ROLLUP_RAW_TABLE = 'pa_rollup_raw';
 const ROLLUP_TABLE = 'pa_rollup';
 
@@ -64,20 +104,30 @@ export interface PackageLfMapRow {
 
 /** §3.33 D2 — explicit-inclusion, exclude-by-absence (PA-10). OPPOSITE default from PackageLfMapRow.
  *  `parent_group` (PA-19) is the 大項 this子站 rolls up under; single-layer
- *  stations have parent_group === merged_workcenter_group. */
+ *  stations have parent_group === merged_workcenter_group.
+ *  `plan_source_side` (PA-20) is which Oracle plan column (input/output) the
+ *  大項 this row belongs to sources its target from — resolved per 大項, not
+ *  per raw row (see `_resolvePlanColumn`). */
 export interface WorkcenterMergeMapRow {
   raw_workcenter_group: string;
   merged_workcenter_group: string;
   parent_group: string;
+  plan_source_side: 'input' | 'output';
 }
 
 export type ProductionSourceMode = 'output' | 'moveout';
 
-/** §3.34 — keyed (workcenter_group, package_lf_group), both already-merged values (PA-11). */
-export interface DailyPlanMapRow {
-  workcenter_group: string;
-  package_lf_group: string;
-  daily_plan_qty: number | null;
+/** Oracle-sourced plan/target rows (business-rules.md PA-11, replaces the old
+ *  Excel-imported DailyPlanMapRow). Keyed on (output_date, plan_package_group)
+ *  ONLY — no station dimension; the same target broadcasts to every station
+ *  for that package/day (confirmed against IT's PROD_ACH.txt/025.txt). Which
+ *  column (planqty_input vs planqty_output) a given station reads is decided
+ *  client-side per query via workcenter_merge_map's plan_source_side (PA-20). */
+export interface PlanMapRow {
+  output_date: string;
+  plan_package_group: string;
+  planqty_input: number | null;
+  planqty_output: number | null;
 }
 
 // ── Computed view row shapes (PA-12 daily / PA-13 cumulative) ───────────────
@@ -98,6 +148,12 @@ export interface DailyViewRow {
   daily_output_qty: number;
   daily_plan_qty: number | null;
   achievement_rate: number | null;
+  /** PA-21: CEIL(daily_plan_qty / 2), null when daily_plan_qty is null. */
+  shift_plan_qty: number | null;
+  /** d_output_qty / shift_plan_qty; null when shift_plan_qty is null or 0. */
+  d_achievement_rate: number | null;
+  /** n_output_qty / shift_plan_qty; null when shift_plan_qty is null or 0. */
+  n_achievement_rate: number | null;
 }
 
 export interface CumulativeViewRow {
@@ -269,16 +325,34 @@ function buildWorkcenterMergeMapSql(rows: WorkcenterMergeMapRow[]): string {
   );
 }
 
-function buildDailyPlanMapSql(rows: DailyPlanMapRow[]): string {
+function buildPlanMapSql(rows: PlanMapRow[]): string {
   return buildValuesTableSql(
-    DAILY_PLAN_MAP_TABLE,
+    PLAN_MAP_TABLE,
     [
-      { name: 'workcenter_group', type: 'VARCHAR', kind: 'string' },
-      { name: 'package_lf_group', type: 'VARCHAR', kind: 'string' },
-      { name: 'daily_plan_qty', type: 'INTEGER', kind: 'number' },
+      { name: 'output_date', type: 'VARCHAR', kind: 'string' },
+      { name: 'plan_package_group', type: 'VARCHAR', kind: 'string' },
+      { name: 'planqty_input', type: 'INTEGER', kind: 'number' },
+      { name: 'planqty_output', type: 'INTEGER', kind: 'number' },
     ],
     rows as unknown as Record<string, unknown>[],
   );
+}
+
+/** PA-20: resolve which Oracle plan column (input/output) `selection` (a
+ *  merged_workcenter_group in single-layer mode, a parent_group in expanded
+ *  大項 mode — both keys are present as `parent_group` in workcenterMergeMap
+ *  rows, single-layer stations having parent_group === merged_workcenter_group)
+ *  sources its target from. Defaults to 'input' (the column DDL default) when
+ *  the selection isn't found — never throws, matches this feature's
+ *  degrade-to-null-target posture rather than blocking the view. */
+function buildPlanSourceSideMap(rows: WorkcenterMergeMapRow[]): Map<string, 'input' | 'output'> {
+  const map = new Map<string, 'input' | 'output'>();
+  for (const row of rows) {
+    const parent = row.parent_group || row.merged_workcenter_group;
+    if (map.has(parent)) continue;
+    map.set(parent, row.plan_source_side === 'output' ? 'output' : 'input');
+  }
+  return map;
 }
 
 function eligibilityErrorMessage(reason: string): string {
@@ -299,15 +373,6 @@ function nullableNumber(val: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Inclusive day count between two 'YYYY-MM-DD' strings (PA-13 elapsed_days). */
-function daysBetweenInclusive(startDate: string, endDate: string): number {
-  const start = new Date(`${startDate}T00:00:00Z`);
-  const end = new Date(`${endDate}T00:00:00Z`);
-  const diffMs = end.getTime() - start.getTime();
-  const days = Math.round(diffMs / 86400000) + 1;
-  return Number.isFinite(days) && days > 0 ? days : 1;
-}
-
 // ── Main composable ───────────────────────────────────────────────────────────
 
 export function useProductionAchievementDuckDB() {
@@ -318,6 +383,16 @@ export function useProductionAchievementDuckDB() {
   let _client: DuckDBClient | null = null;
   let _isRegistered = false;
   let _sourceMode: ProductionSourceMode = 'output';
+  let _planSourceSideByParentGroup: Map<string, 'input' | 'output'> = new Map();
+
+  /** PA-20: resolve which plan column the CURRENT selection (a
+   *  merged_workcenter_group or, in expanded 大項 mode, a parent_group) reads
+   *  from — see `buildPlanSourceSideMap`'s doc comment for the key shape. */
+  function _resolvePlanColumn(selection: string): 'planqty_input' | 'planqty_output' {
+    return _planSourceSideByParentGroup.get(selection) === 'output'
+      ? 'planqty_output'
+      : 'planqty_input';
+  }
 
   /**
    * Stage 1 (`pa_rollup_raw`) — produce the (output_date, shift_code,
@@ -394,8 +469,8 @@ export function useProductionAchievementDuckDB() {
    * @param specWorkcenterMap  - inline SPECNAME -> workcenter_group map (§3.28.2)
    * @param targetsMap         - inline (shift_code, workcenter_group) -> target_qty map (§3.28.3)
    * @param packageLfMap       - inline PACKAGE_LF merge map, D1 (§3.33)
-   * @param workcenterMergeMap - inline workcenter merge map, D2 (§3.33)
-   * @param dailyPlanMap       - inline (workcenter_group, package_lf_group) -> daily_plan_qty map (§3.34)
+   * @param workcenterMergeMap - inline workcenter merge map, D2 (§3.33), now carrying plan_source_side (PA-20)
+   * @param planMap            - inline Oracle-sourced (output_date, plan_package_group) -> planqty_input/output map (PA-11)
    * @throws when WASM is unsupported (explicit unsupported state, no server
    *         fallback), the parquet fetch fails, or DuckDB init/SQL fails.
    */
@@ -405,10 +480,11 @@ export function useProductionAchievementDuckDB() {
     targetsMap: TargetsMapRow[],
     packageLfMap: PackageLfMapRow[] = [],
     workcenterMergeMap: WorkcenterMergeMapRow[] = [],
-    dailyPlanMap: DailyPlanMapRow[] = [],
+    planMap: PlanMapRow[] = [],
     sourceMode: ProductionSourceMode = 'output',
   ): Promise<void> {
     _sourceMode = sourceMode;
+    _planSourceSideByParentGroup = buildPlanSourceSideMap(workcenterMergeMap || []);
     isLoading.value = true;
     error.value = '';
 
@@ -436,7 +512,7 @@ export function useProductionAchievementDuckDB() {
       await _client.sendQuery(buildTargetsMapSql(targetsMap || []));
       await _client.sendQuery(buildPackageLfMapSql(packageLfMap || []));
       await _client.sendQuery(buildWorkcenterMergeMapSql(workcenterMergeMap || []));
-      await _client.sendQuery(buildDailyPlanMapSql(dailyPlanMap || []));
+      await _client.sendQuery(buildPlanMapSql(planMap || []));
       await _buildRollupRaw();
       await _buildRollup();
       _isRegistered = true;
@@ -465,20 +541,26 @@ export function useProductionAchievementDuckDB() {
   /**
    * PA-12: DailyView — one row per package_lf_group for the selected
    * (already-merged) workcenter_group, summing D+N shifts into a single daily
-   * total, LEFT JOIN daily_plan_map on (workcenter_group, package_lf_group).
+   * total, LEFT JOIN plan_map (PA-11, Oracle-sourced) on
+   * (plan_package_group, output_date) reading whichever column (input/output)
+   * `_resolvePlanColumn` resolves for the selection (PA-20).
    * achievement_rate is null when the plan row is missing or 0 (never
    * Infinity); 0.0 when daily output is 0 and a non-null non-zero plan exists.
+   * shift_plan_qty = CEIL(daily_plan_qty / 2) (PA-21); d_/n_achievement_rate
+   * divide each shift's own actual by shift_plan_qty (fixes the previous bug
+   * of dividing a single shift's output by the FULL daily plan).
    */
   async function computeDailyView(options: ComputeDailyViewOptions): Promise<DailyViewRow[]> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
     const sel = sqlString(options.workcenterGroup);
     const outputDate = sqlString(options.outputDate);
     const expand = options.expand === true;
+    const planCol = _resolvePlanColumn(options.workcenterGroup);
 
     if (!expand) {
-      // Single-layer station: one row per package. daily_plan joins on the
-      // selected workcenter_group (which IS the parent for a single-layer
-      // station), PA-11.
+      // Single-layer station: one row per package. plan_map joins on
+      // package_lf_group + the exact day (which IS the parent for a
+      // single-layer station), PA-11.
       const sql = `
         SELECT
           package_lf_group,
@@ -486,21 +568,34 @@ export function useProductionAchievementDuckDB() {
           n_output_qty,
           daily_output_qty,
           daily_plan_qty,
+          shift_plan_qty,
           CASE
             WHEN daily_plan_qty IS NULL THEN NULL
             WHEN daily_plan_qty = 0 THEN NULL
             ELSE CAST(daily_output_qty AS DOUBLE) / daily_plan_qty
-          END AS achievement_rate
+          END AS achievement_rate,
+          CASE
+            WHEN shift_plan_qty IS NULL THEN NULL
+            WHEN shift_plan_qty = 0 THEN NULL
+            ELSE CAST(d_output_qty AS DOUBLE) / shift_plan_qty
+          END AS d_achievement_rate,
+          CASE
+            WHEN shift_plan_qty IS NULL THEN NULL
+            WHEN shift_plan_qty = 0 THEN NULL
+            ELSE CAST(n_output_qty AS DOUBLE) / shift_plan_qty
+          END AS n_achievement_rate
         FROM (
           SELECT
             r.package_lf_group AS package_lf_group,
-            SUM(CASE WHEN r.shift_code = 'D' THEN r.actual_output_qty ELSE 0 END) AS d_output_qty,
-            SUM(CASE WHEN r.shift_code = 'N' THEN r.actual_output_qty ELSE 0 END) AS n_output_qty,
-            SUM(r.actual_output_qty) AS daily_output_qty,
-            MAX(dp.daily_plan_qty) AS daily_plan_qty
+            SUM(CASE WHEN r.shift_code = 'D' THEN r.actual_output_qty ELSE 0 END) / 1000.0 AS d_output_qty,
+            SUM(CASE WHEN r.shift_code = 'N' THEN r.actual_output_qty ELSE 0 END) / 1000.0 AS n_output_qty,
+            SUM(r.actual_output_qty) / 1000.0 AS daily_output_qty,
+            MAX(pm.${planCol}) AS daily_plan_qty,
+            CEIL(MAX(pm.${planCol}) / 2.0) AS shift_plan_qty
           FROM ${ROLLUP_TABLE} r
-          LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
-            ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
+          LEFT JOIN ${PLAN_MAP_TABLE} pm
+            ON pm.plan_package_group = r.package_lf_group
+            AND CAST(pm.output_date AS DATE) = CAST(${outputDate} AS DATE)
           WHERE r.workcenter_group = ${sel}
             AND CAST(r.output_date AS DATE) = CAST(${outputDate} AS DATE)
           GROUP BY r.package_lf_group
@@ -515,6 +610,9 @@ export function useProductionAchievementDuckDB() {
         daily_output_qty: sf(row.daily_output_qty),
         daily_plan_qty: nullableNumber(row.daily_plan_qty),
         achievement_rate: nullableNumber(row.achievement_rate),
+        shift_plan_qty: nullableNumber(row.shift_plan_qty),
+        d_achievement_rate: nullableNumber(row.d_achievement_rate),
+        n_achievement_rate: nullableNumber(row.n_achievement_rate),
       }));
     }
 
@@ -526,8 +624,9 @@ export function useProductionAchievementDuckDB() {
     // subtotal row (leaf rows show a null plan/達成率, the parent-total achievement
     // lives on the小計 row, matching the Excel report). The plan join can touch
     // leaf grains too, but the is_subtotal CASE nulls it there; quantities are
-    // pre-aggregated in `agg` before the join, so no fan-out. ORDER BY puts each
-    // package's leaf子站 rows first (is_subtotal 0) then its小計 (is_subtotal 1).
+    // pre-aggregated in `agg` before the join, and plan_map has at most one row
+    // per (package, day) so no fan-out. ORDER BY puts each package's leaf子站
+    // rows first (is_subtotal 0) then its小計 (is_subtotal 1).
     const sql = `
       SELECT
         agg.package_lf_group AS package_lf_group,
@@ -536,27 +635,39 @@ export function useProductionAchievementDuckDB() {
         agg.d_output_qty AS d_output_qty,
         agg.n_output_qty AS n_output_qty,
         agg.daily_output_qty AS daily_output_qty,
-        CASE WHEN agg.is_subtotal = 1 THEN dp.daily_plan_qty ELSE NULL END AS daily_plan_qty,
+        CASE WHEN agg.is_subtotal = 1 THEN pm.${planCol} ELSE NULL END AS daily_plan_qty,
+        CASE WHEN agg.is_subtotal = 1 THEN CEIL(pm.${planCol} / 2.0) ELSE NULL END AS shift_plan_qty,
         CASE
-          WHEN agg.is_subtotal = 1 AND dp.daily_plan_qty IS NOT NULL AND dp.daily_plan_qty <> 0
-          THEN CAST(agg.daily_output_qty AS DOUBLE) / dp.daily_plan_qty
+          WHEN agg.is_subtotal = 1 AND pm.${planCol} IS NOT NULL AND pm.${planCol} <> 0
+          THEN CAST(agg.daily_output_qty AS DOUBLE) / pm.${planCol}
           ELSE NULL
-        END AS achievement_rate
+        END AS achievement_rate,
+        CASE
+          WHEN agg.is_subtotal = 1 AND pm.${planCol} IS NOT NULL AND pm.${planCol} <> 0
+          THEN CAST(agg.d_output_qty AS DOUBLE) / CEIL(pm.${planCol} / 2.0)
+          ELSE NULL
+        END AS d_achievement_rate,
+        CASE
+          WHEN agg.is_subtotal = 1 AND pm.${planCol} IS NOT NULL AND pm.${planCol} <> 0
+          THEN CAST(agg.n_output_qty AS DOUBLE) / CEIL(pm.${planCol} / 2.0)
+          ELSE NULL
+        END AS n_achievement_rate
       FROM (
         SELECT
           r.package_lf_group AS package_lf_group,
           r.workcenter_group AS workcenter_group,
           GROUPING(r.workcenter_group) AS is_subtotal,
-          SUM(CASE WHEN r.shift_code = 'D' THEN r.actual_output_qty ELSE 0 END) AS d_output_qty,
-          SUM(CASE WHEN r.shift_code = 'N' THEN r.actual_output_qty ELSE 0 END) AS n_output_qty,
-          SUM(r.actual_output_qty) AS daily_output_qty
+          SUM(CASE WHEN r.shift_code = 'D' THEN r.actual_output_qty ELSE 0 END) / 1000.0 AS d_output_qty,
+          SUM(CASE WHEN r.shift_code = 'N' THEN r.actual_output_qty ELSE 0 END) / 1000.0 AS n_output_qty,
+          SUM(r.actual_output_qty) / 1000.0 AS daily_output_qty
         FROM ${ROLLUP_TABLE} r
         WHERE r.parent_group = ${sel}
           AND CAST(r.output_date AS DATE) = CAST(${outputDate} AS DATE)
         GROUP BY GROUPING SETS ((r.package_lf_group, r.workcenter_group), (r.package_lf_group))
       ) agg
-      LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
-        ON dp.workcenter_group = ${sel} AND dp.package_lf_group = agg.package_lf_group
+      LEFT JOIN ${PLAN_MAP_TABLE} pm
+        ON pm.plan_package_group = agg.package_lf_group
+        AND CAST(pm.output_date AS DATE) = CAST(${outputDate} AS DATE)
       ORDER BY agg.package_lf_group, agg.is_subtotal, agg.workcenter_group
     `;
     const rows = await _client.sendQuery(sql);
@@ -572,24 +683,37 @@ export function useProductionAchievementDuckDB() {
         daily_output_qty: sf(row.daily_output_qty),
         daily_plan_qty: nullableNumber(row.daily_plan_qty),
         achievement_rate: nullableNumber(row.achievement_rate),
+        shift_plan_qty: nullableNumber(row.shift_plan_qty),
+        d_achievement_rate: nullableNumber(row.d_achievement_rate),
+        n_achievement_rate: nullableNumber(row.n_achievement_rate),
       };
     });
   }
 
   /**
-   * PA-13: CumulativeView — per-package_lf_group cumulative rows (計畫 scaled
-   * by elapsed_days, computed in JS from the already-resolved/capped
-   * start/end dates) PLUS a daily trend that aggregates ACROSS ALL
-   * package_lf_groups before dividing (D3 — SUM(actual)/SUM(plan) per day,
-   * never a mean of each group's own percentage).
+   * PA-13: CumulativeView — per-package_lf_group cumulative rows, plan side
+   * now a REAL SUM(planqty) over [startDate, endDate] from the Oracle-sourced
+   * pa_plan_map (one row per package per day) — replaces the old
+   * daily_plan_qty * elapsed_days approximation — PLUS a daily trend that
+   * aggregates ACROSS ALL package_lf_groups before dividing (D3 —
+   * SUM(actual)/SUM(plan) per day, never a mean of each group's own
+   * percentage). Which plan column (input/output) is read is resolved once
+   * per call via `_resolvePlanColumn` (PA-20), same as computeDailyView.
    */
   async function computeCumulativeView(options: ComputeCumulativeViewOptions): Promise<CumulativeViewResult> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
     const sel = sqlString(options.workcenterGroup);
     const startDate = sqlString(options.startDate);
     const endDate = sqlString(options.endDate);
-    const elapsedDays = daysBetweenInclusive(options.startDate, options.endDate);
     const expand = options.expand === true;
+    const planCol = _resolvePlanColumn(options.workcenterGroup);
+    // Every cumulative plan SUM below is wrapped in CAST(... AS DOUBLE): planqty_input/
+    // output are registered as INTEGER (buildPlanMapSql), and DuckDB-WASM promotes
+    // SUM(INTEGER) to a 128-bit HUGEINT that serializes to JS as a limb-object
+    // ({0:..,1:..,2:..,3:..}) rather than a Number — nullableNumber() then coerces
+    // that object to NaN -> null, blanking 累計計畫/累計達成率 for the whole period.
+    // The daily view is immune because it reads MAX(planqty) (stays INTEGER), not SUM.
+    // CAST to DOUBLE keeps the summed value a plain JS number.
     // PA-19: expanded (大項) mode filters on parent_group and splits per子站
     // (see computeDailyView). Single-layer mode filters on workcenter_group.
     const filterCol = expand ? 'parent_group' : 'workcenter_group';
@@ -605,11 +729,15 @@ export function useProductionAchievementDuckDB() {
       const rowsSql = `
         SELECT
           r.package_lf_group AS package_lf_group,
-          SUM(r.actual_output_qty) AS cumulative_actual_qty,
-          MAX(dp.daily_plan_qty) AS daily_plan_qty
+          SUM(r.actual_output_qty) / 1000.0 AS cumulative_actual_qty,
+          MAX(plan_totals.cumulative_plan_qty) AS cumulative_plan_qty
         FROM ${ROLLUP_TABLE} r
-        LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
-          ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
+        LEFT JOIN (
+          SELECT plan_package_group, CAST(SUM(${planCol}) AS DOUBLE) AS cumulative_plan_qty
+          FROM ${PLAN_MAP_TABLE}
+          WHERE CAST(output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
+          GROUP BY plan_package_group
+        ) plan_totals ON plan_totals.plan_package_group = r.package_lf_group
         WHERE r.workcenter_group = ${sel}
           AND CAST(r.output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
         GROUP BY r.package_lf_group
@@ -617,9 +745,8 @@ export function useProductionAchievementDuckDB() {
       `;
       const rawRows = await _client.sendQuery(rowsSql);
       rows = (rawRows as Record<string, unknown>[]).map((row) => {
-        const dailyPlan = nullableNumber(row.daily_plan_qty);
         const actual = sf(row.cumulative_actual_qty);
-        const cumulativePlan = dailyPlan === null ? null : dailyPlan * elapsedDays;
+        const cumulativePlan = nullableNumber(row.cumulative_plan_qty);
         const diff = cumulativePlan === null ? null : actual - cumulativePlan;
         const rate = cumulativePlan === null || cumulativePlan === 0 ? null : actual / cumulativePlan;
         return {
@@ -642,28 +769,31 @@ export function useProductionAchievementDuckDB() {
           agg.workcenter_group AS workcenter_group,
           agg.is_subtotal AS is_subtotal,
           agg.cumulative_actual_qty AS cumulative_actual_qty,
-          CASE WHEN agg.is_subtotal = 1 THEN dp.daily_plan_qty ELSE NULL END AS daily_plan_qty
+          CASE WHEN agg.is_subtotal = 1 THEN plan_totals.cumulative_plan_qty ELSE NULL END AS cumulative_plan_qty
         FROM (
           SELECT
             r.package_lf_group AS package_lf_group,
             r.workcenter_group AS workcenter_group,
             GROUPING(r.workcenter_group) AS is_subtotal,
-            SUM(r.actual_output_qty) AS cumulative_actual_qty
+            SUM(r.actual_output_qty) / 1000.0 AS cumulative_actual_qty
           FROM ${ROLLUP_TABLE} r
           WHERE r.parent_group = ${sel}
             AND CAST(r.output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
           GROUP BY GROUPING SETS ((r.package_lf_group, r.workcenter_group), (r.package_lf_group))
         ) agg
-        LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
-          ON dp.workcenter_group = ${sel} AND dp.package_lf_group = agg.package_lf_group
+        LEFT JOIN (
+          SELECT plan_package_group, CAST(SUM(${planCol}) AS DOUBLE) AS cumulative_plan_qty
+          FROM ${PLAN_MAP_TABLE}
+          WHERE CAST(output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
+          GROUP BY plan_package_group
+        ) plan_totals ON plan_totals.plan_package_group = agg.package_lf_group
         ORDER BY agg.package_lf_group, agg.is_subtotal, agg.workcenter_group
       `;
       const rawRows = await _client.sendQuery(rowsSql);
       rows = (rawRows as Record<string, unknown>[]).map((row) => {
         const isSubtotal = Number(row.is_subtotal) === 1;
-        const dailyPlan = nullableNumber(row.daily_plan_qty);
         const actual = sf(row.cumulative_actual_qty);
-        const cumulativePlan = dailyPlan === null ? null : dailyPlan * elapsedDays;
+        const cumulativePlan = nullableNumber(row.cumulative_plan_qty);
         const diff = cumulativePlan === null ? null : actual - cumulativePlan;
         const rate = cumulativePlan === null || cumulativePlan === 0 ? null : actual / cumulativePlan;
         return {
@@ -680,25 +810,26 @@ export function useProductionAchievementDuckDB() {
 
     // D3 aggregate-then-divide trend: sum actual and (known) plan across ALL
     // package_lf_groups for each day BEFORE dividing. A package_lf_group with
-    // no daily_plan_map row contributes 0 to that day's plan sum (SQL SUM
-    // ignores NULL) rather than making the whole day's rate unknown — this
-    // mirrors summing only the KNOWN plans, consistent with how the detail
-    // rows above already show a "—" only for THAT group's own missing plan.
-    // Only per-day actual_qty/plan_qty come from SQL; the RUNNING cumulative
-    // total is a plain JS scan below (not a SQL window function) — rows are
-    // already ORDER BY output_date, so a linear accumulation is simplest and
-    // sidesteps any engine-specific behavior around SUM(...) OVER (...).
-    // Trend aggregates ACROSS ALL package_lf_groups (and, in expanded 大項 mode,
-    // all子站) under the selection for each day, then divides (D3). The trend is
-    // a 大項-level line regardless of mode, so it rolls the子站 up to (day,
-    // package) and joins the 每日計畫 on the SELECTION (= the parent 大項 in
-    // expanded mode, = the station in single-layer mode) — the plan is keyed on
-    // that value in BOTH modes (PA-19), so no子站 split is needed here.
+    // no plan_map row for that exact day contributes 0 to that day's plan sum
+    // (SQL SUM ignores NULL) rather than making the whole day's rate unknown —
+    // this mirrors summing only the KNOWN plans, consistent with how the
+    // detail rows above already show a "—" only for THAT group's own missing
+    // plan. Only per-day actual_qty/plan_qty come from SQL; the RUNNING
+    // cumulative total is a plain JS scan below (not a SQL window function) —
+    // rows are already ORDER BY output_date, so a linear accumulation is
+    // simplest and sidesteps any engine-specific behavior around
+    // SUM(...) OVER (...). Trend aggregates ACROSS ALL package_lf_groups (and,
+    // in expanded 大項 mode, all子站) under the selection for each day, then
+    // divides (D3). The trend is a 大項-level line regardless of mode, so it
+    // rolls the子站 up to (day, package) and joins pa_plan_map on
+    // (package, THAT day) — pa_plan_map has no station dimension at all, so
+    // unlike the old daily_plan_map join there is no `= sel` half to the join
+    // condition anymore.
     const trendSql = `
       SELECT
         strftime(CAST(g.output_date AS DATE), '%Y-%m-%d') AS output_date,
-        SUM(g.actual_output_qty) AS actual_qty,
-        SUM(dp.daily_plan_qty) AS plan_qty
+        SUM(g.actual_output_qty) / 1000.0 AS actual_qty,
+        CAST(SUM(pm.${planCol}) AS DOUBLE) AS plan_qty
       FROM (
         SELECT output_date, package_lf_group, SUM(actual_output_qty) AS actual_output_qty
         FROM ${ROLLUP_TABLE}
@@ -706,8 +837,9 @@ export function useProductionAchievementDuckDB() {
           AND CAST(output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
         GROUP BY output_date, package_lf_group
       ) g
-      LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
-        ON dp.workcenter_group = ${sel} AND dp.package_lf_group = g.package_lf_group
+      LEFT JOIN ${PLAN_MAP_TABLE} pm
+        ON pm.plan_package_group = g.package_lf_group
+        AND CAST(pm.output_date AS DATE) = CAST(g.output_date AS DATE)
       GROUP BY g.output_date
       ORDER BY g.output_date
     `;

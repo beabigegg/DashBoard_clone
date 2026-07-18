@@ -4,11 +4,14 @@
  * Tier 1 — required pre-merge gate (production-achievement-settings-e2e, new).
  *
  * Covers:
- *   - whitelisted-edit path across all 3 tables (package-lf-map,
- *     workcenter-merge-map incl. OD-8 full raw-group toggle, daily-plans
- *     incl. OD-12 constrained dropdowns)
+ *   - whitelisted-edit path across both remaining tables (package-lf-map,
+ *     workcenter-merge-map incl. OD-8 full raw-group toggle and PA-20
+ *     plan_source_side, always submitted together with parent_group).
+ *     production-achievement-oracle-plan-source removed the 3rd table
+ *     (daily-plans, Excel-import — targets are now Oracle-sourced,
+ *     business-rules.md PA-11) — this file now covers exactly 2 panels.
  *   - non-whitelisted read-only path (403 flips editForbidden SHARED across
- *     all 3 panels — fail-closed, "one language everywhere")
+ *     both panels — fail-closed, "one language everywhere")
  *   - OD-5 propagation-delay note after a successful save
  *   - ← 返回報表 navigates back to /production-achievement
  *
@@ -30,8 +33,7 @@ function errorEnvelope(code: string, message: string, status: number) {
 }
 
 const PKG_ROWS = [{ raw_package_lf: 'SOD-123FL OP1', merged_group: 'SOD-123FL', updated_at: '2026-07-01T00:00:00Z', updated_by: 'admin' }];
-const WC_ROWS = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', updated_at: '2026-07-01T00:00:00Z', updated_by: 'admin' }];
-const PLAN_ROWS = [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 500, updated_at: '2026-07-01T00:00:00Z', updated_by: 'admin' }];
+const WC_ROWS = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input', updated_at: '2026-07-01T00:00:00Z', updated_by: 'admin' }];
 
 async function setupBaseRoutes(page: Page, { isAdmin = true }: { isAdmin?: boolean } = {}) {
   await page.route('**/*', (route) => (route.request().resourceType() === 'document' ? route.fallback() : route.continue()));
@@ -70,10 +72,6 @@ async function setupDataRoutes(page: Page) {
   await page.route('**/api/production-achievement/known-workcenter-groups**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: envelope({ raw_workcenter_groups: ['焊接_DB', '切割'] }) }),
   );
-  await page.route('**/api/production-achievement/daily-plans**', (route) => {
-    if (route.request().method() === 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(PLAN_ROWS) });
-    return route.continue();
-  });
 }
 
 async function isPageRendered(page: Page): Promise<boolean> {
@@ -84,7 +82,7 @@ async function isPageRendered(page: Page): Promise<boolean> {
 }
 
 test.describe('production-achievement-settings — whitelisted edit path', () => {
-  test('editing PACKAGE_LF merge, workcenter include-toggle, and a daily plan all PUT successfully and show the OD-5 save note', async ({ page }) => {
+  test('editing PACKAGE_LF merge, workcenter include-toggle, and a PA-20 plan_source_side rename all PUT successfully and show the OD-5 save note', async ({ page }) => {
     await setupBaseRoutes(page, { isAdmin: true });
     await setupDataRoutes(page);
 
@@ -97,22 +95,17 @@ test.describe('production-achievement-settings — whitelisted edit path', () =>
       return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(PKG_ROWS) });
     });
 
-    let wcIncludeCalled = false;
+    // Single handler for BOTH workcenter-merge-map writes in this test (the
+    // OD-8 include-toggle, then the PA-20 rename) — Playwright page.route()
+    // is LIFO per-pattern, so a second registration for the SAME URL would
+    // entirely shadow this one rather than composing with it.
+    const wcPutBodies: { raw_workcenter_group: string; plan_source_side?: string }[] = [];
     await page.route('**/api/production-achievement/workcenter-merge-map**', (route) => {
       if (route.request().method() === 'PUT') {
-        wcIncludeCalled = true;
+        wcPutBodies.push(route.request().postDataJSON());
         return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(null) });
       }
       return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(WC_ROWS) });
-    });
-
-    let planPutCalled = false;
-    await page.route('**/api/production-achievement/daily-plans**', (route) => {
-      if (route.request().method() === 'PUT') {
-        planPutCalled = true;
-        return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(null) });
-      }
-      return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(PLAN_ROWS) });
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
@@ -142,21 +135,25 @@ test.describe('production-achievement-settings — whitelisted edit path', () =>
     await expect(toggles).toHaveCount(2, { timeout: 10_000 });
     const excludedToggle = page.locator('[data-testid="pa-wc-toggle"]', { hasText: '未納入' });
     await excludedToggle.click();
-    await expect.poll(() => wcIncludeCalled, { timeout: 10_000 }).toBe(true);
+    await expect.poll(() => wcPutBodies.length, { timeout: 10_000 }).toBe(1);
+    expect(wcPutBodies[0].raw_workcenter_group).toBe('切割');
+    // Including a previously-excluded row defaults plan_source_side to
+    // 'input' (the column DDL default) — the admin can rename it afterwards.
+    expect(wcPutBodies[0].plan_source_side).toBe('input');
 
-    // 3) OD-12: daily-plan new row uses constrained dropdowns only
-    await page.locator('[data-testid="pa-plan-new-btn"]').click();
-    await expect(page.locator('[data-testid="pa-plan-new-workcenter"]')).toHaveCount(1);
-    await page.locator('[data-testid="pa-plan-new-workcenter"]').selectOption('焊接_DB');
-    await page.locator('[data-testid="pa-plan-new-package"]').selectOption('SOD-123FL');
-    await page.locator('[data-testid="pa-plan-new-qty"]').fill('700');
-    await page.locator('[data-testid="pa-plan-new-save"]').click();
-    await expect.poll(() => planPutCalled, { timeout: 10_000 }).toBe(true);
+    // 3) PA-20: renaming 焊接_DB and changing plan_source_side submits BOTH
+    // fields together in the SAME PUT, never independently.
+    await page.locator('[data-testid="pa-wc-rename-btn"]').first().click();
+    await page.locator('[data-testid="pa-wc-plan-source-side-select"]').selectOption('output');
+    await page.locator('[data-testid="pa-wc-rename-save"]').click();
+    await expect.poll(() => wcPutBodies.length, { timeout: 10_000 }).toBe(2);
+    expect(wcPutBodies[1].raw_workcenter_group).toBe('焊接_DB');
+    expect(wcPutBodies[1].plan_source_side).toBe('output');
   });
 });
 
 test.describe('production-achievement-settings — non-whitelisted read-only path', () => {
-  test('a 403 on any panel write flips editForbidden SHARED across all 3 panels', async ({ page }) => {
+  test('a 403 on any panel write flips editForbidden SHARED across both panels', async ({ page }) => {
     await setupBaseRoutes(page, { isAdmin: false });
     await setupDataRoutes(page);
     await page.route('**/api/production-achievement/package-lf-map**', (route) => {
@@ -186,11 +183,10 @@ test.describe('production-achievement-settings — non-whitelisted read-only pat
     await page.locator('[data-testid="pa-pkg-edit-input"]').press('Enter');
 
     await expect(page.locator('[data-testid="pa-pkg-readonly-note"]')).toBeVisible({ timeout: 10_000 });
-    // Shared fail-closed flag — the OTHER two panels also flip to read-only.
+    // Shared fail-closed flag — the OTHER panel also flips to read-only.
     await expect(page.locator('[data-testid="pa-wc-readonly-note"]')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('[data-testid="pa-plan-readonly-note"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-testid="pa-pkg-new-btn"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid="pa-plan-new-btn"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="pa-wc-rename-btn"]')).toHaveCount(0);
   });
 });
 
@@ -257,7 +253,7 @@ test.describe('production-achievement-settings — return path', () => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: envelope({ query_id: 'qid-od7', spool_download_url: '/api/spool/production_achievement/qid-od7.parquet', spec_workcenter_map: [], targets_map: [], package_lf_map: [], workcenter_merge_map: [], daily_plan_map: [] }),
+        body: envelope({ query_id: 'qid-od7', spool_download_url: '/api/spool/production_achievement/qid-od7.parquet', spec_workcenter_map: [], targets_map: [], package_lf_map: [], workcenter_merge_map: [], plan_map: [] }),
       }),
     );
     await page.route('**/api/spool/**', (route) => route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(EMPTY_PA_PARQUET_B64, 'base64') }));

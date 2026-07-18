@@ -66,7 +66,7 @@ async function setupReportRoutes(page: Page) {
         targets_map: [],
         package_lf_map: [],
         workcenter_merge_map: [],
-        daily_plan_map: [],
+        plan_map: [],
       }),
     });
   });
@@ -192,11 +192,6 @@ test.describe('production-achievement-settings monkey — rapid CRUD clicks (dou
       return route.fulfill({ status: 200, contentType: 'application/json', body: envelope([{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', updated_at: 't', updated_by: 'admin' }]) });
     });
 
-    await page.route('**/api/production-achievement/daily-plans**', (route) => {
-      if (route.request().method() === 'PUT') return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(null) });
-      return route.fulfill({ status: 200, contentType: 'application/json', body: envelope([]) });
-    });
-
     return { getPkgPutCount: () => pkgPutCount, getWcPutCount: () => wcPutCount };
   }
 
@@ -236,24 +231,6 @@ test.describe('production-achievement-settings monkey — rapid CRUD clicks (dou
 
     expect(pageErrors).toHaveLength(0);
     expect(getWcPutCount()).toBeGreaterThanOrEqual(0); // no crash is the primary guarantee; exact count is server-race-dependent
-  });
-
-  test('rapidly opening and cancelling the daily-plan new-row form repeatedly leaves no duplicate forms and never calls PUT', async ({ page }) => {
-    await setupSettingsRoutes(page);
-    const pageErrors: string[] = [];
-    page.on('pageerror', (err) => pageErrors.push(err.message));
-
-    const rendered = await gotoAndWaitForApp(page, '.theme-production-achievement-settings');
-    if (skipIfNotRendered(rendered, 'settings app not mounted — skipping rapid open/cancel assertions')) return;
-
-    for (let i = 0; i < 5; i++) {
-      await page.locator('[data-testid="pa-plan-new-btn"]').click().catch(() => {});
-      await page.locator('[data-testid="pa-plan-new-row"] .ui-btn--ghost').click().catch(() => {});
-    }
-    await page.waitForTimeout(300);
-
-    await expect(page.locator('[data-testid="pa-plan-new-row"]')).toHaveCount(0);
-    expect(pageErrors).toHaveLength(0);
   });
 });
 
@@ -312,7 +289,7 @@ test.describe('production-achievement monkey — rapid mode-mashing during a GEN
           targets_map: [],
           package_lf_map: [],
           workcenter_merge_map: [],
-          daily_plan_map: [],
+          plan_map: [],
         }),
       });
     });
@@ -414,7 +391,7 @@ test.describe('production-achievement monkey — adversarial 自訂區間 date-r
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: envelope({ query_id: 'q-range', spool_download_url: '/api/spool/production_achievement/q-range.parquet', spec_workcenter_map: [], targets_map: [], package_lf_map: [], workcenter_merge_map: [], daily_plan_map: [] }),
+          body: envelope({ query_id: 'q-range', spool_download_url: '/api/spool/production_achievement/q-range.parquet', spec_workcenter_map: [], targets_map: [], package_lf_map: [], workcenter_merge_map: [], plan_map: [] }),
         });
       });
       await page.route('**/api/spool/**', (route) => route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(EMPTY_PARQUET_B64, 'base64') }));
@@ -459,7 +436,7 @@ test.describe('production-achievement monkey — adversarial 自訂區間 date-r
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: envelope({ query_id: 'q-inj', spool_download_url: '/api/spool/production_achievement/q-inj.parquet', spec_workcenter_map: [], targets_map: [], package_lf_map: [], workcenter_merge_map: [], daily_plan_map: [] }),
+        body: envelope({ query_id: 'q-inj', spool_download_url: '/api/spool/production_achievement/q-inj.parquet', spec_workcenter_map: [], targets_map: [], package_lf_map: [], workcenter_merge_map: [], plan_map: [] }),
       });
     });
     await page.route('**/api/spool/**', (route) => route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(EMPTY_PARQUET_B64, 'base64') }));

@@ -26,7 +26,7 @@ import { formatQty } from '../utils';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, LegendComponent, MarkLineComponent, TooltipComponent]);
 
-const QTY_SERIES_NAME = '每日產出數量';
+const QTY_SERIES_NAME = '每日產出數量 (K)';
 const RATE_SERIES_NAME = '累計達成率';
 
 function safeNumber(value: number | null | undefined): number | null {
@@ -106,7 +106,7 @@ const chartOption = computed(() => {
     yAxis: [
       {
         type: 'value',
-        name: '每日產出數量',
+        name: '每日產出數量 (K)',
         position: 'left',
         axisLabel: { formatter: (v: number) => formatQty(v) },
       },

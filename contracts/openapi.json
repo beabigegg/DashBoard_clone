@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.43.0"
+    "version": "1.44.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -6455,7 +6455,7 @@
           }
         ],
         "requestBody": {
-          "description": "Contract request: body {raw_workcenter_group, merged_workcenter_group}; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "description": "Contract request: body {raw_workcenter_group, merged_workcenter_group, parent_group(opt), plan_source_side(required, input/output)}; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
           "content": {},
           "x-cdd-unresolved": true
         },
@@ -6515,70 +6515,6 @@
         "x-cdd-errors": "400/403/404/500/503"
       }
     },
-    "/api/production-achievement/daily-plans": {
-      "get": {
-        "summary": "GET /api/production-achievement/daily-plans",
-        "responses": {
-          "200": {
-            "description": "Contract response: ProductionAchievementDailyPlanResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProductionAchievementDailyPlanResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error response (see contract error format)"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-cdd-errors": "500"
-      },
-      "put": {
-        "summary": "PUT /api/production-achievement/daily-plans",
-        "responses": {
-          "200": {
-            "description": "Contract response: AckResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AckResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error response (see contract error format)"
-          },
-          "403": {
-            "description": "Error response (see contract error format)"
-          },
-          "500": {
-            "description": "Error response (see contract error format)"
-          },
-          "503": {
-            "description": "Error response (see contract error format)"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "description": "Contract request: body {workcenter_group, package_lf_group, daily_plan_qty}; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
-          "content": {},
-          "x-cdd-unresolved": true
-        },
-        "x-cdd-errors": "400/403/500/503"
-      }
-    },
     "/api/production-achievement/known-package-lf-values": {
       "get": {
         "summary": "GET /api/production-achievement/known-package-lf-values",
@@ -6629,86 +6565,6 @@
           }
         ],
         "x-cdd-errors": "500"
-      }
-    },
-    "/api/production-achievement/daily-plans/import/preview": {
-      "post": {
-        "summary": "POST /api/production-achievement/daily-plans/import/preview",
-        "responses": {
-          "201": {
-            "description": "Contract response: ProductionAchievementDailyPlanImportPreviewResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportPreviewResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error response (see contract error format)"
-          },
-          "403": {
-            "description": "Error response (see contract error format)"
-          },
-          "500": {
-            "description": "Error response (see contract error format)"
-          },
-          "503": {
-            "description": "Error response (see contract error format)"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "description": "Contract request: multipart/form-data field file (.xlsx only); parses PJMES052-生產達成率 report, categorizes rows against live legal-value/current-plan state, writes nothing; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
-          "content": {},
-          "x-cdd-unresolved": true
-        },
-        "x-cdd-errors": "400/403/500/503"
-      }
-    },
-    "/api/production-achievement/daily-plans/import/confirm": {
-      "post": {
-        "summary": "POST /api/production-achievement/daily-plans/import/confirm",
-        "responses": {
-          "201": {
-            "description": "Contract response: ProductionAchievementDailyPlanImportConfirmResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportConfirmResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error response (see contract error format)"
-          },
-          "403": {
-            "description": "Error response (see contract error format)"
-          },
-          "500": {
-            "description": "Error response (see contract error format)"
-          },
-          "503": {
-            "description": "Error response (see contract error format)"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "description": "Contract request: body {rows: [{workcenter_group, package_lf_group, daily_plan_qty}]}; server re-validates every row against legal-value sets (never trusts client selection) and bulk-upserts in a single transaction (all-or-nothing); gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
-          "content": {},
-          "x-cdd-unresolved": true
-        },
-        "x-cdd-errors": "400/403/500/503"
       }
     },
     "/api/production-achievement/permissions/me": {
@@ -8359,7 +8215,9 @@
                   "type": "object",
                   "required": [
                     "raw_workcenter_group",
-                    "merged_workcenter_group"
+                    "merged_workcenter_group",
+                    "parent_group",
+                    "plan_source_side"
                   ],
                   "properties": {
                     "raw_workcenter_group": {
@@ -8367,31 +8225,42 @@
                     },
                     "merged_workcenter_group": {
                       "type": "string"
+                    },
+                    "parent_group": {
+                      "type": "string"
+                    },
+                    "plan_source_side": {
+                      "type": "string",
+                      "enum": [
+                        "input",
+                        "output"
+                      ]
                     }
                   }
                 }
               },
-              "daily_plan_map": {
+              "plan_map": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "required": [
-                    "workcenter_group",
-                    "package_lf_group",
-                    "daily_plan_qty"
+                    "output_date",
+                    "plan_package_group",
+                    "planqty_input",
+                    "planqty_output"
                   ],
                   "properties": {
-                    "workcenter_group": {
+                    "output_date": {
                       "type": "string"
                     },
-                    "package_lf_group": {
+                    "plan_package_group": {
                       "type": "string"
                     },
-                    "daily_plan_qty": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                    "planqty_input": {
+                      "type": "integer"
+                    },
+                    "planqty_output": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -9176,6 +9045,12 @@
           "merged_workcenter_group": {
             "type": "string"
           },
+          "parent_group": {
+            "type": "string"
+          },
+          "plan_source_side": {
+            "type": "string"
+          },
           "updated_at": {
             "type": "string"
           },
@@ -9186,33 +9061,8 @@
         "required": [
           "raw_workcenter_group",
           "merged_workcenter_group",
-          "updated_at",
-          "updated_by"
-        ]
-      },
-      "ProductionAchievementDailyPlanRow": {
-        "type": "object",
-        "properties": {
-          "workcenter_group": {
-            "type": "string"
-          },
-          "package_lf_group": {
-            "type": "string"
-          },
-          "daily_plan_qty": {
-            "type": "integer"
-          },
-          "updated_at": {
-            "type": "string"
-          },
-          "updated_by": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "workcenter_group",
-          "package_lf_group",
-          "daily_plan_qty",
+          "parent_group",
+          "plan_source_side",
           "updated_at",
           "updated_by"
         ]
@@ -9292,30 +9142,19 @@
           },
           "merged_workcenter_group": {
             "type": "string"
+          },
+          "parent_group": {
+            "type": "string"
+          },
+          "plan_source_side": {
+            "type": "string"
           }
         },
         "required": [
           "raw_workcenter_group",
-          "merged_workcenter_group"
-        ]
-      },
-      "ProductionAchievementDailyPlanMapEntry": {
-        "type": "object",
-        "properties": {
-          "workcenter_group": {
-            "type": "string"
-          },
-          "package_lf_group": {
-            "type": "string"
-          },
-          "daily_plan_qty": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "workcenter_group",
-          "package_lf_group",
-          "daily_plan_qty"
+          "merged_workcenter_group",
+          "parent_group",
+          "plan_source_side"
         ]
       },
       "ProductionAchievementKnownWorkcenterGroupsResponse": {
@@ -9378,27 +9217,6 @@
           "data"
         ]
       },
-      "ProductionAchievementDailyPlanResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProductionAchievementDailyPlanRow"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
-          }
-        },
-        "required": [
-          "success",
-          "data"
-        ]
-      },
       "ProductionAchievementKnownPackageLfValuesData": {
         "type": "object",
         "properties": {
@@ -9438,179 +9256,6 @@
           }
         }
       },
-      "ProductionAchievementDailyPlanImportRow": {
-        "type": "object",
-        "properties": {
-          "workcenter_group": {
-            "type": "string"
-          },
-          "package_lf_group": {
-            "type": "string"
-          },
-          "daily_plan_qty": {
-            "type": "integer",
-            "description": "null when status=invalid_qty"
-          },
-          "current_qty": {
-            "type": "integer",
-            "description": "existing daily_plan_qty for this combo, null if new"
-          },
-          "status": {
-            "type": "string",
-            "description": "enum new/update/unchanged/invalid_workcenter/invalid_package/invalid_qty"
-          },
-          "source_sheet": {
-            "type": "string"
-          },
-          "source_block": {
-            "type": "string"
-          },
-          "importable": {
-            "type": "boolean"
-          },
-          "default_selected": {
-            "type": "boolean"
-          },
-          "warning": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "workcenter_group",
-          "package_lf_group",
-          "status",
-          "source_sheet",
-          "source_block",
-          "importable",
-          "default_selected"
-        ]
-      },
-      "ProductionAchievementDailyPlanImportMissingRow": {
-        "type": "object",
-        "properties": {
-          "workcenter_group": {
-            "type": "string"
-          },
-          "package_lf_group": {
-            "type": "string"
-          },
-          "daily_plan_qty": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "workcenter_group",
-          "package_lf_group",
-          "daily_plan_qty"
-        ]
-      },
-      "ProductionAchievementDailyPlanImportSummary": {
-        "type": "object",
-        "properties": {
-          "total_parsed": {
-            "type": "integer"
-          },
-          "new": {
-            "type": "integer"
-          },
-          "update": {
-            "type": "integer"
-          },
-          "unchanged": {
-            "type": "integer"
-          },
-          "invalid": {
-            "type": "integer"
-          },
-          "missing_from_file": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "total_parsed",
-          "new",
-          "update",
-          "unchanged",
-          "invalid",
-          "missing_from_file"
-        ]
-      },
-      "ProductionAchievementDailyPlanImportPreviewData": {
-        "type": "object",
-        "properties": {
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportRow"
-            }
-          },
-          "missing_from_file": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportMissingRow"
-            }
-          },
-          "summary": {
-            "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportSummary"
-          }
-        },
-        "required": [
-          "rows",
-          "missing_from_file",
-          "summary"
-        ]
-      },
-      "ProductionAchievementDailyPlanImportPreviewResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportPreviewData"
-          },
-          "meta": {
-            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
-          }
-        },
-        "required": [
-          "success",
-          "data"
-        ]
-      },
-      "ProductionAchievementDailyPlanImportConfirmData": {
-        "type": "object",
-        "properties": {
-          "acknowledged": {
-            "type": "boolean"
-          },
-          "upserted": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "acknowledged",
-          "upserted"
-        ]
-      },
-      "ProductionAchievementDailyPlanImportConfirmResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportConfirmData"
-          },
-          "meta": {
-            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
-          }
-        },
-        "required": [
-          "success",
-          "data"
-        ]
-      },
       "ProductionAchievementOwnPermissionResponse": {
         "type": "object",
         "properties": {
@@ -9639,6 +9284,29 @@
         },
         "required": [
           "can_edit_targets"
+        ]
+      },
+      "ProductionAchievementPlanMapEntry": {
+        "type": "object",
+        "properties": {
+          "output_date": {
+            "type": "string"
+          },
+          "plan_package_group": {
+            "type": "string"
+          },
+          "planqty_input": {
+            "type": "integer"
+          },
+          "planqty_output": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "output_date",
+          "plan_package_group",
+          "planqty_input",
+          "planqty_output"
         ]
       }
     }

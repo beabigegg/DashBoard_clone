@@ -40,7 +40,7 @@ Test Reference column:
 Deliberately NOT covered here: PA-07's target-based `achievement_rate` (the
 OLD `_FINAL_SQL`'s `LEFT JOIN pa_targets_map`). Verified directly against the
 CURRENT `useProductionAchievementDuckDB.ts`: `computeDailyView()`/
-`computeCumulativeView()` join only `pa_daily_plan_map`, never
+`computeCumulativeView()` join only `pa_plan_map`, never
 `pa_targets_map` -- `pa_targets_map`/`updateTargetsMap()` are still
 registered/updatable (feeding `TargetEditPanel.vue`'s still-present
 edit-target UI via `useProductionAchievement.ts::saveTarget()`) but are no
@@ -75,7 +75,7 @@ from mes_dashboard.services.production_achievement_workcenter_merge_service impo
 #    buildValuesTableSql(), simplified: every inline map table built here --
 #    spec_workcenter_map / workcenter_merge_map / package_lf_map -- is
 #    all-VARCHAR, unlike the report envelope's numeric targets_map/
-#    daily_plan_map, which this file no longer needs -- see module docstring) ──
+#    plan_map, which this file no longer needs -- see module docstring) ──
 
 
 def _sql_string(value: Any) -> str:

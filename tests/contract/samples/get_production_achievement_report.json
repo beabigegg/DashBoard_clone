@@ -1,11 +1,12 @@
 {
   "error": {
-    "code": "INTERNAL_ERROR",
-    "message": "伺服器內部錯誤"
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "背景查詢服務不可用，請稍後再試"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-07-02T07:54:44.509246"
+    "retry_after_seconds": 30,
+    "timestamp": "2026-07-16T16:28:24.577969"
   },
   "success": false
 }

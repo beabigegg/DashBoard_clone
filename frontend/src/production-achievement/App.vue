@@ -193,17 +193,23 @@ const chartCategories = computed(() => chartRows.value.map((r) => r.package_lf_g
 // Y-axis stays % (single axis; 計畫 is the y=100 markLine, not a second
 // scale). Each series carries its own qtyData so the chart's "% (QTY)"
 // label/tooltip can distinguish D班/N班 individually (field-directed spec).
+//
+// PA-21 fix: each shift's rate divides by its OWN shift_plan_qty
+// (CEIL(daily_plan_qty / 2), computed in useProductionAchievementDuckDB.ts)
+// via the pre-computed d_/n_achievement_rate fields, not the FULL daily plan
+// — dividing a single shift's output by the whole day's target under-counted
+// achievement by roughly half.
 const chartSeries = computed(() => [
   {
     name: 'D班',
     colorVar: 'var(--pa-shift-d)',
-    data: chartRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.d_output_qty / r.daily_plan_qty : null)),
+    data: chartRows.value.map((r) => achievementRateForChart(r.d_achievement_rate)),
     qtyData: chartRows.value.map((r) => r.d_output_qty),
   },
   {
     name: 'N班',
     colorVar: 'var(--pa-shift-n)',
-    data: chartRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.n_output_qty / r.daily_plan_qty : null)),
+    data: chartRows.value.map((r) => achievementRateForChart(r.n_achievement_rate)),
     qtyData: chartRows.value.map((r) => r.n_output_qty),
   },
 ]);
@@ -329,8 +335,8 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
          then, instead of also showing a contradictory empty table. -->
     <template v-if="showResults">
       <SummaryCardGroup :columns="3" data-testid="pa-kpi-cards">
-        <SummaryCard :label="`實際${metricNoun}合計`" :value="totalActual" format="number" accent="brand" />
-        <SummaryCard label="計畫合計" :value="totalPlan" format="number" accent="info" />
+        <SummaryCard :label="`實際${metricNoun}合計 (K)`" :value="totalActual" format="number" accent="brand" />
+        <SummaryCard label="計畫合計 (K)" :value="totalPlan" format="number" accent="info" />
         <SummaryCard label="整體達成率" :value="overallRate !== null ? overallRate * 100 : null" format="percent" accent="success" />
       </SummaryCardGroup>
 
@@ -367,16 +373,21 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
                  scatter 大項小計 rows away from their子站). -->
             <DataTableColumn v-if="isExpandedSelection" column-key="workcenter_group" label="子站" :sortable="false" />
             <DataTableColumn column-key="package_lf_group" label="Package Group" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="d_output_qty" :label="`D班${metricNoun}`" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="n_output_qty" :label="`N班${metricNoun}`" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="daily_output_qty" :label="`每日${metricNoun}`" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="daily_plan_qty" label="每日計畫" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="d_output_qty" :label="`D班${metricNoun} (K)`" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="n_output_qty" :label="`N班${metricNoun} (K)`" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="daily_output_qty" :label="`每日${metricNoun} (K)`" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="daily_plan_qty" label="每日計畫 (K)" align="right" :sortable="!isExpandedSelection" />
+            <!-- 班達成率 (PA-21): each shift's output ÷ its own shift target
+                 (CEIL(每日計畫/2)) — the same values the grouped chart bars plot,
+                 shown per-shift alongside the whole-day 每日達成率. -->
+            <DataTableColumn column-key="d_achievement_rate" label="D班達成率" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="n_achievement_rate" label="N班達成率" align="right" :sortable="!isExpandedSelection" />
             <DataTableColumn column-key="achievement_rate" label="每日達成率" align="right" :sortable="!isExpandedSelection" />
             <template #cell="{ columnKey, value, row }">
               <span :class="{ 'pa-app__subtotal-cell': (row as Record<string, unknown>).is_subtotal === true }">
                 <template v-if="columnKey === 'workcenter_group' && (row as Record<string, unknown>).is_subtotal === true">▸ 小計 {{ value }}</template>
                 <template v-else-if="['d_output_qty', 'n_output_qty', 'daily_output_qty', 'daily_plan_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
-                <template v-else-if="columnKey === 'achievement_rate'">{{ formatAchievementRate(value as number | null) }}</template>
+                <template v-else-if="['achievement_rate', 'd_achievement_rate', 'n_achievement_rate'].includes(columnKey)">{{ formatAchievementRate(value as number | null) }}</template>
                 <template v-else>{{ value }}</template>
               </span>
             </template>
@@ -392,9 +403,9 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
             <!-- Sort disabled in expanded 大項 mode — see the daily table above. -->
             <DataTableColumn v-if="isExpandedSelection" column-key="workcenter_group" label="子站" :sortable="false" />
             <DataTableColumn column-key="package_lf_group" label="Package Group" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="cumulative_plan_qty" label="累計計畫" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="cumulative_actual_qty" :label="`累計${metricNoun}`" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="cumulative_diff_qty" label="累計差異" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="cumulative_plan_qty" label="累計計畫 (K)" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="cumulative_actual_qty" :label="`累計${metricNoun} (K)`" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="cumulative_diff_qty" label="累計差異 (K)" align="right" :sortable="!isExpandedSelection" />
             <DataTableColumn column-key="cumulative_achievement_rate" label="累計達成率" align="right" :sortable="!isExpandedSelection" />
             <template #cell="{ columnKey, value, row }">
               <span :class="{ 'pa-app__subtotal-cell': (row as Record<string, unknown>).is_subtotal === true }">

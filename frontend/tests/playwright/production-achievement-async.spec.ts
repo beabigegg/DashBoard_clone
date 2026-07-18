@@ -9,7 +9,7 @@
  *     -> poll generic GET /api/job/<id>?prefix=production-achievement until status=finished
  *     -> re-issue the IDENTICAL GET /report (now a zero-Oracle-cost 200 spool-hit)
  *     -> 200 {query_id, spool_download_url, spec_workcenter_map, targets_map,
- *             package_lf_map, workcenter_merge_map, daily_plan_map} (5 inline maps, IP-6)
+ *             package_lf_map, workcenter_merge_map, plan_map} (5 inline maps, IP-6)
  *   always_async: no worker available -> 503 (no sync fallback)
  *
  * production-achievement-overhaul changes exercised here vs. the prior
@@ -62,10 +62,15 @@ const EMPTY_PA_PARQUET = Buffer.from(EMPTY_PA_PARQUET_B64, 'base64');
 const SAMPLE_PA_PARQUET = Buffer.from(SAMPLE_PA_PARQUET_B64, 'base64');
 
 const SAMPLE_SPEC_MAP = [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }];
-const SAMPLE_WC_MERGE_MAP = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+const SAMPLE_WC_MERGE_MAP = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input' }];
 const SAMPLE_PKG_MAP = [{ raw_package_lf: 'SOD-123FL OP1', merged_group: 'SOD-123FL' }];
-// daily_plan_qty=1000 against rolled-up actual=500 => achievement_rate 0.5 (50.0%)
-const SAMPLE_PLAN_MAP = [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 1000 }];
+// production-achievement-oracle-plan-source: plan_map is Oracle-sourced and
+// date-indexed (output_date, plan_package_group) -> {planqty_input,
+// planqty_output} -- no station dimension. 焊接_DB's plan_source_side is
+// 'input' (前中段), so computeDailyView reads planqty_input.
+// planqty_input=1000 against rolled-up actual=500 => achievement_rate 0.5 (50.0%).
+// output_date matches SAMPLE_PA_PARQUET's embedded row date (2026-06-01).
+const SAMPLE_PLAN_MAP = [{ output_date: '2026-06-01', plan_package_group: 'SOD-123FL', planqty_input: 1000, planqty_output: 900 }];
 
 function spoolHitData(overrides: Record<string, unknown> = {}) {
   return {
@@ -75,7 +80,7 @@ function spoolHitData(overrides: Record<string, unknown> = {}) {
     targets_map: [],
     package_lf_map: SAMPLE_PKG_MAP,
     workcenter_merge_map: SAMPLE_WC_MERGE_MAP,
-    daily_plan_map: SAMPLE_PLAN_MAP,
+    plan_map: SAMPLE_PLAN_MAP,
     ...overrides,
   };
 }
@@ -228,7 +233,7 @@ test.describe('production-achievement — empty, malformed, and large payloads',
     await registerCatchAllRoutes(page);
 
     await page.route('**/api/production-achievement/report**', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: envelope(spoolHitData({ query_id: 'qid-pa-empty-001', spool_download_url: '/api/spool/production_achievement/empty-001.parquet', spec_workcenter_map: [], workcenter_merge_map: [], package_lf_map: [], daily_plan_map: [] })) }),
+      route.fulfill({ status: 200, contentType: 'application/json', body: envelope(spoolHitData({ query_id: 'qid-pa-empty-001', spool_download_url: '/api/spool/production_achievement/empty-001.parquet', spec_workcenter_map: [], workcenter_merge_map: [], package_lf_map: [], plan_map: [] })) }),
     );
     await page.route('**/api/spool/production_achievement/empty-001.parquet**', (route) =>
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: EMPTY_PA_PARQUET }),
@@ -256,7 +261,7 @@ test.describe('production-achievement — empty, malformed, and large payloads',
             query_id: 'qid-pa-malformed-001',
             spool_download_url: '/api/spool/production_achievement/malformed-001.parquet',
             spec_workcenter_map: null,
-            // targets_map/package_lf_map/workcenter_merge_map/daily_plan_map intentionally omitted
+            // targets_map/package_lf_map/workcenter_merge_map/plan_map intentionally omitted
           },
           meta: MOCK_META,
         }),

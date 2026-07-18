@@ -1,29 +1,33 @@
 <script setup lang="ts">
 /**
- * PlanAchievementStackedChart — DailyView (當日/前日) stacked-percentage
- * chart: x-axis = PACKAGE_LF groups, D%/N% stacked series. CumulativeView
- * (當月/自訂區間) uses CumulativeTrendComboChart.vue instead (bar 每日產出數量
- * + line 累計達成率, dual axis) — this component stays daily-only but keeps
- * its generic single-series shape (no hardcoded assumption of exactly 2
- * series) since nothing here is daily-specific beyond its caller.
+ * PlanAchievementStackedChart — DailyView (當日/前日) grouped-bar chart:
+ * x-axis = PACKAGE_LF groups; D班 and N班 render as TWO SEPARATE side-by-side
+ * bars per group (NOT stacked), each showing that shift's 班達成率 (shift
+ * output ÷ shift target = CEIL(每日計畫/2), PA-21). CumulativeView (當月/自訂
+ * 區間) uses CumulativeTrendComboChart.vue instead (bar 每日產出數量 + line
+ * 累計達成率, dual axis) — this component stays daily-only but keeps its
+ * generic multi-series shape (no hardcoded assumption of exactly 2 series).
  *
- * Change: production-achievement-overhaul (IP-8). Y-axis is 達成率 (%) — a
- * SINGLE axis; 計畫 (target) is the y=100 reference markLine, not a second
- * scale (a dual y-axis is a dataviz anti-pattern — two different-unit
- * measures on one plot invent an alignment the data doesn't have).
+ * The filename keeps the historical "Stacked" name from the pre-PA-21 design;
+ * the chart is now GROUPED side-by-side bars — stacking two independent shift
+ * achievement rates has no meaningful combined height (D班 90% + N班 85% ≠ a
+ * 175%-tall bar), so each shift gets its own bar compared to the 計畫 line.
  *
- * Field-directed design (owner's explicit spec, not the generic dataviz
- * default): every value is displayed as "「%」(「量」)" — e.g. "75.0%
- * (300)" — as a DIRECT LABEL on each D/N segment, not tooltip-only. This also
- * happens to fix the earlier field-reported "blank chart when no 計畫 is
- * configured yet" complaint: even a 0%-tall segment (achievement_rate is
- * null -> charted as 0) still renders its label text at the baseline, so the
- * underlying quantity stays visible with or without a target configured.
+ * Change: production-achievement-overhaul (IP-8) + shift-achievement split.
+ * Y-axis is 達成率 (%) — a SINGLE axis; 計畫 (target) is the y=100 reference
+ * markLine, not a second scale (a dual y-axis is a dataviz anti-pattern — two
+ * different-unit measures on one plot invent an alignment the data doesn't have).
  *
- * REAL (non-normalized) stacked series: every series shares one `stack` key
- * with ECharts' default summing behaviour — segments can visually exceed the
- * y=100 `markLine` (計畫) for an over-plan combination. Deliberately NOT
- * ECharts' normalize-to-100 stacking, which would silently cap that signal.
+ * Field-directed design (owner's explicit spec): each bar carries a DIRECT
+ * "%" label at its own top edge (e.g. "75.0%"); the underlying quantity moves
+ * to the tooltip ("% (量)" per shift). A 0%-tall bar (achievement_rate is null
+ * -> charted as 0) still renders its "0.0%" label at the baseline, and the
+ * quantity stays visible in the tooltip and the detail table below.
+ *
+ * Grouped (non-stacked) series: the bars share NO `stack` key, so each shift's
+ * bar independently exceeds or falls short of the y=100 `markLine` (計畫) —
+ * an over-plan shift is read directly off its own bar height, never masked by
+ * a sibling shift the way a shared stack would.
  *
  * Colors resolve via resolveCssVar() (CSS custom properties defined in
  * style.css under .theme-production-achievement), never inline rgb()/hex —
@@ -41,8 +45,6 @@ import { formatQty } from '../utils';
 
 use([CanvasRenderer, BarChart, GridComponent, LegendComponent, MarkLineComponent, TooltipComponent]);
 
-const STACK_KEY = 'pa-achievement-stack';
-
 /** null/undefined/non-finite degrade to null, never NaN. `Number(null)`
  *  coerces to 0, so null/undefined must be checked BEFORE the numeric
  *  coercion or a genuinely-missing value silently becomes a real zero. */
@@ -54,11 +56,19 @@ function safeNumber(value: number | null | undefined): number | null {
 
 /** "「%」(「量」)" combined display, e.g. "75.0% (300)". A null/missing
  *  percent still renders as "0.0%" (no bar height) paired with the real
- *  quantity, rather than hiding the value entirely. */
+ *  quantity, rather than hiding the value entirely. Used by the tooltip. */
 function formatPercentQty(percent: number | null | undefined, qty: number | null | undefined): string {
   const p = safeNumber(percent);
   const percentText = p === null ? '0.0' : p.toFixed(1);
   return `${percentText}% (${formatQty(qty)})`;
+}
+
+/** Percent-only display, e.g. "75.0%" — the DIRECT bar label (owner spec:
+ *  quantity lives in the tooltip, not on the bar). A null/missing percent
+ *  renders as "0.0%" so a 0%-tall bar still shows a label at the baseline. */
+function formatPercent(percent: number | null | undefined): string {
+  const p = safeNumber(percent);
+  return `${p === null ? '0.0' : p.toFixed(1)}%`;
 }
 
 export interface StackedSeriesInput {
@@ -133,27 +143,23 @@ const chartOption = computed(() => {
     return {
       name: s.name,
       type: 'bar',
-      stack: STACK_KEY,
+      // No `stack` key: D班/N班 render as SEPARATE side-by-side bars per
+      // package group, each at its own 班達成率 vs the y=100 計畫 line.
       itemStyle: { color: resolveCssVar(s.colorVar) },
       data: s.data.map((v) => safeNumber(v) ?? 0),
       barMaxWidth: 40,
-      // "% (QTY)" on EVERY segment (D班 AND N班, distinguished per the
-      // field spec) — rendered at each segment's own top edge, which still
-      // places the text at the baseline (visible) when that segment is 0%
-      // tall, so the quantity stays readable even with no 計畫 configured.
-      // A fixed per-series vertical `offset` (independent of the data value)
-      // guarantees separation between adjacent series' labels even when they
-      // tie exactly at 0% — without it, D班/N班 both anchor to the same
-      // baseline pixel and their text renders on top of each other, unreadable.
+      // Percent-only DIRECT label at each bar's own top edge (owner spec:
+      // quantity moves to the tooltip). No per-series vertical offset needed
+      // now that the bars are side-by-side — each label sits above its own
+      // bar and can't collide with the sibling shift's label even at 0%.
       label: {
         show: true,
         position: 'top',
-        offset: [0, -(index * 14)],
-        formatter: (p: BarLabelParam) => formatPercentQty(s.data[p.dataIndex], s.qtyData?.[p.dataIndex]),
+        formatter: (p: BarLabelParam) => formatPercent(s.data[p.dataIndex]),
         fontSize: 10,
       },
-      // Attach the y=100 計畫 markLine once, to the LAST stacked series, so it
-      // visually renders at the top of the stack regardless of series count.
+      // Attach the y=100 計畫 markLine once, to the LAST series, so it renders
+      // across the whole plot regardless of series count.
       ...(isLast
         ? {
             markLine: {

@@ -207,12 +207,14 @@ class TestWorkcenterMergeTableRoundtrip:
         monkeypatch.setattr(svc, "get_mysql_connection", lambda: _FakeConnCtx(conn))
 
         svc.upsert_workcenter_merge(
-            raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB", updated_by="tester"
+            raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB",
+            plan_source_side="output", updated_by="tester",
         )
         rows = svc.get_workcenter_merge_entries()
         assert len(rows) == 1
         assert rows[0]["raw_workcenter_group"] == "焊接_DW"
         assert rows[0]["merged_workcenter_group"] == "焊接_WB"
+        assert rows[0]["plan_source_side"] == "output"
 
         assert svc.get_workcenter_merge_map() == {"焊接_DW": "焊接_WB"}
 
@@ -242,46 +244,3 @@ class TestWorkcenterMergeTableRoundtrip:
         with pytest.raises(svc.MySQLUnavailableError):
             svc.delete_workcenter_merge(raw_workcenter_group="焊接_DW")
 
-
-class TestDailyPlanTableRoundtrip:
-    """production-achievement-overhaul (PA-11): keyed on
-    (workcenter_group, package_lf_group), no shift dimension, fully
-    independent of production_achievement_targets. Mirrors
-    TestTargetTableRoundtrip."""
-
-    @patch("mes_dashboard.services.production_achievement_daily_plan_service.MYSQL_OPS_ENABLED", True)
-    def test_daily_plan_table_write_then_read_roundtrip(self, monkeypatch):
-        from mes_dashboard.services import production_achievement_daily_plan_service as svc
-
-        table = _FakeMySQLTable()
-        conn = _FakeConn(table, key_fields=("workcenter_group", "package_lf_group"))
-        monkeypatch.setattr(svc, "get_mysql_connection", lambda: _FakeConnCtx(conn))
-
-        svc.upsert_daily_plan(
-            workcenter_group="焊接_DB", package_lf_group="SOD-123FL",
-            daily_plan_qty=300, updated_by="tester",
-        )
-        rows = svc.get_daily_plans()
-        assert len(rows) == 1
-        assert rows[0]["workcenter_group"] == "焊接_DB"
-        assert rows[0]["package_lf_group"] == "SOD-123FL"
-        assert rows[0]["daily_plan_qty"] == 300
-
-        assert svc.get_daily_plans_map() == {("焊接_DB", "SOD-123FL"): 300}
-
-    @patch("mes_dashboard.services.production_achievement_daily_plan_service.MYSQL_OPS_ENABLED", False)
-    def test_mysql_ops_disabled_read_degrades_to_empty_null_qty(self):
-        from mes_dashboard.services import production_achievement_daily_plan_service as svc
-
-        assert svc.get_daily_plans() == []
-        assert svc.get_daily_plans_map() == {}
-
-    @patch("mes_dashboard.services.production_achievement_daily_plan_service.MYSQL_OPS_ENABLED", False)
-    def test_mysql_ops_disabled_write_returns_503(self):
-        from mes_dashboard.services import production_achievement_daily_plan_service as svc
-
-        with pytest.raises(svc.MySQLUnavailableError):
-            svc.upsert_daily_plan(
-                workcenter_group="焊接_DB", package_lf_group="SOD-123FL",
-                daily_plan_qty=300, updated_by="tester",
-            )

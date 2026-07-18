@@ -1,11 +1,11 @@
 {
   "error": {
-    "code": "SERVICE_UNAVAILABLE",
-    "message": "服務暫時無法使用，請稍後再試"
+    "code": "NOT_FOUND",
+    "message": "找不到指定的 raw_workcenter_group"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-07-14T12:10:49.741999"
+    "timestamp": "2026-07-16T16:28:24.649735"
   },
   "success": false
 }

@@ -47,12 +47,6 @@ interface WorkcenterMergeMapRow {
   merged_workcenter_group: string;
 }
 
-interface DailyPlanMapRow {
-  workcenter_group: string;
-  package_lf_group: string;
-  daily_plan_qty: number | null;
-}
-
 interface RollupRow {
   output_date: string;
   shift_code: string;
@@ -304,9 +298,9 @@ describe('useProductionAchievementDuckDB composable', () => {
     const specMap = [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }];
     const targetsMap = [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 500 }];
     const packageLfMap = [{ raw_package_lf: 'SOD-123FL OP1', merged_group: 'SOD-123FL' }];
-    const workcenterMergeMap = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB' }];
-    const dailyPlanMap = [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 300 }];
-    await composable.activate('/api/spool/production_achievement/x.parquet', specMap, targetsMap, packageLfMap, workcenterMergeMap, dailyPlanMap);
+    const workcenterMergeMap = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input' as const }];
+    const planMap = [{ output_date: '2026-07-14', plan_package_group: 'SOD-123FL', planqty_input: 300, planqty_output: 250 }];
+    await composable.activate('/api/spool/production_achievement/x.parquet', specMap, targetsMap, packageLfMap, workcenterMergeMap, planMap);
 
     expect(client.registerParquet).toHaveBeenCalledWith('production_achievement_data', expect.any(ArrayBuffer));
     const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
@@ -314,7 +308,7 @@ describe('useProductionAchievementDuckDB composable', () => {
     expect(sqlCalls.some((sql) => sql.includes('pa_targets_map') && sql.includes('500'))).toBe(true);
     expect(sqlCalls.some((sql) => sql.includes('pa_package_lf_map') && sql.includes('SOD-123FL'))).toBe(true);
     expect(sqlCalls.some((sql) => sql.includes('pa_workcenter_merge_map') && sql.includes('焊接_DB'))).toBe(true);
-    expect(sqlCalls.some((sql) => sql.includes('pa_daily_plan_map') && sql.includes('300'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('pa_plan_map') && sql.includes('300') && sql.includes('250'))).toBe(true);
     expect(sqlCalls.some((sql) => sql.includes('pa_rollup_raw') && sql.toUpperCase().includes('UPPER(TRIM'))).toBe(true);
     // Stage 2 must show BOTH join kinds distinctly (D2 INNER, D1 LEFT) — never the same kind twice.
     const stage2Sql = sqlCalls.find((sql) => /CREATE OR REPLACE TABLE pa_rollup\s/.test(sql));
@@ -330,7 +324,7 @@ describe('useProductionAchievementDuckDB composable', () => {
     client.sendQuery.mockClear();
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    const workcenterMergeMap = [{ raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' }];
+    const workcenterMergeMap = [{ raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍', plan_source_side: 'input' as const }];
     await composable.activate(
       '/api/spool/production_achievement_moveout/x.parquet',
       [], [], [], workcenterMergeMap, [], 'moveout',
@@ -355,7 +349,7 @@ describe('useProductionAchievementDuckDB composable', () => {
     ]);
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await composable.activate('/api/spool/production_achievement_moveout/x.parquet', [], [], [], [{ raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' }], [], 'moveout');
+    await composable.activate('/api/spool/production_achievement_moveout/x.parquet', [], [], [], [{ raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍', plan_source_side: 'input' as const }], [], 'moveout');
     client.sendQuery.mockClear();
     client.sendQuery.mockResolvedValue([
       { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', d_output_qty: 10, n_output_qty: 5, daily_output_qty: 15, daily_plan_qty: 20, achievement_rate: 0.75 },
@@ -374,30 +368,35 @@ describe('useProductionAchievementDuckDB composable', () => {
     const composable = useProductionAchievementDuckDB();
     await composable.activate(
       '/api/spool/production_achievement_moveout/x.parquet', [], [], [], [
-        { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' },
-        { raw_workcenter_group: '條鍍', merged_workcenter_group: '條鍍', parent_group: '電鍍' },
+        { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍', plan_source_side: 'input' as const },
+        { raw_workcenter_group: '條鍍', merged_workcenter_group: '條鍍', parent_group: '電鍍', plan_source_side: 'input' as const },
       ], [], 'moveout',
     );
     client.sendQuery.mockClear();
     // Shape the GROUPING SETS output the composable maps: 2 子站 leaf rows
     // (is_subtotal 0) + 1 per-package 大項小計 (is_subtotal 1, workcenter_group
     // aggregated to NULL by GROUPING SETS, plan/rate populated in SQL).
+    // shift_plan_qty = CEIL(40/2) = 20; d_achievement_rate = 22/20 = 1.1;
+    // n_achievement_rate = 10/20 = 0.5 (PA-21).
     client.sendQuery.mockResolvedValue([
-      { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', is_subtotal: 0, d_output_qty: 10, n_output_qty: 5, daily_output_qty: 15, daily_plan_qty: null, achievement_rate: null },
-      { package_lf_group: 'PKG-1', workcenter_group: '條鍍', is_subtotal: 0, d_output_qty: 12, n_output_qty: 5, daily_output_qty: 17, daily_plan_qty: null, achievement_rate: null },
-      { package_lf_group: 'PKG-1', workcenter_group: null, is_subtotal: 1, d_output_qty: 22, n_output_qty: 10, daily_output_qty: 32, daily_plan_qty: 40, achievement_rate: 0.8 },
+      { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', is_subtotal: 0, d_output_qty: 10, n_output_qty: 5, daily_output_qty: 15, daily_plan_qty: null, shift_plan_qty: null, achievement_rate: null, d_achievement_rate: null, n_achievement_rate: null },
+      { package_lf_group: 'PKG-1', workcenter_group: '條鍍', is_subtotal: 0, d_output_qty: 12, n_output_qty: 5, daily_output_qty: 17, daily_plan_qty: null, shift_plan_qty: null, achievement_rate: null, d_achievement_rate: null, n_achievement_rate: null },
+      { package_lf_group: 'PKG-1', workcenter_group: null, is_subtotal: 1, d_output_qty: 22, n_output_qty: 10, daily_output_qty: 32, daily_plan_qty: 40, shift_plan_qty: 20, achievement_rate: 0.8, d_achievement_rate: 1.1, n_achievement_rate: 0.5 },
     ]);
     const rows = await composable.computeDailyView({ workcenterGroup: '電鍍', outputDate: '2026-07-14', expand: true });
     const querySql = String(client.sendQuery.mock.calls[0][0]);
     expect(querySql.toUpperCase()).toContain('GROUPING SETS');
-    // plan join keys on the selection (= 大項/parent '電鍍'), NOT a子站 value
-    expect(querySql).toContain("dp.workcenter_group = '電鍍'");
+    // plan_map has no station dimension -- it joins on (package, exact day),
+    // NOT on the selection (大項/parent).
+    expect(querySql).toContain('pm.plan_package_group = agg.package_lf_group');
+    expect(querySql).toContain("CAST(pm.output_date AS DATE) = CAST('2026-07-14' AS DATE)");
 
     const leaves = rows.filter((r) => !r.is_subtotal);
     const subtotal = rows.find((r) => r.is_subtotal);
     expect(leaves).toHaveLength(2);
     // 子站 leaf rows carry actuals but NO plan/達成率 (plan lives on the 大項)
     expect(leaves.every((r) => r.daily_plan_qty === null && r.achievement_rate === null)).toBe(true);
+    expect(leaves.every((r) => r.shift_plan_qty === null && r.d_achievement_rate === null && r.n_achievement_rate === null)).toBe(true);
     expect(leaves.map((r) => r.workcenter_group)).toEqual(['掛鍍', '條鍍']);
     // 大項小計 row: workcenter_group relabeled to the 大項, carries plan + rate
     expect(subtotal).toBeDefined();
@@ -405,6 +404,9 @@ describe('useProductionAchievementDuckDB composable', () => {
     expect(subtotal!.daily_output_qty).toBe(32);
     expect(subtotal!.daily_plan_qty).toBe(40);
     expect(subtotal!.achievement_rate).toBe(0.8);
+    expect(subtotal!.shift_plan_qty).toBe(20);
+    expect(subtotal!.d_achievement_rate).toBe(1.1);
+    expect(subtotal!.n_achievement_rate).toBe(0.5);
   });
 
   it('PA-19 expanded computeCumulativeView emits 子站 leaf rows + a 大項小計 with parent-keyed 累計計畫/達成率', async () => {
@@ -414,20 +416,24 @@ describe('useProductionAchievementDuckDB composable', () => {
     const composable = useProductionAchievementDuckDB();
     await composable.activate(
       '/api/spool/production_achievement_moveout/x.parquet', [], [], [], [
-        { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' },
+        { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍', plan_source_side: 'input' as const },
       ], [], 'moveout',
     );
     client.sendQuery.mockClear();
-    // rows query (GROUPING SETS) then trend query. elapsedDays for a single day = 1.
+    // rows query (GROUPING SETS) then trend query. cumulative_plan_qty is
+    // now a REAL SQL SUM(planqty) from the plan_totals subquery, not a JS
+    // elapsed_days multiplication.
     client.sendQuery.mockResolvedValueOnce([
-      { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', is_subtotal: 0, cumulative_actual_qty: 30, daily_plan_qty: null },
-      { package_lf_group: 'PKG-1', workcenter_group: null, is_subtotal: 1, cumulative_actual_qty: 30, daily_plan_qty: 40 },
+      { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', is_subtotal: 0, cumulative_actual_qty: 30, cumulative_plan_qty: null },
+      { package_lf_group: 'PKG-1', workcenter_group: null, is_subtotal: 1, cumulative_actual_qty: 30, cumulative_plan_qty: 40 },
     ]);
     client.sendQuery.mockResolvedValueOnce([]); // trend
     const result = await composable.computeCumulativeView({ workcenterGroup: '電鍍', startDate: '2026-07-14', endDate: '2026-07-14', expand: true });
     const rowsSql = String(client.sendQuery.mock.calls[0][0]);
     expect(rowsSql.toUpperCase()).toContain('GROUPING SETS');
-    expect(rowsSql).toContain("dp.workcenter_group = '電鍍'");
+    // plan_map has no station dimension -- the plan_totals subquery joins on
+    // package only, NOT on the selection (大項/parent).
+    expect(rowsSql).toContain('plan_totals.plan_package_group = agg.package_lf_group');
 
     const leaf = result.rows.find((r) => !r.is_subtotal)!;
     const subtotal = result.rows.find((r) => r.is_subtotal)!;
@@ -435,11 +441,11 @@ describe('useProductionAchievementDuckDB composable', () => {
     expect(leaf.cumulative_plan_qty).toBeNull();
     expect(leaf.cumulative_achievement_rate).toBeNull();
     expect(subtotal.workcenter_group).toBe('電鍍');
-    expect(subtotal.cumulative_plan_qty).toBe(40); // 40/day * 1 day
+    expect(subtotal.cumulative_plan_qty).toBe(40);
     expect(subtotal.cumulative_achievement_rate).toBeCloseTo(30 / 40);
   });
 
-  it('activate() defaults missing package_lf_map/workcenter_merge_map/daily_plan_map to empty (MYSQL_OPS_ENABLED=false degrade)', async () => {
+  it('activate() defaults missing package_lf_map/workcenter_merge_map/plan_map to empty (MYSQL_OPS_ENABLED=false degrade)', async () => {
     const client = await mockedClient();
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
@@ -495,7 +501,10 @@ describe('useProductionAchievementDuckDB composable', () => {
         n_output_qty: 100,
         daily_output_qty: 400,
         daily_plan_qty: 500,
+        shift_plan_qty: 250,
         achievement_rate: 0.8,
+        d_achievement_rate: 1.2,
+        n_achievement_rate: 0.4,
       },
     ]); // computeDailyView SELECT
 
@@ -510,7 +519,12 @@ describe('useProductionAchievementDuckDB composable', () => {
         n_output_qty: 100,
         daily_output_qty: 400,
         daily_plan_qty: 500,
+        // PA-21: shift_plan_qty = CEIL(500 / 2) = 250; d_achievement_rate =
+        // 300/250 = 1.2; n_achievement_rate = 100/250 = 0.4.
+        shift_plan_qty: 250,
         achievement_rate: 0.8,
+        d_achievement_rate: 1.2,
+        n_achievement_rate: 0.4,
       },
     ]);
     const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
@@ -524,15 +538,15 @@ describe('useProductionAchievementDuckDB composable', () => {
     expect(selectSql).toContain("'2026-07-14'");
   });
 
-  it('computeDailyView() null/zero-rate guards mirror PA-12 (missing plan -> null, zero plan -> null, zero actual+plan -> 0.0)', async () => {
+  it('computeDailyView() null/zero-rate guards mirror PA-12 (missing plan -> null, zero plan -> null, zero actual+plan -> 0.0), and PA-21 shift_plan_qty/d_/n_achievement_rate mirror the same guards', async () => {
     const client = await mockedClient();
     client.sendQuery.mockResolvedValue([]);
     client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     client.sendQuery.mockResolvedValueOnce([
-      { package_lf_group: 'A', d_output_qty: 10, n_output_qty: 0, daily_output_qty: 10, daily_plan_qty: null, achievement_rate: null },
-      { package_lf_group: 'B', d_output_qty: 10, n_output_qty: 0, daily_output_qty: 10, daily_plan_qty: 0, achievement_rate: null },
-      { package_lf_group: 'C', d_output_qty: 0, n_output_qty: 0, daily_output_qty: 0, daily_plan_qty: 100, achievement_rate: 0 },
+      { package_lf_group: 'A', d_output_qty: 10, n_output_qty: 0, daily_output_qty: 10, daily_plan_qty: null, shift_plan_qty: null, achievement_rate: null, d_achievement_rate: null, n_achievement_rate: null },
+      { package_lf_group: 'B', d_output_qty: 10, n_output_qty: 0, daily_output_qty: 10, daily_plan_qty: 0, shift_plan_qty: 0, achievement_rate: null, d_achievement_rate: null, n_achievement_rate: null },
+      { package_lf_group: 'C', d_output_qty: 0, n_output_qty: 0, daily_output_qty: 0, daily_plan_qty: 100, shift_plan_qty: 50, achievement_rate: 0, d_achievement_rate: 0, n_achievement_rate: 0 },
     ]);
 
     const { useProductionAchievementDuckDB } = await importComposable();
@@ -542,6 +556,12 @@ describe('useProductionAchievementDuckDB composable', () => {
     expect(rows.find((r) => r.package_lf_group === 'A')!.achievement_rate).toBeNull();
     expect(rows.find((r) => r.package_lf_group === 'B')!.achievement_rate).toBeNull();
     expect(rows.find((r) => r.package_lf_group === 'C')!.achievement_rate).toBe(0);
+    // PA-21: shift_plan_qty null/0 -> d_/n_achievement_rate null; a real 0
+    // shift_plan_qty with zero actual -> a real 0.0, never Infinity.
+    expect(rows.find((r) => r.package_lf_group === 'A')!.d_achievement_rate).toBeNull();
+    expect(rows.find((r) => r.package_lf_group === 'B')!.d_achievement_rate).toBeNull();
+    expect(rows.find((r) => r.package_lf_group === 'C')!.d_achievement_rate).toBe(0);
+    expect(rows.find((r) => r.package_lf_group === 'C')!.n_achievement_rate).toBe(0);
   });
 
   it('computeCumulativeView() aggregate-then-divide (D3): per-day trend rate must NOT equal the mean of per-group percentages when plan magnitudes differ', async () => {
@@ -549,10 +569,11 @@ describe('useProductionAchievementDuckDB composable', () => {
     client.sendQuery.mockResolvedValue([]);
     // 5 CREATE TABLE calls (spec/targets/pkg/wc/plan maps) + 2 rollup stage creates
     for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
-    // per-group cumulative rows query
+    // per-group cumulative rows query (cumulative_plan_qty is a real SQL SUM,
+    // not a daily_plan_qty*elapsed_days JS multiplication)
     client.sendQuery.mockResolvedValueOnce([
-      { package_lf_group: 'BIG', cumulative_actual_qty: 950, daily_plan_qty: 1000 },
-      { package_lf_group: 'SMALL', cumulative_actual_qty: 5, daily_plan_qty: 10 },
+      { package_lf_group: 'BIG', cumulative_actual_qty: 950, cumulative_plan_qty: 1000 },
+      { package_lf_group: 'SMALL', cumulative_actual_qty: 5, cumulative_plan_qty: 10 },
     ]);
     // per-day trend query: day 1 actual=955 across both groups, plan=1010 (aggregate-then-divide != mean)
     client.sendQuery.mockResolvedValueOnce([{ output_date: '2026-07-01', actual_qty: 955, plan_qty: 1010 }]);
@@ -602,6 +623,29 @@ describe('useProductionAchievementDuckDB composable', () => {
     const trendSql = sqlCalls[sqlCalls.length - 1];
     for (const sql of [rowsSql, trendSql]) {
       expect(sql).toContain("BETWEEN CAST('2026-07-01' AS DATE) AND CAST('2026-07-14' AS DATE)");
+    }
+  });
+
+  it('computeCumulativeView() casts every plan SUM to DOUBLE -- regression: planqty_input/output register as INTEGER, and DuckDB-WASM serializes SUM(INTEGER) as a 128-bit HUGEINT limb-object ({0,1,2,3}) that nullableNumber() coerces to NaN->null, blanking 累計計畫/累計達成率 for the whole period (the daily MAX(planqty) path was immune, masking the bug in unit tests that mock a plain-number client)', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([]); // per-group cumulative rows query
+    client.sendQuery.mockResolvedValueOnce([]); // per-day trend query
+
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('url', [], [], [], [], []);
+    await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-14' });
+
+    const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
+    const rowsSql = sqlCalls[sqlCalls.length - 2];
+    const trendSql = sqlCalls[sqlCalls.length - 1];
+    // Every SUM over a plan column must be wrapped in CAST(... AS DOUBLE) so it
+    // never crosses the worker boundary as a HUGEINT. Dropping the CAST (a bare
+    // SUM(planqty_...)) is the regression this guards.
+    for (const sql of [rowsSql, trendSql]) {
+      expect(sql).toMatch(/CAST\(SUM\(\s*(?:pm\.)?planqty_(?:input|output)\s*\) AS DOUBLE\)/);
     }
   });
 
@@ -660,28 +704,38 @@ describe('useProductionAchievementDuckDB composable', () => {
     expect(result.trend[1].cumulative_achievement_rate).toBeCloseTo(110 / 100, 6);
   });
 
-  it('computeCumulativeView() scales daily_plan_qty by elapsed_days for 累計計畫', async () => {
+  it('computeCumulativeView() cumulative_plan_qty is a REAL SQL SUM(planqty) over the range, not a daily_plan_qty*elapsed_days approximation (production-achievement-oracle-plan-source)', async () => {
     const client = await mockedClient();
     client.sendQuery.mockResolvedValue([]);
     for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
-    client.sendQuery.mockResolvedValueOnce([{ package_lf_group: 'SOD-123FL', cumulative_actual_qty: 3000, daily_plan_qty: 500 }]);
+    // Oracle's own daily target varies day-to-day (real data: one package's
+    // July Planqty_Input ranged 1814-3814 across different days in the same
+    // month) -- the SQL-side SUM already reflects that; the composable must
+    // pass this value through verbatim, never re-derive it from a single
+    // day's value * a day count.
+    client.sendQuery.mockResolvedValueOnce([{ package_lf_group: 'SOD-123FL', cumulative_actual_qty: 3000, cumulative_plan_qty: 2650 }]);
     client.sendQuery.mockResolvedValueOnce([]);
 
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
     await composable.activate('url', [], [], [], [], []);
-    // 2026-07-01 .. 2026-07-05 inclusive = 5 elapsed days
     const result = await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-05' });
-    expect(result.rows[0].cumulative_plan_qty).toBe(2500); // 500 * 5
-    expect(result.rows[0].cumulative_diff_qty).toBe(500); // 3000 - 2500
-    expect(result.rows[0].cumulative_achievement_rate).toBeCloseTo(3000 / 2500, 6);
+    expect(result.rows[0].cumulative_plan_qty).toBe(2650);
+    expect(result.rows[0].cumulative_diff_qty).toBe(350); // 3000 - 2650
+    expect(result.rows[0].cumulative_achievement_rate).toBeCloseTo(3000 / 2650, 6);
+
+    const rowsSql = String(client.sendQuery.mock.calls[client.sendQuery.mock.calls.length - 2][0]);
+    // The plan side is a SUM(...) subquery bounded to the requested range,
+    // not a bare column reference.
+    expect(rowsSql).toContain('SUM(');
+    expect(rowsSql).toContain("BETWEEN CAST('2026-07-01' AS DATE) AND CAST('2026-07-05' AS DATE)");
   });
 
   it('computeCumulativeView() null-plan row -> cumulative_plan_qty/diff/rate all null (never Infinity)', async () => {
     const client = await mockedClient();
     client.sendQuery.mockResolvedValue([]);
     for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
-    client.sendQuery.mockResolvedValueOnce([{ package_lf_group: '(未分類)', cumulative_actual_qty: 42, daily_plan_qty: null }]);
+    client.sendQuery.mockResolvedValueOnce([{ package_lf_group: '(未分類)', cumulative_actual_qty: 42, cumulative_plan_qty: null }]);
     client.sendQuery.mockResolvedValueOnce([]);
 
     const { useProductionAchievementDuckDB } = await importComposable();

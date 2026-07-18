@@ -30,6 +30,26 @@ class MySQLUnavailableError(RuntimeError):
     """Raised by write operations when MySQL OPS is disabled or unreachable."""
 
 
+class WorkcenterMergeValidationError(ValueError):
+    """Raised when ``plan_source_side`` fails enum validation."""
+
+
+_VALID_PLAN_SOURCE_SIDES = ("input", "output")
+
+
+def validate_plan_source_side(plan_source_side: Optional[str]) -> str:
+    """Validate ``plan_source_side`` is 'input' or 'output' (business-rules.md
+    PA-20). Never touches MySQL -- callers (routes) validate at the API
+    boundary BEFORE any MySQL round-trip and return 400 VALIDATION_ERROR.
+    """
+    value = (plan_source_side or "").strip().lower()
+    if value not in _VALID_PLAN_SOURCE_SIDES:
+        raise WorkcenterMergeValidationError(
+            f"plan_source_side 必須為 {' 或 '.join(_VALID_PLAN_SOURCE_SIDES)}"
+        )
+    return value
+
+
 def resolve_workcenter_merge_group(
     raw_workcenter_group: str, mapping: Dict[str, str]
 ) -> Optional[str]:
@@ -60,6 +80,11 @@ def get_workcenter_merge_entries() -> List[Dict[str, Any]]:
     ``parent_group`` is NULL/blank (legacy install pre-backfill) falls back to
     its ``merged_workcenter_group`` so a missing column never collapses a
     station out of the dropdown.
+
+    ``plan_source_side`` (PA-20) is which Oracle MES_WIP_OUTPUTPLAN column
+    (input/output) the 大項 sources its target from. A row whose DB value is
+    NULL/blank (legacy install pre-migration) falls back to 'input' -- same
+    safe default as the column's own DDL DEFAULT.
     """
     if not MYSQL_OPS_ENABLED:
         return []
@@ -70,7 +95,7 @@ def get_workcenter_merge_entries() -> List[Dict[str, Any]]:
             result = conn.execute(
                 text(
                     "SELECT raw_workcenter_group, merged_workcenter_group, parent_group, "
-                    "updated_at, updated_by "
+                    "plan_source_side, updated_at, updated_by "
                     "FROM production_achievement_workcenter_merge_map "
                     "ORDER BY raw_workcenter_group ASC"
                 )
@@ -84,6 +109,7 @@ def get_workcenter_merge_entries() -> List[Dict[str, Any]]:
                         r._mapping["parent_group"]
                         or r._mapping["merged_workcenter_group"]
                     ),
+                    "plan_source_side": r._mapping["plan_source_side"] or "input",
                     "updated_at": r._mapping["updated_at"],
                     "updated_by": r._mapping["updated_by"],
                 }
@@ -124,6 +150,7 @@ def upsert_workcenter_merge(
     raw_workcenter_group: str,
     merged_workcenter_group: str,
     parent_group: Optional[str] = None,
+    plan_source_side: Optional[str] = None,
     updated_by: str,
 ) -> None:
     """Upsert (INSERT ... ON DUPLICATE KEY UPDATE) a workcenter_merge_map
@@ -131,7 +158,10 @@ def upsert_workcenter_merge(
     constraint).
 
     ``parent_group`` (PA-19) defaults to ``merged_workcenter_group`` when not
-    supplied (single-layer station).
+    supplied (single-layer station). ``plan_source_side`` (PA-20) defaults to
+    'input' when not supplied -- callers that care about correctness (routes)
+    must call ``validate_plan_source_side()`` and pass its result explicitly;
+    this default only protects internal/test callers that don't touch PA-20.
 
     Raises MySQLUnavailableError when MYSQL_OPS_ENABLED=false or MySQL is
     unreachable -- writes cannot degrade gracefully.
@@ -140,18 +170,20 @@ def upsert_workcenter_merge(
         raise MySQLUnavailableError("MySQL OPS is disabled (MYSQL_OPS_ENABLED=false)")
 
     resolved_parent = parent_group or merged_workcenter_group
+    resolved_plan_source_side = plan_source_side or "input"
 
     from sqlalchemy import text
 
     sql = text(
         """
         INSERT INTO production_achievement_workcenter_merge_map
-            (raw_workcenter_group, merged_workcenter_group, parent_group, updated_at, updated_by)
+            (raw_workcenter_group, merged_workcenter_group, parent_group, plan_source_side, updated_at, updated_by)
         VALUES
-            (:raw_workcenter_group, :merged_workcenter_group, :parent_group, NOW(), :updated_by)
+            (:raw_workcenter_group, :merged_workcenter_group, :parent_group, :plan_source_side, NOW(), :updated_by)
         ON DUPLICATE KEY UPDATE
             merged_workcenter_group = VALUES(merged_workcenter_group),
             parent_group = VALUES(parent_group),
+            plan_source_side = VALUES(plan_source_side),
             updated_at = NOW(),
             updated_by = VALUES(updated_by)
         """
@@ -164,6 +196,7 @@ def upsert_workcenter_merge(
                     "raw_workcenter_group": raw_workcenter_group,
                     "merged_workcenter_group": merged_workcenter_group,
                     "parent_group": resolved_parent,
+                    "plan_source_side": resolved_plan_source_side,
                     "updated_by": updated_by,
                 },
             )

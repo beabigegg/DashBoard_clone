@@ -169,8 +169,13 @@ class TestReportRoute:
     # ── AC-2/AC-8: spool hit -> 200, unconditional map injection ────────────
 
     @patch(
-        "mes_dashboard.routes.production_achievement_routes.get_daily_plans_map",
-        return_value={("焊接_DB", "SOD-123FL"): 300},
+        "mes_dashboard.routes.production_achievement_routes.get_oracle_plan_rows",
+        return_value=[{
+            "output_date": "2026-04-01",
+            "plan_package_group": "SOD-123FL",
+            "planqty_input": 300,
+            "planqty_output": 250,
+        }],
     )
     @patch(
         "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries",
@@ -178,6 +183,7 @@ class TestReportRoute:
             "raw_workcenter_group": "焊接_DW",
             "merged_workcenter_group": "焊接_WB",
             "parent_group": "焊接_WB",
+            "plan_source_side": "input",
             "updated_at": "2026-04-01T00:00:00",
             "updated_by": "system-seed",
         }],
@@ -200,11 +206,12 @@ class TestReportRoute:
     )
     def test_spool_hit_response_shape_has_spool_download_url_spec_map_targets_map(
         self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
-        mock_workcenter_merge_entries, mock_daily_plans_map, auth_client
+        mock_workcenter_merge_entries, mock_plan_rows, auth_client
     ):
         """AC-6: envelope inline arrays -- spec_workcenter_map, targets_map,
         package_lf_map (D1), workcenter_merge_map (D2, now carrying
-        parent_group per PA-19), daily_plan_map. Default source=output."""
+        parent_group/plan_source_side per PA-19/PA-20), plan_map (Oracle-
+        sourced, PA-11). Default source=output."""
         resp = auth_client.get(
             "/api/production-achievement/report",
             query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
@@ -231,17 +238,25 @@ class TestReportRoute:
                 "raw_workcenter_group": "焊接_DW",
                 "merged_workcenter_group": "焊接_WB",
                 "parent_group": "焊接_WB",
+                "plan_source_side": "input",
             }
         ]
-        assert data["daily_plan_map"] == [
-            {"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300}
+        assert data["plan_map"] == [
+            {
+                "output_date": "2026-04-01",
+                "plan_package_group": "SOD-123FL",
+                "planqty_input": 300,
+                "planqty_output": 250,
+            }
         ]
+        mock_plan_rows.assert_called_once_with("2026-04-01", "2026-04-02", force_refresh=False)
+        mock_package_lf_map.assert_called_once_with(force_refresh=False)
         # Enqueue must never be reached on a spool hit.
         mock_spool.assert_called_once()
 
     @patch(
-        "mes_dashboard.routes.production_achievement_routes.get_daily_plans_map",
-        return_value={},
+        "mes_dashboard.routes.production_achievement_routes.get_oracle_plan_rows",
+        return_value=[],
     )
     @patch(
         "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries",
@@ -265,7 +280,7 @@ class TestReportRoute:
     )
     def test_spool_hit_injects_download_url_unconditionally_not_row_count_gated(
         self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
-        mock_workcenter_merge_map, mock_daily_plans_map, auth_client
+        mock_workcenter_merge_map, mock_plan_rows, auth_client
     ):
         """AC-8: injection is unconditional -- even with empty maps (which
         would correspond to a tiny/empty spool), spool_download_url must
@@ -281,7 +296,7 @@ class TestReportRoute:
         assert data["targets_map"] == []
         assert data["package_lf_map"] == []
         assert data["workcenter_merge_map"] == []
-        assert data["daily_plan_map"] == []
+        assert data["plan_map"] == []
 
     # ── AC-1/AC-8: spool miss + no worker -> 503, no sync fallback ──────────
 
@@ -331,7 +346,7 @@ class TestReportSourceParam:
         assert resp.status_code == 400
         assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
 
-    @patch("mes_dashboard.routes.production_achievement_routes.get_daily_plans_map", return_value={})
+    @patch("mes_dashboard.routes.production_achievement_routes.get_oracle_plan_rows", return_value=[])
     @patch("mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries", return_value=[])
     @patch("mes_dashboard.routes.production_achievement_routes.get_package_lf_map", return_value={})
     @patch("mes_dashboard.routes.production_achievement_routes.get_targets_map", return_value={})
@@ -453,6 +468,65 @@ class TestReportForceRefresh:
         assert resp.status_code == 202
         mock_clear.assert_not_called()
         mock_spool.assert_called_once()
+
+
+class TestReportRefreshPlan:
+    """refresh_plan (independent of force_refresh) bypasses ONLY the Oracle
+    plan/target caches -- get_oracle_plan_rows (PA-11) AND get_package_lf_map's
+    Oracle default layer (PA-09) -- see api_get_report's docstring for why
+    this must be a separate signal from force_refresh (force_refresh always
+    takes the 202 branch, so it never itself reaches either call in the SAME
+    request; the frontend's tail re-fetch carries refresh_plan=true instead,
+    without resending force_refresh=true, to avoid re-clearing the spool the
+    job just finished computing)."""
+
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_oracle_plan_rows",
+        return_value=[],
+    )
+    @patch("mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries", return_value=[])
+    @patch("mes_dashboard.routes.production_achievement_routes.get_package_lf_map", return_value={})
+    @patch("mes_dashboard.routes.production_achievement_routes.get_targets_map", return_value={})
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spec_workcenter_mapping", return_value={})
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_refresh_plan_true_forces_plan_cache_bypass_on_a_spool_hit(
+        self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
+        mock_workcenter_merge_map, mock_plan_rows, auth_client
+    ):
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-07-15", "end_date": "2026-07-15", "refresh_plan": "true"},
+        )
+        assert resp.status_code == 200
+        mock_plan_rows.assert_called_once_with("2026-07-15", "2026-07-15", force_refresh=True)
+        mock_package_lf_map.assert_called_once_with(force_refresh=True)
+
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_oracle_plan_rows",
+        return_value=[],
+    )
+    @patch("mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries", return_value=[])
+    @patch("mes_dashboard.routes.production_achievement_routes.get_package_lf_map", return_value={})
+    @patch("mes_dashboard.routes.production_achievement_routes.get_targets_map", return_value={})
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spec_workcenter_mapping", return_value={})
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_neither_flag_leaves_plan_cache_untouched(
+        self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
+        mock_workcenter_merge_map, mock_plan_rows, auth_client
+    ):
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-07-15", "end_date": "2026-07-15"},
+        )
+        assert resp.status_code == 200
+        mock_plan_rows.assert_called_once_with("2026-07-15", "2026-07-15", force_refresh=False)
+        mock_package_lf_map.assert_called_once_with(force_refresh=False)
 
 
 # ---------------------------------------------------------------------------
@@ -800,6 +874,8 @@ class TestWorkcenterMergeMapRoutes:
             {
                 "raw_workcenter_group": "焊接_DW",
                 "merged_workcenter_group": "焊接_WB",
+                "parent_group": "焊接_WB",
+                "plan_source_side": "input",
                 "updated_at": "2026-07-01T00:00:00",
                 "updated_by": "tester",
             }
@@ -847,16 +923,47 @@ class TestWorkcenterMergeMapRoutes:
 
     @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
     @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    def test_put_400_when_missing_plan_source_side(self, mock_can_edit, auth_client):
+        """PA-20: plan_source_side is REQUIRED -- raw+merged alone is not
+        enough, unlike parent_group (which the service defaults)."""
+        resp = auth_client.put(
+            "/api/production-achievement/workcenter-merge-map",
+            json={"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    def test_put_400_when_invalid_plan_source_side(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/workcenter-merge-map",
+            json={
+                "raw_workcenter_group": "焊接_DW",
+                "merged_workcenter_group": "焊接_WB",
+                "plan_source_side": "sideways",
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
     @patch("mes_dashboard.routes.production_achievement_routes.upsert_workcenter_merge")
     def test_put_forwards_kwargs(self, mock_upsert, mock_can_edit, auth_client):
         resp = auth_client.put(
             "/api/production-achievement/workcenter-merge-map",
-            json={"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"},
+            json={
+                "raw_workcenter_group": "焊接_DW",
+                "merged_workcenter_group": "焊接_WB",
+                "plan_source_side": "output",
+            },
         )
         assert resp.status_code == 200
         kwargs = mock_upsert.call_args.kwargs
         assert kwargs["raw_workcenter_group"] == "焊接_DW"
         assert kwargs["merged_workcenter_group"] == "焊接_WB"
+        assert kwargs["plan_source_side"] == "output"
         assert kwargs["updated_by"] == "alice"
 
     def test_delete_requires_login(self, client):
@@ -891,307 +998,6 @@ class TestWorkcenterMergeMapRoutes:
     def test_delete_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
         resp = auth_client.delete("/api/production-achievement/workcenter-merge-map/焊接_DW")
         assert resp.status_code == 503
-
-
-# ---------------------------------------------------------------------------
-# GET/PUT /api/production-achievement/daily-plans
-# ---------------------------------------------------------------------------
-
-class TestDailyPlansRoutes:
-    def test_get_requires_login(self, client):
-        resp = client.get("/api/production-achievement/daily-plans")
-        assert resp.status_code == 401
-
-    @patch("mes_dashboard.routes.production_achievement_routes.get_daily_plans")
-    def test_get_forwards(self, mock_get, auth_client):
-        mock_get.return_value = [
-            {
-                "workcenter_group": "焊接_DB",
-                "package_lf_group": "SOD-123FL",
-                "daily_plan_qty": 300,
-                "updated_at": "2026-07-01T00:00:00",
-                "updated_by": "tester",
-            }
-        ]
-        resp = auth_client.get("/api/production-achievement/daily-plans")
-        assert resp.status_code == 200
-        payload = resp.get_json()
-        assert payload["success"] is True
-        assert payload["data"] == mock_get.return_value
-
-    def test_put_requires_login(self, client):
-        resp = client.put(
-            "/api/production-achievement/daily-plans",
-            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300},
-        )
-        assert resp.status_code == 401
-
-    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=False)
-    def test_put_403_not_whitelisted(self, mock_can_edit, auth_client):
-        resp = auth_client.put(
-            "/api/production-achievement/daily-plans",
-            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300},
-        )
-        assert resp.status_code == 403
-        assert resp.get_json()["error"]["code"] == "FORBIDDEN"
-
-    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
-    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", False)
-    def test_put_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
-        resp = auth_client.put(
-            "/api/production-achievement/daily-plans",
-            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300},
-        )
-        assert resp.status_code == 503
-
-    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
-    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
-    def test_put_400_when_negative_qty(self, mock_can_edit, auth_client):
-        resp = auth_client.put(
-            "/api/production-achievement/daily-plans",
-            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": -5},
-        )
-        assert resp.status_code == 400
-        assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
-
-    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
-    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
-    def test_put_400_when_missing_fields(self, mock_can_edit, auth_client):
-        resp = auth_client.put(
-            "/api/production-achievement/daily-plans",
-            json={"workcenter_group": "焊接_DB"},
-        )
-        assert resp.status_code == 400
-
-    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
-    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
-    @patch("mes_dashboard.routes.production_achievement_routes.upsert_daily_plan")
-    def test_put_forwards_kwargs(self, mock_upsert, mock_can_edit, auth_client):
-        resp = auth_client.put(
-            "/api/production-achievement/daily-plans",
-            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300},
-        )
-        assert resp.status_code == 200
-        kwargs = mock_upsert.call_args.kwargs
-        assert kwargs["workcenter_group"] == "焊接_DB"
-        assert kwargs["package_lf_group"] == "SOD-123FL"
-        assert kwargs["daily_plan_qty"] == 300
-        assert kwargs["updated_by"] == "alice"
-
-
-# ---------------------------------------------------------------------------
-# POST /api/production-achievement/daily-plans/import/preview
-# POST /api/production-achievement/daily-plans/import/confirm
-# (business-rules.md PA-16)
-# ---------------------------------------------------------------------------
-
-_IMPORT_MOD = "mes_dashboard.routes.production_achievement_routes"
-
-
-def _upload_file(client, url, *, filename="report.xlsx", content=b"dummy"):
-    import io as _io
-
-    return client.post(
-        url,
-        data={"file": (_io.BytesIO(content), filename)},
-        content_type="multipart/form-data",
-    )
-
-
-class TestDailyPlansImportPreviewRoute:
-    def test_requires_login(self, client):
-        resp = _upload_file(client, "/api/production-achievement/daily-plans/import/preview")
-        assert resp.status_code == 401
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=False)
-    def test_403_not_whitelisted(self, mock_can_edit, auth_client):
-        resp = _upload_file(auth_client, "/api/production-achievement/daily-plans/import/preview")
-        assert resp.status_code == 403
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", False)
-    def test_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
-        resp = _upload_file(auth_client, "/api/production-achievement/daily-plans/import/preview")
-        assert resp.status_code == 503
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    def test_400_when_no_file(self, mock_can_edit, auth_client):
-        resp = auth_client.post(
-            "/api/production-achievement/daily-plans/import/preview",
-            data={}, content_type="multipart/form-data",
-        )
-        assert resp.status_code == 400
-        assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    def test_400_when_not_xlsx(self, mock_can_edit, auth_client):
-        resp = _upload_file(
-            auth_client, "/api/production-achievement/daily-plans/import/preview",
-            filename="report.csv",
-        )
-        assert resp.status_code == 400
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    @patch(f"{_IMPORT_MOD}.parse_pjmes052_workbook")
-    def test_400_when_parse_error(self, mock_parse, mock_can_edit, auth_client):
-        from mes_dashboard.services.production_achievement_import_service import ImportParseError
-
-        mock_parse.side_effect = ImportParseError("找不到工作表「FQC」")
-        resp = _upload_file(auth_client, "/api/production-achievement/daily-plans/import/preview")
-        assert resp.status_code == 400
-        assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    @patch(f"{_IMPORT_MOD}.categorize_import_rows")
-    @patch(f"{_IMPORT_MOD}.get_daily_plans_map")
-    @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
-    @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
-    @patch(f"{_IMPORT_MOD}.parse_pjmes052_workbook")
-    def test_happy_path_returns_preview(
-        self, mock_parse, mock_wg_map, mock_plf_map, mock_known, mock_plans_map,
-        mock_categorize, mock_can_edit, auth_client,
-    ):
-        mock_parse.return_value = ["parsed-row-sentinel"]
-        # PA-19: the daily-plan legal set is the 大項/parent_group list (what a
-        # plan can key to), not the raw->merged map — so the route now calls
-        # get_workcenter_parent_groups(), which returns a list of parent names.
-        mock_wg_map.return_value = ["焊接_DB"]
-        mock_plf_map.return_value = {"SOD-123FL OP1": "SOD-123FL"}
-        mock_known.return_value = ["SOD-123FL", "SOT-23"]
-        mock_plans_map.return_value = {("焊接_DB", "SOD-123FL"): 100}
-        mock_categorize.return_value = {
-            "rows": [{"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL",
-                      "daily_plan_qty": 200, "status": "update", "importable": True}],
-            "missing_from_file": [],
-            "summary": {"total_parsed": 1, "new": 0, "update": 1, "unchanged": 0,
-                        "invalid": 0, "missing_from_file": 0},
-        }
-        resp = _upload_file(auth_client, "/api/production-achievement/daily-plans/import/preview")
-        assert resp.status_code == 200
-        payload = resp.get_json()
-        assert payload["data"] == mock_categorize.return_value
-
-        kwargs = mock_categorize.call_args.kwargs
-        assert kwargs["legal_workcenter_groups"] == {"焊接_DB"}
-        # legal_package_lf_groups = merged values ∪ (known raw values - already-mapped raws)
-        assert kwargs["legal_package_lf_groups"] == {"SOD-123FL", "SOT-23"}
-        assert kwargs["current_plans"] == {("焊接_DB", "SOD-123FL"): 100}
-
-
-class TestDailyPlansImportConfirmRoute:
-    _VALID_BODY = {"rows": [{"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 200}]}
-
-    def test_requires_login(self, client):
-        resp = client.post("/api/production-achievement/daily-plans/import/confirm", json=self._VALID_BODY)
-        assert resp.status_code == 401
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=False)
-    def test_403_not_whitelisted(self, mock_can_edit, auth_client):
-        resp = auth_client.post("/api/production-achievement/daily-plans/import/confirm", json=self._VALID_BODY)
-        assert resp.status_code == 403
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", False)
-    def test_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
-        resp = auth_client.post("/api/production-achievement/daily-plans/import/confirm", json=self._VALID_BODY)
-        assert resp.status_code == 503
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    def test_400_when_rows_empty(self, mock_can_edit, auth_client):
-        resp = auth_client.post("/api/production-achievement/daily-plans/import/confirm", json={"rows": []})
-        assert resp.status_code == 400
-
-    def _mock_legal_sets(self, mock_wg_map, mock_plf_map, mock_known):
-        # PA-19: the daily-plan legal set is the 大項/parent_group list (what a
-        # plan can key to), not the raw->merged map — so the route now calls
-        # get_workcenter_parent_groups(), which returns a list of parent names.
-        mock_wg_map.return_value = ["焊接_DB"]
-        mock_plf_map.return_value = {}
-        mock_known.return_value = ["SOD-123FL"]
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    @patch(f"{_IMPORT_MOD}.bulk_upsert_daily_plans")
-    @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
-    @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
-    def test_400_and_no_write_when_workcenter_group_illegal(
-        self, mock_wg_map, mock_plf_map, mock_known, mock_bulk, mock_can_edit, auth_client,
-    ):
-        self._mock_legal_sets(mock_wg_map, mock_plf_map, mock_known)
-        resp = auth_client.post(
-            "/api/production-achievement/daily-plans/import/confirm",
-            json={"rows": [{"workcenter_group": "焊接_XX", "package_lf_group": "SOD-123FL", "daily_plan_qty": 200}]},
-        )
-        assert resp.status_code == 400
-        mock_bulk.assert_not_called()
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    @patch(f"{_IMPORT_MOD}.bulk_upsert_daily_plans")
-    @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
-    @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
-    def test_400_and_no_write_when_package_lf_group_illegal(
-        self, mock_wg_map, mock_plf_map, mock_known, mock_bulk, mock_can_edit, auth_client,
-    ):
-        self._mock_legal_sets(mock_wg_map, mock_plf_map, mock_known)
-        resp = auth_client.post(
-            "/api/production-achievement/daily-plans/import/confirm",
-            json={"rows": [{"workcenter_group": "焊接_DB", "package_lf_group": "DFN2510/0603", "daily_plan_qty": 200}]},
-        )
-        assert resp.status_code == 400
-        mock_bulk.assert_not_called()
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    @patch(f"{_IMPORT_MOD}.bulk_upsert_daily_plans")
-    @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
-    @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
-    def test_400_and_no_write_when_one_row_has_negative_qty(
-        self, mock_wg_map, mock_plf_map, mock_known, mock_bulk, mock_can_edit, auth_client,
-    ):
-        self._mock_legal_sets(mock_wg_map, mock_plf_map, mock_known)
-        resp = auth_client.post(
-            "/api/production-achievement/daily-plans/import/confirm",
-            json={"rows": [
-                {"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 200},
-                {"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": -5},
-            ]},
-        )
-        assert resp.status_code == 400
-        mock_bulk.assert_not_called()
-
-    @patch(f"{_IMPORT_MOD}.can_edit_targets", return_value=True)
-    @patch(f"{_IMPORT_MOD}.MYSQL_OPS_ENABLED", True)
-    @patch(f"{_IMPORT_MOD}.bulk_upsert_daily_plans")
-    @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
-    @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
-    def test_happy_path_calls_bulk_upsert_once(
-        self, mock_wg_map, mock_plf_map, mock_known, mock_bulk, mock_can_edit, auth_client,
-    ):
-        self._mock_legal_sets(mock_wg_map, mock_plf_map, mock_known)
-        mock_bulk.return_value = 1
-        resp = auth_client.post("/api/production-achievement/daily-plans/import/confirm", json=self._VALID_BODY)
-        assert resp.status_code == 200
-        payload = resp.get_json()
-        assert payload["data"] == {"acknowledged": True, "upserted": 1}
-
-        mock_bulk.assert_called_once()
-        call_kwargs = mock_bulk.call_args.kwargs
-        assert call_kwargs["updated_by"] == "alice"
-        positional_rows = mock_bulk.call_args.args[0]
-        assert positional_rows == [
-            {"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 200}
-        ]
 
 
 # ---------------------------------------------------------------------------
