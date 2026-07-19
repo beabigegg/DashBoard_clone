@@ -23,12 +23,26 @@ export function useUphPerformanceFilter() {
   const coarseFilter = reactive({
     date_from: '',
     date_to: '',
-    families: [],        // closed enum subset of {GDBA, GWBA}; empty = both (UPH-02)
-    workcenter_names: [], // free-text multi-value (no pre-query options endpoint)
+    families: [],        // DB/WB category: closed enum subset of {GDBA, GWBA}; empty = both (UPH-02)
+    models: [],          // 機型 (RESOURCEFAMILYNAME, e.g. DBA_AD832UR) — real machine models, cascaded from families
+    workcenter_names: [], // 工作站 (WORKCENTERNAME) — dropdown from machine-options, cascaded
     packages: [],         // product dim: Package (PRODUCTLINENAME) — backed by product-filter-options
     pj_types: [],         // product dim: Type (PJ_TYPE) — backed by product-filter-options
-    equipment_ids: [],    // free-text multi-value, max 200 (UPH contract)
+    equipment_ids: [],    // 機台 (RESOURCENAME) — dropdown from machine-options, cascaded, max 200 (UPH contract)
   });
+
+  // ── Machine options (from /api/uph-performance/machine-options, DW_MES_RESOURCE) ─
+  // Cascadable pre-query dropdown source: family (DB/WB) -> model -> workcenter
+  // -> equipment. Replaces the old GDBA/GWBA-only 機型 select + free-text
+  // 工作站 / 機台 textareas.
+  const machineOptions = ref({
+    families: [],     // [{code:'GDBA', label:'Die-Bond'}, ...]
+    models: [],       // [{family:'GDBA', model:'DBA_AD832UR'}, ...]
+    workcenters: [],  // ['焊接_DB', ...]
+    equipment: [],    // [{equipment_id, family, model, workcenter}, ...]
+  });
+  const machineOptionsLoading = ref(false);
+  const machineOptionsError = ref('');
 
   // ── Product filter options (from /api/uph-performance/product-filter-options) ─
   const productFilterOptions = ref({
@@ -180,6 +194,9 @@ export function useUphPerformanceFilter() {
     if (coarseFilter.families.length > 0) {
       params.families = coarseFilter.families;
     }
+    if (coarseFilter.models.length > 0) {
+      params.models = coarseFilter.models;
+    }
     if (coarseFilter.workcenter_names.length > 0) {
       params.workcenter_names = coarseFilter.workcenter_names;
     }
@@ -232,8 +249,34 @@ export function useUphPerformanceFilter() {
     }
   }
 
+  /**
+   * Load machine-options (機型 / 工作站 / 機台 cascadable dropdowns) on mount
+   * from DW_MES_RESOURCE. On failure, surface an inline warning; the date
+   * range + Package/Type filters stay usable (mirrors product-filter-options'
+   * degrade path).
+   */
+  async function loadMachineOptions() {
+    machineOptionsLoading.value = true;
+    machineOptionsError.value = '';
+    try {
+      const result = await apiGet('/api/uph-performance/machine-options', { timeout: 30000 });
+      const data = result?.data ?? {};
+      machineOptions.value = {
+        families: Array.isArray(data.families) ? data.families : [],
+        models: Array.isArray(data.models) ? data.models : [],
+        workcenters: Array.isArray(data.workcenters) ? data.workcenters : [],
+        equipment: Array.isArray(data.equipment) ? data.equipment : [],
+      };
+    } catch (err) {
+      machineOptionsError.value = String(err?.message || '無法載入 機型 / 工作站 / 機台 選項，可改用日期與 Package / Type 篩選');
+    } finally {
+      machineOptionsLoading.value = false;
+    }
+  }
+
   onMounted(() => {
     loadProductFilterOptions();
+    loadMachineOptions();
   });
 
   function setDefaultDateRange() {
@@ -260,6 +303,10 @@ export function useUphPerformanceFilter() {
     productFilterOptions,
     productOptionsLoading,
     productOptionsError,
+    machineOptions,
+    machineOptionsLoading,
+    machineOptionsError,
+    loadMachineOptions,
     queryId,
     spoolReady,
     setQueryId,

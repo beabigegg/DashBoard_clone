@@ -292,6 +292,48 @@
     background: theme('colors.stroke.soft');
   }
 
+  /* `.ui-btn--sm` is a SIZE modifier that also (historically) sets its own
+     neutral colours, and it is declared AFTER the colour variants -- so on
+     equal single-class specificity it overrode them on source order,
+     swallowing e.g. `--primary`'s blue whenever a button combined
+     `ui-btn--sm ui-btn--primary` (the UPH trend group-by toggle's active
+     state, and ~53 buttons app-wide). These compound selectors (two classes
+     -> higher specificity) restore each variant's colours at --sm size, while
+     a bare `ui-btn--sm` (12 standalone toggle/util buttons) keeps its neutral
+     look untouched. Additive: no existing rule is edited. */
+  .ui-btn--sm.ui-btn--primary {
+    background: theme('colors.brand.500');
+    color: theme('colors.token.hffffff');
+    border-color: transparent;
+  }
+  .ui-btn--sm.ui-btn--primary:hover:not(:disabled):not(.is-loading) {
+    background: theme('colors.brand.600');
+  }
+  .ui-btn--sm.ui-btn--secondary {
+    background: theme('colors.brand.50');
+    color: theme('colors.brand.600');
+    border-color: theme('colors.brand.500');
+  }
+  .ui-btn--sm.ui-btn--secondary:hover:not(:disabled):not(.is-loading) {
+    background: theme('colors.brand.100');
+  }
+  .ui-btn--sm.ui-btn--danger {
+    background: theme('colors.state.danger');
+    color: theme('colors.surface.card');
+    border-color: transparent;
+  }
+  .ui-btn--sm.ui-btn--danger:hover:not(:disabled):not(.is-loading) {
+    background: theme('colors.token.hdc2626');
+  }
+  .ui-btn--sm.ui-btn--ghost {
+    background: theme('colors.surface.hover');
+    color: theme('colors.token.h334155');
+    border-color: theme('colors.stroke.soft');
+  }
+  .ui-btn--sm.ui-btn--ghost:hover:not(:disabled):not(.is-loading) {
+    background: theme('colors.stroke.soft');
+  }
+
   .ui-btn--icon {
     padding: theme('spacing.token.p6');
     display: inline-flex;

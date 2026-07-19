@@ -151,6 +151,7 @@ def get_filter_options(spool_path: str, filters: Optional[Dict[str, Any]] = None
 GROUP_DIMENSIONS: Dict[str, str] = {
     "equipment_id": "EQUIPMENT_ID",
     "family": "EQUIPMENT_FAMILY",
+    "model": "MODEL",
     "package": "PACKAGE",
 }
 
@@ -301,7 +302,7 @@ def get_detail(
         total_pages = max(1, math.ceil(total_count / per_page)) if total_count > 0 else 1
 
         raw_rows = conn.execute(f"""
-            SELECT LOT_ID, EQUIPMENT_ID, EVENT_TIME, UPH_VALUE, PACKAGE, PJ_TYPE
+            SELECT LOT_ID, EQUIPMENT_ID, MODEL, EVENT_TIME, UPH_VALUE, PACKAGE, PJ_TYPE
             FROM read_parquet(?)
             {where_sql}
             ORDER BY EVENT_TIME DESC, LOT_ID
@@ -320,10 +321,11 @@ def get_detail(
             rows.append({
                 "lot_id": str(r[0]) if r[0] is not None else None,
                 "equipment_id": str(r[1]) if r[1] is not None else None,
-                "event_time": _fmt_ts(r[2]),
-                "uph_value": round(float(r[3]), 2) if r[3] is not None else None,
-                "package": str(r[4]) if r[4] is not None else None,
-                "pj_type": str(r[5]) if r[5] is not None else None,
+                "model": str(r[2]) if r[2] is not None else None,
+                "event_time": _fmt_ts(r[3]),
+                "uph_value": round(float(r[4]), 2) if r[4] is not None else None,
+                "package": str(r[5]) if r[5] is not None else None,
+                "pj_type": str(r[6]) if r[6] is not None else None,
             })
 
         return {

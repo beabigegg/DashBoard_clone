@@ -75,6 +75,7 @@ function onPageChange(page: number): void {
       >
         <DataTableColumn column-key="lot_id"       label="LOT ID"      :sortable="false" />
         <DataTableColumn column-key="equipment_id" label="機台 ID"      :sortable="false" />
+        <DataTableColumn column-key="model"        label="機型"         :sortable="false" />
         <DataTableColumn column-key="event_time"   label="事件時間"     :sortable="false" />
         <DataTableColumn column-key="uph_value"    label="UPH"          :sortable="false" />
         <DataTableColumn column-key="package"      label="Package"      :sortable="false" />
@@ -86,6 +87,9 @@ function onPageChange(page: number): void {
           </template>
           <template v-else-if="columnKey === 'uph_value'">
             {{ formatUph(row.uph_value as number | null) }}
+          </template>
+          <template v-else-if="columnKey === 'model'">
+            {{ row.model ?? '—' }}
           </template>
           <template v-else-if="columnKey === 'package'">
             {{ row.package ?? '—' }}

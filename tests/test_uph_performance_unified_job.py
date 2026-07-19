@@ -94,7 +94,7 @@ class TestUphPerformanceJobPostAggregate:
         pq.write_table(self._make_events_table(), chunk_dir / "chunk-0000-0000.parquet")
 
         empty_product = pd.DataFrame(columns=["LOT_ID", "PACKAGE", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION"])
-        empty_workcenter = pd.DataFrame(columns=["EQUIPMENT_ID", "WORKCENTERNAME", "DB_WB_LABEL"])
+        empty_workcenter = pd.DataFrame(columns=["EQUIPMENT_ID", "WORKCENTERNAME", "MODEL", "DB_WB_LABEL"])
 
         with patch(
             "mes_dashboard.workers.uph_performance_worker._safe_lot_product_df",
@@ -113,7 +113,7 @@ class TestUphPerformanceJobPostAggregate:
         columns = set(table.column_names)
         expected = {
             "LOT_ID", "EQUIPMENT_ID", "EQUIPMENT_FAMILY", "EVENT_TIME",
-            "PARAMETER_NAME", "UPH_VALUE", "WORKCENTERNAME", "DB_WB_LABEL",
+            "PARAMETER_NAME", "UPH_VALUE", "WORKCENTERNAME", "MODEL", "DB_WB_LABEL",
             "PACKAGE", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION", "coarse_filter_hash",
         }
         assert expected.issubset(columns)

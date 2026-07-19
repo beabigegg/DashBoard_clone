@@ -154,6 +154,31 @@ def _build_workcenter_names_exists_filter(
     return clause, params
 
 
+def _build_models_exists_filter(
+    models: Optional[List[str]],
+) -> tuple[str, Dict[str, Any]]:
+    """EXISTS semi-join on DW_MES_RESOURCE.RESOURCEFAMILYNAME for the 機型 filter.
+
+    RESOURCEFAMILYNAME is the real machine model (e.g. DBA_AD832UR, WBA_iHawk) --
+    the coarse 機型 axis that replaces the old GDBA/GWBA-only selector. Mirrors
+    `_build_workcenter_names_exists_filter` (same DW_MES_RESOURCE bridge,
+    RESOURCENAME = EQUIPMENT_ID). No embedded newline -- see
+    `_build_equipment_ids_filter`'s docstring for why.
+    """
+    cleaned = [str(v).strip() for v in (models or []) if str(v).strip()]
+    if not cleaned:
+        return "", {}
+    placeholders = ", ".join(f":mdl_{i}" for i in range(len(cleaned)))
+    clause = (
+        "AND EXISTS (SELECT 1 FROM DWH.DW_MES_RESOURCE r"
+        " WHERE r.RESOURCENAME = e.EQUIPMENT_ID"
+        " AND r.OBJECTCATEGORY = 'ASSEMBLY'"
+        f" AND NVL(TRIM(r.RESOURCEFAMILYNAME), '(NA)') IN ({placeholders}))"
+    )
+    params = {f"mdl_{i}": v for i, v in enumerate(cleaned)}
+    return clause, params
+
+
 def _build_time_chunks(date_from: str, date_to: str) -> List[Dict[str, str]]:
     """Build <=6h [chunk_start, chunk_end) windows spanning [date_from, date_to] inclusive.
 
@@ -192,13 +217,17 @@ _LOT_PRODUCT_COLUMNS = ["LOT_ID", "PACKAGE", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION"]
 
 _RESOURCE_WORKCENTER_SQL_TEMPLATE = """\
 SELECT
-    TRIM(r.RESOURCENAME)   AS EQUIPMENT_ID,
-    TRIM(r.WORKCENTERNAME) AS WORKCENTERNAME
+    TRIM(r.RESOURCENAME)        AS EQUIPMENT_ID,
+    TRIM(r.WORKCENTERNAME)      AS WORKCENTERNAME,
+    TRIM(r.RESOURCEFAMILYNAME)  AS MODEL
 FROM DWH.DW_MES_RESOURCE r
 WHERE r.OBJECTCATEGORY = 'ASSEMBLY'
   AND r.RESOURCENAME IN ({placeholders})
 """
-_RESOURCE_WORKCENTER_COLUMNS = ["EQUIPMENT_ID", "WORKCENTERNAME"]
+# MODEL (RESOURCEFAMILYNAME, e.g. DBA_AD832UR) is carried into the spool so the
+# real 機型 is a first-class visible dimension (trend grouping + detail column),
+# not just a coarse filter -- same DW_MES_RESOURCE bridge, no extra query.
+_RESOURCE_WORKCENTER_COLUMNS = ["EQUIPMENT_ID", "WORKCENTERNAME", "MODEL"]
 
 
 def _empty_df(columns: List[str]):
@@ -317,6 +346,7 @@ def _build_final_select_sql(coarse_filter_hash: str) -> str:
             e.PARAMETER_NAME,
             TRY_CAST(e.UPH_VALUE_RAW AS DOUBLE) AS UPH_VALUE,
             w.WORKCENTERNAME,
+            w.MODEL,
             w.DB_WB_LABEL,
             lp.PACKAGE,
             lp.PJ_TYPE,
@@ -357,6 +387,7 @@ class UphPerformanceJob(BaseChunkedDuckDBJob):
         date_from = str(self.params.get("date_from", "")).strip()
         date_to = str(self.params.get("date_to", "")).strip()
         families = list(self.params.get("families", []))
+        models = list(self.params.get("models", []))
         workcenter_names = list(self.params.get("workcenter_names", []))
         packages = list(self.params.get("packages", []))
         pj_types = list(self.params.get("pj_types", []))
@@ -365,14 +396,15 @@ class UphPerformanceJob(BaseChunkedDuckDBJob):
         self._family_filter = _build_family_filter(families)
 
         eq_clause, eq_params = _build_equipment_ids_filter(equipment_ids)
+        mdl_clause, mdl_params = _build_models_exists_filter(models)
         pjt_clause, pjt_params = _build_container_exists_filter(pj_types, "PJ_TYPE", "pjt")
         pkg_clause, pkg_params = _build_container_exists_filter(packages, "PRODUCTLINENAME", "pkg")
         wc_clause, wc_params = _build_workcenter_names_exists_filter(workcenter_names)
 
         self._extra_filters = "".join(
-            f"\n  {clause}" for clause in (eq_clause, pjt_clause, pkg_clause, wc_clause) if clause
+            f"\n  {clause}" for clause in (eq_clause, mdl_clause, pjt_clause, pkg_clause, wc_clause) if clause
         )
-        self._extra_params = {**eq_params, **pjt_params, **pkg_params, **wc_params}
+        self._extra_params = {**eq_params, **mdl_params, **pjt_params, **pkg_params, **wc_params}
 
         from mes_dashboard.services.uph_performance_cache import (
             make_uph_performance_spool_key,
@@ -380,6 +412,7 @@ class UphPerformanceJob(BaseChunkedDuckDBJob):
         )
         self._spool_key = make_uph_performance_spool_key(
             date_from, date_to, families, workcenter_names, packages, pj_types, equipment_ids,
+            models=models,
         )
         self._spool_path = get_uph_performance_spool_path(self._spool_key)
         self._coarse_filter_hash = hashlib.sha256(self._spool_key.encode("utf-8")).hexdigest()[:8]

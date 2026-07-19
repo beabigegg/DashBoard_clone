@@ -22,9 +22,13 @@ from __future__ import annotations
 import hashlib
 from typing import Iterable, Optional
 
-# data-shape-contract.md §3.29 Spool parquet schema (schema_version 1).
+# data-shape-contract.md §3.29 Spool parquet schema.
 # Bump on any parquet column add/remove/rename.
-_SCHEMA_VERSION: int = 1
+#   v1 -> v2: added MODEL (RESOURCEFAMILYNAME) column to the spool so the real
+#             機型 is a visible trend/detail dimension (add-uph-performance-page
+#             redesign). Old v1 spools carry a different key suffix and simply
+#             age out via TTL -- no forced purge needed (ephemeral spool).
+_SCHEMA_VERSION: int = 2
 
 _NAMESPACE = "uph_performance"
 
@@ -44,6 +48,7 @@ def make_uph_performance_spool_key(
     packages: Optional[Iterable[str]] = (),
     pj_types: Optional[Iterable[str]] = (),
     equipment_ids: Optional[Iterable[str]] = (),
+    models: Optional[Iterable[str]] = (),
 ) -> str:
     """Build the deterministic spool key for a coarse UPH Performance query.
 
@@ -52,8 +57,10 @@ def make_uph_performance_spool_key(
     Canonical repr (sorted, per-dim separated so empty dims cannot collide,
     data-shape-contract.md §3.29 Spool key composition): date_from, date_to,
     families (closed enum subset of {GDBA, GWBA}; empty/absent = both),
-    workcenter_names, packages (PRODUCTLINENAME), pj_types (PJ_TYPE),
-    equipment_ids (whitespace-stripped). _SCHEMA_VERSION participates in the key.
+    models (RESOURCEFAMILYNAME, e.g. DBA_AD832UR -- the real 機型, replaces the
+    GDBA/GWBA-only selector), workcenter_names, packages (PRODUCTLINENAME),
+    pj_types (PJ_TYPE), equipment_ids (whitespace-stripped). _SCHEMA_VERSION
+    participates in the key.
 
     Note: the ranking endpoint's own pj_type[] fine filter is deliberately
     NOT part of this key (design.md Key Decisions; it re-slices the
@@ -67,6 +74,7 @@ def make_uph_performance_spool_key(
 
     canonical = "|".join([
         _canon_part("fam", families, upper=True),
+        _canon_part("mdl", models),
         _canon_part("wc", workcenter_names),
         _canon_part("pkg", packages),
         _canon_part("pjt", pj_types),

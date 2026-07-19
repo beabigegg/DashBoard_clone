@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.42.0
+schema-version: 1.43.0
 last-changed: 2026-07-16
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1930,11 +1930,11 @@ On `status=finished`, the job `result` payload is `{"query_id": "<string>"}` onl
 
 ### §3.29 UPH-Performance Spool Schema
 
-Added by change `add-uph-performance-page`. Spool namespace: `tmp/query_spool/uph_performance/`. Governed by `_SCHEMA_VERSION` in `uph_performance_cache.py`. Mirrors `eap-alarm-analysis`'s always-async (Type B) coarse-spool + DuckDB-derived-views pattern (§3.17).
+Added by change `add-uph-performance-page`. Updated by the filter-bar redesign (UPH-06, schema_version 1→2): real machine-model (`RESOURCEFAMILYNAME`) filter + cascadable machine-options endpoint replacing the GDBA/GWBA-only 機型 select and free-text 工作站/機台 textareas; `MODEL` added to the spool as a groupable trend dimension + detail column. Spool namespace: `tmp/query_spool/uph_performance/`. Governed by `_SCHEMA_VERSION` in `uph_performance_cache.py`. Mirrors `eap-alarm-analysis`'s always-async (Type B) coarse-spool + DuckDB-derived-views pattern (§3.17).
 
 #### Spool key composition
 
-`make_uph_performance_spool_key()` canonical repr covers (sorted): `date_from`, `date_to`, `families` (closed enum subset of `{GDBA, GWBA}`; empty/absent = both), `workcenter_names`, `packages` (PRODUCTLINENAME), `pj_types` (PJ_TYPE), `equipment_ids` (whitespace-stripped). `_SCHEMA_VERSION = 1` participates in the key.
+`make_uph_performance_spool_key()` canonical repr covers (sorted): `date_from`, `date_to`, `families` (DB/WB category, closed enum subset of `{GDBA, GWBA}`; empty/absent = both), `models` (RESOURCEFAMILYNAME machine model e.g. `DBA_AD832UR` — the real 機型 filter, UPH-06), `workcenter_names`, `packages` (PRODUCTLINENAME), `pj_types` (PJ_TYPE), `equipment_ids` (whitespace-stripped). `_SCHEMA_VERSION = 2` participates in the key.
 
 #### Oracle coarse-filter mapping
 
@@ -1945,6 +1945,7 @@ Added by change `add-uph-performance-page`. Spool namespace: `tmp/query_spool/up
 | pj_types | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PJ_TYPE),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join (mirrors EA-10) |
 | packages | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PRODUCTLINENAME),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join |
 | workcenter_names | `EXISTS (SELECT 1 FROM DWH.DW_MES_RESOURCE r WHERE r.RESOURCENAME = e.EQUIPMENT_ID AND r.OBJECTCATEGORY = 'ASSEMBLY' AND NVL(TRIM(r.WORKCENTERNAME),'(NA)') IN (...))` | DWH.DW_MES_RESOURCE | EXISTS semi-join |
+| models (機型, UPH-06) | `EXISTS (SELECT 1 FROM DWH.DW_MES_RESOURCE r WHERE r.RESOURCENAME = e.EQUIPMENT_ID AND r.OBJECTCATEGORY = 'ASSEMBLY' AND NVL(TRIM(r.RESOURCEFAMILYNAME),'(NA)') IN (...))` | DWH.DW_MES_RESOURCE.RESOURCEFAMILYNAME | EXISTS semi-join (mirrors workcenter_names) |
 
 Mandatory index filter (UPH-01, mirrors EA-03): `LAST_UPDATE_TIME BETWEEN :date_from AND :date_to`. Every chunk window is ≤6h (`BaseChunkedDuckDBJob`, `chunk_strategy=TIME`) — the detail JOIN against this ~12M-row/day table has previously timed out at >180s over a 24h window (docs/architecture/eap-event-uph-collection-investigation.md); a single unchunked full-range query is forbidden. Event-type predicate: `EVENT_TYPE LIKE '%_M[60]' AND LOT_ID IS NOT NULL`.
 
@@ -1962,10 +1963,10 @@ Mandatory index filter (UPH-01, mirrors EA-03): `LAST_UPDATE_TIME BETWEEN :date_
 #### Product-dim + workcenter enrichment
 
 - `LOT_ID` → `DW_MES_CONTAINER.CONTAINERNAME` bridge (mirrors `eap_alarm_worker.py`'s pattern — `DW_MES_WIP` has no `CONTAINERID` index) → `PRODUCTLINENAME` (displayed as **Package**), `PJ_TYPE` (displayed as **Type**), `PJ_BOP`, `PJ_FUNCTION`. No container match → all four `NULL`.
-- `EQUIPMENT_ID` → `DW_MES_RESOURCE.RESOURCENAME` bridge (`OBJECTCATEGORY = 'ASSEMBLY'`) → `WORKCENTERNAME`. No resource match → `WORKCENTERNAME` `NULL`.
+- `EQUIPMENT_ID` → `DW_MES_RESOURCE.RESOURCENAME` bridge (`OBJECTCATEGORY = 'ASSEMBLY'`) → `WORKCENTERNAME` **and `MODEL` (`RESOURCEFAMILYNAME`, the real 機型 e.g. `DBA_AD832UR`)**. No resource match → both `NULL`. Same single bridge query serves the workcenter enrichment and the model column.
 - `WORKCENTERNAME` → `src/mes_dashboard/config/workcenter_groups.py` 焊接_DB/焊接_WB mapping → DB/WB label (UPH-05). **MUST use this mapping — MUST NOT use `EQUIPMENT_ID` prefix enumeration** (a prior prefix-enumeration approach for a similar classification was retired because it never matched real production data; business-rules.md EA-07). Unmapped/NULL `WORKCENTERNAME` → DB/WB label `NULL` (not an error).
 
-#### Parquet column schema (schema_version 1)
+#### Parquet column schema (schema_version 2)
 
 | column | type | nullable | notes |
 |---|---|---|---|
@@ -1976,12 +1977,13 @@ Mandatory index filter (UPH-01, mirrors EA-03): `LAST_UPDATE_TIME BETWEEN :date_
 | PARAMETER_NAME | VARCHAR | no | `BondUPH` (GDBA) or `fHCM_UPH` (GWBA) — family-conditional (UPH-03) |
 | UPH_VALUE | DOUBLE | yes | raw `PARAMETER_VALUE`, no scale conversion (UPH-04); `NULL` when the detail join finds no matching parameter row for this event |
 | WORKCENTERNAME | VARCHAR | yes | `DW_MES_RESOURCE` bridge; `NULL` if no resource match |
+| MODEL | VARCHAR | yes | `DW_MES_RESOURCE.RESOURCEFAMILYNAME` (real 機型 e.g. `DBA_AD832UR`) via the same bridge (v2, UPH-06); `NULL` if no resource match. Groupable trend dimension + detail column |
 | DB_WB_LABEL | VARCHAR | yes | `焊接_DB \| 焊接_WB` via `workcenter_groups` mapping (UPH-05); `NULL` if `WORKCENTERNAME` is `NULL` or unmapped |
 | PACKAGE | VARCHAR | yes | `DW_MES_CONTAINER.PRODUCTLINENAME`, displayed as **Package**; `NULL` if no container match |
 | PJ_TYPE | VARCHAR | yes | `DW_MES_CONTAINER.PJ_TYPE`, displayed as **Type**; `NULL` if no container match |
 | PJ_BOP | VARCHAR | yes | `DW_MES_CONTAINER.PJ_BOP`; `NULL` if no container match |
 | PJ_FUNCTION | VARCHAR | yes | `DW_MES_CONTAINER.PJ_FUNCTION`; `NULL` if no container match |
-| coarse_filter_hash | VARCHAR | no | hash of the 5 coarse dims (mirrors EA-01's `eqp_types_filter`); used for partition-reuse validation |
+| coarse_filter_hash | VARCHAR | no | hash of the 6 coarse dims (mirrors EA-01's `eqp_types_filter`); used for partition-reuse validation |
 
 **Breaking-change surface:** column add/remove/rename to the `uph_performance` parquet orphans existing files — bump `_SCHEMA_VERSION` in the same commit. Rollback: `rm -f tmp/query_spool/uph_performance/*.parquet`.
 
@@ -1993,11 +1995,13 @@ Fine-filter axes (filter-options / trend / detail — global-filter-scoped): `eq
 
 **Product-filter-options** (`GET /api/uph-performance/product-filter-options`, no `query_id`): Oracle-free, sourced from `container_filter_cache` cross-filter narrowing (mirrors eap-alarm's `/product-filter-options`) — `data = {pj_types: string[], product_lines: string[]}` populated before the user has run any query, so the Package/Type global-filter dropdowns are not empty pre-first-query.
 
-**Trend** (`GET /api/uph-performance/trend`): `data = {labels: string[], series: [{name: string, data: (number|null)[]}], group_by: string}`. `group_by` closed enum (400 on unknown): `equipment_id` | `family` | `package` (default `family`). Native `M[60]` hourly granularity — no day/hour granularity switch (unlike eap-alarm trend). A group's missing hour bucket is `null` in `data[]`, never `0` — a gap must not visually imply zero output.
+**Machine-options** (`GET /api/uph-performance/machine-options`, no `query_id`; UPH-06): pre-query cascadable dropdown source for the redesigned filter bar, sourced from `DWH.DW_MES_RESOURCE` (`OBJECTCATEGORY = 'ASSEMBLY'`, `RESOURCENAME LIKE 'GDBA%'/'GWBA%'`), cached in-process per worker (1h TTL). `data = {families: [{code (GDBA/GWBA), label (Die-Bond/Wire-Bond)}], models: [{family, model}] (model = `RESOURCEFAMILYNAME`), workcenters: string[] (`WORKCENTERNAME`), equipment: [{equipment_id (`RESOURCENAME`), family, model, workcenter}]}`. The full per-equipment `equipment[]` map lets the frontend cascade family → model → workcenter → equipment entirely client-side. Replaces the old GDBA/GWBA-only 機型 select and the free-text 工作站 / 機台 textareas (which had no pre-query options endpoint). On Oracle/cache failure → HTTP 500; the frontend shows an inline warning while the date range + Package/Type filters stay usable.
+
+**Trend** (`GET /api/uph-performance/trend`): `data = {labels: string[], series: [{name: string, data: (number|null)[]}], group_by: string}`. `group_by` closed enum (400 on unknown): `equipment_id` | `family` (DB/WB category) | `model` (機型, `RESOURCEFAMILYNAME` — v2, UPH-06) | `package` (default `family`). Native `M[60]` hourly granularity — no day/hour granularity switch (unlike eap-alarm trend). A group's missing hour bucket is `null` in `data[]`, never `0` — a gap must not visually imply zero output.
 
 **Ranking** (`GET /api/uph-performance/ranking`): `data = {items: [{equipment_id: string, workcenter_name: string | null, db_wb_label: string | null, pj_type: string | null, avg_uph: number | null, sample_count: integer}], pj_types: string[]}`. `items` grouped by `equipment_id` (further groupable by `pj_type` client-side), sorted **ascending** by `avg_uph` (lowest-UPH equipment first — the point is finding underperformers). No threshold/alert coloring (explicit non-goal). The `pj_type[]` query param on this endpoint is a **fine filter independent of the page's global filters** — it re-queries the DuckDB spool with its own selection state and does not read or write the global `pj_type` filter; it is NOT part of the spool key (the spool is already built at global scope). `avg_uph` is `null` for an equipment/pj_type combination with zero rows carrying a non-null `UPH_VALUE` (never a divide-by-zero `0`).
 
-**Detail** (`GET /api/uph-performance/detail`): `data = {rows: [{lot_id: string, equipment_id: string, event_time: string (ISO 8601), uph_value: number | null, package: string | null, pj_type: string | null}], meta: {page: int, per_page: int, total_count: int, total_pages: int}}`. Pagination: `per_page` max 200 (mirrors EA-04 detail pagination).
+**Detail** (`GET /api/uph-performance/detail`): `data = {rows: [{lot_id: string, equipment_id: string, model: string | null, event_time: string (ISO 8601), uph_value: number | null, package: string | null, pj_type: string | null}], meta: {page: int, per_page: int, total_count: int, total_pages: int}}`. `model` (機型, `RESOURCEFAMILYNAME` — v2, UPH-06) is `null` when the equipment has no `DW_MES_RESOURCE` match. Pagination: `per_page` max 200 (mirrors EA-04 detail pagination).
 
 #### Async envelope (mirrors §3.17 / EA-ASYNC; `POST /api/uph-performance/spool`)
 

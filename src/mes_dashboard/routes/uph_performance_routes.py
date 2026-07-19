@@ -134,6 +134,7 @@ def api_uph_performance_spool():
     date_from = str(body.get("date_from") or "").strip()
     date_to = str(body.get("date_to") or "").strip()
     families = _clean_str_list(body.get("families"))
+    models = _clean_str_list(body.get("models"))
     workcenter_names = _clean_str_list(body.get("workcenter_names"))
     packages = _clean_str_list(body.get("packages"))
     pj_types = _clean_str_list(body.get("pj_types"))
@@ -151,6 +152,7 @@ def api_uph_performance_spool():
         from mes_dashboard.services.uph_performance_cache import make_uph_performance_spool_key
         spool_key = make_uph_performance_spool_key(
             date_from, date_to, families, workcenter_names, packages, pj_types, equipment_ids,
+            models=models,
         )
     except ValueError as exc:
         return validation_error(str(exc))
@@ -192,6 +194,7 @@ def api_uph_performance_spool():
                 "date_from": date_from,
                 "date_to": date_to,
                 "families": families,
+                "models": models,
                 "workcenter_names": workcenter_names,
                 "packages": packages,
                 "pj_types": pj_types,
@@ -300,6 +303,28 @@ def api_uph_performance_product_filter_options():
         "pj_types": data.get("pj_types") or [],
         "product_lines": data.get("packages") or [],  # packages -> product_lines (PRODUCTLINENAME)
     })
+
+
+# ── GET /api/uph-performance/machine-options ─────────────────────────────────
+
+@uph_performance_bp.route("/machine-options", methods=["GET"])
+def api_uph_performance_machine_options():
+    """Return cascadable machine filter options (機型/工作站/機台) from the
+    equipment master DW_MES_RESOURCE (Oracle, cached per-worker TTL).
+
+    Feeds the pre-query filter-bar dropdowns (family/model/workcenter/equipment)
+    -- replaces the old GDBA/GWBA-only 機型 select and the free-text 工作站 /
+    機台 textareas. A cache/Oracle failure returns HTTP 500; the frontend shows
+    an inline warning while the date range + Package/Type filters stay usable.
+    """
+    try:
+        from mes_dashboard.services.uph_performance_machine_options import get_machine_options
+        data = get_machine_options()
+    except Exception as exc:
+        logger.error("uph_performance_routes: machine-options failed: %s", exc, exc_info=True)
+        return internal_error("機台選項查詢失敗")
+
+    return success_response(data)
 
 
 # ── GET /api/uph-performance/trend ───────────────────────────────────────────

@@ -31,6 +31,7 @@ def _empty_spool(tmp_path) -> str:
         pa.field("PARAMETER_NAME", pa.string()),
         pa.field("UPH_VALUE", pa.float64()),
         pa.field("WORKCENTERNAME", pa.string()),
+        pa.field("MODEL", pa.string()),
         pa.field("DB_WB_LABEL", pa.string()),
         pa.field("PACKAGE", pa.string()),
         pa.field("PJ_TYPE", pa.string()),

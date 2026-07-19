@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.44.0
+schema-version: 1.45.0
 last-changed: 2026-07-16
 breaking-change-policy: deprecate-2-minors
 ---
@@ -263,11 +263,11 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/eap-alarm/product-filter-options | required | - | EapAlarmProductFilterOptionsResponse | 500 | route tests |
 | POST | /api/query-tool/lot-history | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/query-tool/lot-associations | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
-| POST | /api/uph-performance/spool | required | JSON body {date_from, date_to (both required, 730-day cap SYS-04), families[] (opt, closed enum GDBA/GWBA; empty/absent = both), workcenter_names[] (opt), packages[] (opt), pj_types[] (opt), equipment_ids[] (opt, max 200)} | UphPerformanceSpoolJobAccepted | 202/400/500/503 | route tests |
+| POST | /api/uph-performance/spool | required | JSON body {date_from, date_to (both required, 730-day cap SYS-04), families[] (opt, DB/WB category, closed enum GDBA/GWBA; empty/absent = both), models[] (opt, RESOURCEFAMILYNAME machine model e.g. DBA_AD832UR — the real 機型 filter, UPH-06), workcenter_names[] (opt), packages[] (opt), pj_types[] (opt), equipment_ids[] (opt, max 200)} | UphPerformanceSpoolJobAccepted | 202/400/500/503 | route tests |
 | GET | /api/uph-performance/spool/status | required | ?query_id= | UphPerformanceSpoolStatusResponse | 400/410 | route tests |
 | GET | /api/uph-performance/filter-options | required | ?query_id= | UphPerformanceFilterOptionsResponse | 400/410 | route tests |
 | GET | /api/uph-performance/product-filter-options | required | - | UphPerformanceProductFilterOptionsResponse | 500 | route tests |
-| GET | /api/uph-performance/trend | required | ?query_id=&group_by=(equipment_id/family/package, default family; 400 on unknown)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceTrendResponse | 400/410 | route tests |
+| GET | /api/uph-performance/trend | required | ?query_id=&group_by=(equipment_id/family/model/package, default family; 400 on unknown)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceTrendResponse | 400/410 | route tests |
 | GET | /api/uph-performance/ranking | required | ?query_id=&pj_type[]=(opt, own filter axis independent of global filters) | UphPerformanceRankingResponse | 400/410 | route tests |
 | GET | /api/uph-performance/detail | required | ?query_id=&page=&per_page=(max 200)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceDetailResponse | 400/410 | route tests |
 | GET | /api/production-achievement/package-lf-map | required | - | ProductionAchievementPackageLfMapResponse | 500 | route tests |
@@ -279,6 +279,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/production-achievement/known-package-lf-values | required | - | ProductionAchievementKnownPackageLfValuesResponse | 500 | route tests |
 | GET | /api/production-achievement/known-workcenter-groups | required | - | ProductionAchievementKnownWorkcenterGroupsResponse | 500 | route tests |
 | GET | /api/production-achievement/permissions/me | required | - | ProductionAchievementOwnPermissionResponse | 500 | route tests |
+| GET | /api/uph-performance/machine-options | required | - | UphPerformanceMachineOptionsResponse | 500 | route tests |
 
 ## 5. Routing & Naming
 
@@ -1649,7 +1650,7 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 ### UphPerformanceTrendSeriesItem
 | field | type | required | format | notes |
 |---|---|---|---|---|
-| name | string | yes |  | group label (equipment_id, family, or package value depending on group_by) |
+| name | string | yes |  | group label — equipment_id, family (DB/WB category), model (機型), or package value depending on group_by |
 | data | number[] | yes |  | one value per label bucket; null entries mean a missing hour, never a zero |
 
 ### UphPerformanceRankingItem
@@ -1664,6 +1665,7 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 |---|---|---|---|---|
 | lot_id | string | yes |  |  |
 | equipment_id | string | yes |  |  |
+| model | string | no |  | machine model (RESOURCEFAMILYNAME); null when equipment has no DW_MES_RESOURCE match |
 | uph_value | number | no |  | raw PARAMETER_VALUE, no scale conversion (UPH-04) |
 
 ### UphPerformanceTrendResponse
@@ -1801,3 +1803,31 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 | plan_package_group | string | yes |  |  |
 | planqty_input | integer | yes |  |  |
 | planqty_output | integer | yes |  |  |
+
+### UphPerformanceMachineFamily
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| code | string | yes |  | GDBA or GWBA |
+| label | string | yes |  | Die-Bond or Wire-Bond |
+
+### UphPerformanceMachineModel
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| family | string | yes |  | GDBA/GWBA the model belongs to |
+| model | string | yes |  | RESOURCEFAMILYNAME (e.g. DBA_AD832UR) — the real 機型 |
+
+### UphPerformanceMachineEquipment
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| equipment_id | string | yes |  | RESOURCENAME (e.g. GDBA-0131) |
+| family | string | yes |  | GDBA/GWBA |
+| model | string | no |  | RESOURCEFAMILYNAME; null when unmapped |
+| workcenter | string | no |  | WORKCENTERNAME; null when unmapped |
+
+### UphPerformanceMachineOptionsResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| families | UphPerformanceMachineFamily[] | yes |  | DB/WB category options |
+| models | UphPerformanceMachineModel[] | yes |  | cascade source (family→model) |
+| workcenters | string[] | yes |  | distinct WORKCENTERNAME (工作站) |
+| equipment | UphPerformanceMachineEquipment[] | yes |  | full per-equipment map for client-side cascade |

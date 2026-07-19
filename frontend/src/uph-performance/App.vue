@@ -27,6 +27,9 @@ const {
   productFilterOptions,
   productOptionsLoading,
   productOptionsError,
+  machineOptions,
+  machineOptionsLoading,
+  machineOptionsError,
   queryId,
   spoolReady,
   setQueryId,
@@ -233,6 +236,7 @@ async function _loadAfterSpool(qId: string): Promise<void> {
 function handleClear(): void {
   cancelAsyncJob();
   coarseFilter.families = [];
+  coarseFilter.models = [];
   coarseFilter.workcenter_names = [];
   coarseFilter.packages = [];
   coarseFilter.pj_types = [];
@@ -307,6 +311,9 @@ async function handleFineFilterChange(): Promise<void> {
       <!-- Coarse filter bar -->
       <FilterBar
         :filters="coarseFilter"
+        :machine-options="machineOptions"
+        :machine-options-loading="machineOptionsLoading"
+        :machine-options-error="machineOptionsError"
         :product-filter-options="productFilterOptions"
         :product-options-loading="productOptionsLoading"
         :product-options-error="productOptionsError"

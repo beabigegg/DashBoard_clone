@@ -1,14 +1,25 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 
-// Closed enum per UPH-02 — no other family prefix is ever valid for this page.
-const FAMILY_OPTIONS = Object.freeze(['GDBA', 'GWBA']);
+interface MachineRow {
+  equipment_id: string;
+  family: string;
+  model: string | null;
+  workcenter: string | null;
+}
+interface MachineOptions {
+  families: { code: string; label: string }[];
+  models: { family: string; model: string }[];
+  workcenters: string[];
+  equipment: MachineRow[];
+}
 
 interface CoarseFilter {
   date_from: string;
   date_to: string;
-  families: string[];
+  families: string[];        // DB/WB category (GDBA/GWBA)
+  models: string[];          // 機型 (RESOURCEFAMILYNAME)
   workcenter_names: string[];
   packages: string[];
   pj_types: string[];
@@ -27,6 +38,9 @@ interface LoadingState {
 
 const props = defineProps<{
   filters: CoarseFilter;
+  machineOptions: MachineOptions;
+  machineOptionsLoading?: boolean;
+  machineOptionsError?: string;
   productFilterOptions: ProductFilterOptions;
   loading: LoadingState;
   productOptionsLoading?: boolean;
@@ -39,43 +53,77 @@ const emit = defineEmits<{
   (e: 'update:filters', value: CoarseFilter): void;
 }>();
 
-// ── Free-text multi-value entry (no pre-query options endpoint exists for
-//    workcenter_names / equipment_ids in the API contract — mirrors
-//    eap-alarm's LOT ID textarea pattern) ──────────────────────────────────
-const workcenterRaw = ref('');
-const equipmentRaw = ref('');
-
-function parseLines(raw: string): string[] {
-  return raw
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean);
+// ── Cascade (machine-options): family (DB/WB) -> model -> workcenter -> equipment ──
+// Each dropdown's options are constrained by the UPSTREAM selections only; an
+// empty upstream selection means "all". Downstream selections are pruned in the
+// change handlers below so an invalid combination can never survive a change.
+function matchRows(families: string[], models: string[], workcenters: string[]): MachineRow[] {
+  return (props.machineOptions.equipment || []).filter((r) =>
+    (families.length === 0 || families.includes(r.family)) &&
+    (models.length === 0 || (r.model != null && models.includes(r.model))) &&
+    (workcenters.length === 0 || (r.workcenter != null && workcenters.includes(r.workcenter))),
+  );
+}
+function distinct<T>(xs: (T | null | undefined)[]): T[] {
+  return [...new Set(xs.filter((x): x is T => x != null && x !== ''))];
 }
 
-function onWorkcenterBlur() {
-  emit('update:filters', { ...props.filters, workcenter_names: parseLines(workcenterRaw.value) });
-}
+// DB/WB category options: value = GDBA/GWBA code, label = 分類 (GDBA)
+const familyOptions = computed(() =>
+  (props.machineOptions.families || []).map((f) => ({ label: `${f.label} (${f.code})`, value: f.code })),
+);
+// 機型: constrained by selected families; sorted.
+const modelOptions = computed(() =>
+  distinct(matchRows(props.filters.families, [], []).map((r) => r.model)).sort(),
+);
+// 工作站: constrained by families + models.
+const workcenterOptions = computed(() =>
+  distinct(matchRows(props.filters.families, props.filters.models, []).map((r) => r.workcenter)).sort(),
+);
+// 機台: constrained by families + models + workcenters.
+const equipmentOptions = computed(() =>
+  distinct(
+    matchRows(props.filters.families, props.filters.models, props.filters.workcenter_names).map((r) => r.equipment_id),
+  ).sort(),
+);
 
-function onEquipmentBlur() {
-  emit('update:filters', { ...props.filters, equipment_ids: parseLines(equipmentRaw.value) });
+// Change handlers prune every downstream axis to values still reachable under
+// the new upstream selection (so the spool never receives a mutually-exclusive
+// combination the user can no longer see).
+function onFamiliesChange(families: string[]) {
+  const validModels = new Set(distinct(matchRows(families, [], []).map((r) => r.model)));
+  const models = props.filters.models.filter((m) => validModels.has(m));
+  applyDownstream(families, models);
+}
+function onModelsChange(models: string[]) {
+  applyDownstream(props.filters.families, models);
+}
+function onWorkcentersChange(workcenter_names: string[]) {
+  const validEq = new Set(matchRows(props.filters.families, props.filters.models, workcenter_names).map((r) => r.equipment_id));
+  const equipment_ids = props.filters.equipment_ids.filter((e) => validEq.has(e));
+  emit('update:filters', { ...props.filters, workcenter_names, equipment_ids });
+}
+function onEquipmentChange(equipment_ids: string[]) {
+  emit('update:filters', { ...props.filters, equipment_ids });
+}
+// Re-prune workcenters + equipment for a given (families, models).
+function applyDownstream(families: string[], models: string[]) {
+  const validWc = new Set(distinct(matchRows(families, models, []).map((r) => r.workcenter)));
+  const workcenter_names = props.filters.workcenter_names.filter((w) => validWc.has(w));
+  const validEq = new Set(matchRows(families, models, workcenter_names).map((r) => r.equipment_id));
+  const equipment_ids = props.filters.equipment_ids.filter((e) => validEq.has(e));
+  emit('update:filters', { ...props.filters, families, models, workcenter_names, equipment_ids });
 }
 
 function handleSubmit() {
-  // Sync free-text fields from their textareas in case blur didn't fire yet.
-  emit('update:filters', {
-    ...props.filters,
-    workcenter_names: parseLines(workcenterRaw.value),
-    equipment_ids: parseLines(equipmentRaw.value),
-  });
   emit('submit');
 }
 
 function handleClear() {
-  workcenterRaw.value = '';
-  equipmentRaw.value = '';
   emit('update:filters', {
     ...props.filters,
     families: [],
+    models: [],
     workcenter_names: [],
     packages: [],
     pj_types: [],
@@ -84,14 +132,19 @@ function handleClear() {
   emit('clear');
 }
 
-// UPH-only rule: date range is the sole required input (no at-least-one-of-N
-// rule — families empty means "both", per UPH-02).
+// UPH-only rule: date range is the sole required input (families empty = both).
 const canSubmit = computed(() =>
   !props.loading.querying &&
   !!props.filters.date_from &&
   !!props.filters.date_to &&
-  props.filters.date_from <= props.filters.date_to
+  props.filters.date_from <= props.filters.date_to,
 );
+
+const equipmentPlaceholder = computed(() => {
+  if (props.machineOptionsLoading) return '載入中...';
+  const n = equipmentOptions.value.length;
+  return n ? `全部機台 (${n} 台)` : '全部機台';
+});
 </script>
 
 <template>
@@ -124,45 +177,58 @@ const canSubmit = computed(() =>
         />
       </div>
 
-      <!-- Family (GDBA/GWBA only — confirmed #7: no static DB/WB gloss here) -->
+      <!-- DB/WB category (GDBA/GWBA) -->
       <div class="filter-group">
-        <label class="filter-label">機型</label>
+        <label class="filter-label">類別 (Die-Bond / Wire-Bond)</label>
         <MultiSelect
           :model-value="filters.families"
-          :options="FAMILY_OPTIONS"
-          placeholder="全部 (GDBA/GWBA)"
+          :options="familyOptions"
+          :disabled="loading.querying || machineOptionsLoading"
+          placeholder="全部類別"
           data-testid="ctrl-family-select"
-          @update:model-value="(v: string[]) => emit('update:filters', { ...filters, families: v })"
+          @update:model-value="onFamiliesChange"
         />
       </div>
 
-      <!-- Workcenter (free-text, no pre-query options endpoint) -->
-      <div class="filter-group filter-group-wide">
-        <label class="filter-label" for="uph-workcenter">工作站 / WORKCENTERNAME</label>
-        <textarea
-          id="uph-workcenter"
-          v-model="workcenterRaw"
-          class="filter-input filter-textarea"
-          :disabled="loading.querying"
-          placeholder="每行一個工作站名稱 / One WORKCENTERNAME per line"
-          rows="2"
+      <!-- 機型 (RESOURCEFAMILYNAME) — cascaded by category -->
+      <div class="filter-group">
+        <label class="filter-label">機型 / Model</label>
+        <MultiSelect
+          :model-value="filters.models"
+          :options="modelOptions"
+          :disabled="loading.querying || machineOptionsLoading"
+          :placeholder="machineOptionsLoading ? '載入中...' : '全部機型'"
+          searchable
+          data-testid="ctrl-model-select"
+          @update:model-value="onModelsChange"
+        />
+      </div>
+
+      <!-- 工作站 (WORKCENTERNAME) — cascaded -->
+      <div class="filter-group">
+        <label class="filter-label">工作站 / Workcenter</label>
+        <MultiSelect
+          :model-value="filters.workcenter_names"
+          :options="workcenterOptions"
+          :disabled="loading.querying || machineOptionsLoading"
+          :placeholder="machineOptionsLoading ? '載入中...' : '全部工作站'"
+          searchable
           data-testid="ctrl-workcenter-select"
-          @blur="onWorkcenterBlur"
+          @update:model-value="onWorkcentersChange"
         />
       </div>
 
-      <!-- Equipment ID (free-text, max 200) -->
-      <div class="filter-group filter-group-wide">
-        <label class="filter-label" for="uph-equipment">機台 ID / EQUIPMENT_ID</label>
-        <textarea
-          id="uph-equipment"
-          v-model="equipmentRaw"
-          class="filter-input filter-textarea"
-          :disabled="loading.querying"
-          placeholder="每行一個機台 ID，最多 200 筆 / One EQUIPMENT_ID per line, max 200"
-          rows="2"
-          data-testid="ctrl-equipment-search"
-          @blur="onEquipmentBlur"
+      <!-- 機台 (RESOURCENAME / EQUIPMENT_ID) — cascaded, searchable (408) -->
+      <div class="filter-group">
+        <label class="filter-label">機台 ID / Equipment</label>
+        <MultiSelect
+          :model-value="filters.equipment_ids"
+          :options="equipmentOptions"
+          :disabled="loading.querying || machineOptionsLoading"
+          :placeholder="equipmentPlaceholder"
+          searchable
+          data-testid="ctrl-equipment-select"
+          @update:model-value="onEquipmentChange"
         />
       </div>
 
@@ -180,8 +246,7 @@ const canSubmit = computed(() =>
         />
       </div>
 
-      <!-- Type (global scope — feeds the spool key; visibly distinct from the
-           ranking block's own independent Type filter) -->
+      <!-- Type (global scope) -->
       <div class="filter-group">
         <label class="filter-label">Type / 全域類型</label>
         <MultiSelect
@@ -195,8 +260,10 @@ const canSubmit = computed(() =>
         />
       </div>
 
-      <!-- Confirmed #6: product-filter-options 500 -> inline warning; other
-           filters remain usable (state-coarse-options-degraded) -->
+      <!-- Options-load warnings (machine-options / product-options degrade) -->
+      <div v-if="machineOptionsError" class="filter-group-full product-options-warning" data-testid="machine-options-warning" role="alert">
+        機型 / 工作站 / 機台 選項載入失敗，可改用日期與 Package / Type 篩選：{{ machineOptionsError }}
+      </div>
       <div v-if="productOptionsError" class="filter-group-full product-options-warning" data-testid="product-options-warning" role="alert">
         Package / Type 選項載入失敗，其餘篩選器仍可使用：{{ productOptionsError }}
       </div>
@@ -226,7 +293,7 @@ const canSubmit = computed(() =>
           </button>
         </div>
         <div class="filter-hint">
-          日期為必填；機型 / 工作站 / Package / Type / 機台 ID 皆為選填（留空代表全部）。
+          日期為必填；類別 / 機型 / 工作站 / 機台 / Package / Type 皆為選填（留空代表全部），機型以下逐層連動。
         </div>
       </div>
     </div>

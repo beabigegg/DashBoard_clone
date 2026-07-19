@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.45.0] — 2026-07-19
+### Added
+- uph-performance-machine-model-redesign: `GET /api/uph-performance/machine-options` (cascadable 機型/工作站/機台 dropdown source from `DW_MES_RESOURCE`; new schemas `UphPerformanceMachineOptionsResponse`, `UphPerformanceMachineFamily`, `UphPerformanceMachineModel`, `UphPerformanceMachineEquipment`). `POST /api/uph-performance/spool` body gains optional `models[]` (RESOURCEFAMILYNAME machine-model filter, UPH-06). `GET /api/uph-performance/trend` `group_by` enum gains `model`. `UphPerformanceDetailRow` gains `model`. Additive/backward-compatible.
+
+## [data 1.43.0] — 2026-07-19
+### Added
+- uph-performance-machine-model-redesign: §3.29 schema_version 1→2 — `MODEL` (`RESOURCEFAMILYNAME`) column added to the `uph_performance` spool via the existing `EQUIPMENT_ID`→`DW_MES_RESOURCE` bridge (groupable trend dimension + detail column); `models` added to the spool key + Oracle coarse-filter mapping (`EXISTS` on `RESOURCEFAMILYNAME`); new `GET /api/uph-performance/machine-options` response shape; trend `group_by` gains `model`; detail row gains `model`. Deploy: key bump orphans v1 spools (no manual rm needed on ordinary bumps); schema-breaking rollback: `rm -f tmp/query_spool/uph_performance/*.parquet`.
+
+## [business 1.52.0] — 2026-07-19
+### Added
+- uph-performance-machine-model-redesign: Added UPH-06 — the 機型 filter is the real machine model (`DW_MES_RESOURCE.RESOURCEFAMILYNAME`, e.g. `DBA_AD832UR`), NOT the GDBA/GWBA family prefix (now a coarser DB/WB *category*, still `families[]`/UPH-02). 機型/工作站/機台 are cascadable pre-query dropdowns from `GET /api/uph-performance/machine-options`; `models[]` filters the coarse spool via an `EXISTS` semi-join on `RESOURCEFAMILYNAME` and participates in the spool key; `MODEL` is carried into the spool (schema_version 2) as a groupable trend dimension + detail column. Replaces the GDBA/GWBA-only 機型 select and the free-text 工作站/機台 textareas.
+
 ## [api 1.44.0] — 2026-07-16
 ### Changed (BREAKING)
 - production-achievement-oracle-plan-source: `GET /api/production-achievement/report` `ProductionAchievementReportResponse` redefined in place again — `data.daily_plan_map` renamed to `data.plan_map`, shape changed from static `(workcenter_group, package_lf_group) -> daily_plan_qty` to date-indexed `(output_date, plan_package_group) -> {planqty_input, planqty_output}` (new schema `ProductionAchievementPlanMapEntry`). `data.workcenter_merge_map` entries gain `parent_group`/`plan_source_side`. `PUT /api/production-achievement/workcenter-merge-map` body gains a REQUIRED `plan_source_side` field. No deprecation window (same pre-launch/atomic-PR/sole-consumer exception precedent as every prior `production-achievement-*` breaking change).

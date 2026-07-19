@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.44.0"
+    "version": "1.45.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -6103,7 +6103,7 @@
           }
         ],
         "requestBody": {
-          "description": "Contract request: JSON body {date_from, date_to (both required, 730-day cap SYS-04), families[] (opt, closed enum GDBA/GWBA; empty/absent = both), workcenter_names[] (opt), packages[] (opt), pj_types[] (opt), equipment_ids[] (opt, max 200)} (schema not machine-resolved; see contract)",
+          "description": "Contract request: JSON body {date_from, date_to (both required, 730-day cap SYS-04), families[] (opt, DB/WB category, closed enum GDBA/GWBA; empty/absent = both), models[] (opt, RESOURCEFAMILYNAME machine model e.g. DBA_AD832UR — the real 機型 filter, UPH-06), workcenter_names[] (opt), packages[] (opt), pj_types[] (opt), equipment_ids[] (opt, max 200)} (schema not machine-resolved; see contract)",
           "content": {},
           "x-cdd-unresolved": true
         },
@@ -6577,6 +6577,32 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProductionAchievementOwnPermissionResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/uph-performance/machine-options": {
+      "get": {
+        "summary": "GET /api/uph-performance/machine-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: UphPerformanceMachineOptionsResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UphPerformanceMachineOptionsResponse"
                 }
               }
             }
@@ -8865,7 +8891,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "group label (equipment_id, family, or package value depending on group_by)"
+            "description": "group label — equipment_id, family (DB/WB category), model (機型), or package value depending on group_by"
           },
           "data": {
             "type": "array",
@@ -8907,6 +8933,10 @@
           },
           "equipment_id": {
             "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "description": "machine model (RESOURCEFAMILYNAME); null when equipment has no DW_MES_RESOURCE match"
           },
           "uph_value": {
             "type": "number",
@@ -9307,6 +9337,104 @@
           "plan_package_group",
           "planqty_input",
           "planqty_output"
+        ]
+      },
+      "UphPerformanceMachineFamily": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "GDBA or GWBA"
+          },
+          "label": {
+            "type": "string",
+            "description": "Die-Bond or Wire-Bond"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ]
+      },
+      "UphPerformanceMachineModel": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string",
+            "description": "GDBA/GWBA the model belongs to"
+          },
+          "model": {
+            "type": "string",
+            "description": "RESOURCEFAMILYNAME (e.g. DBA_AD832UR) — the real 機型"
+          }
+        },
+        "required": [
+          "family",
+          "model"
+        ]
+      },
+      "UphPerformanceMachineEquipment": {
+        "type": "object",
+        "properties": {
+          "equipment_id": {
+            "type": "string",
+            "description": "RESOURCENAME (e.g. GDBA-0131)"
+          },
+          "family": {
+            "type": "string",
+            "description": "GDBA/GWBA"
+          },
+          "model": {
+            "type": "string",
+            "description": "RESOURCEFAMILYNAME; null when unmapped"
+          },
+          "workcenter": {
+            "type": "string",
+            "description": "WORKCENTERNAME; null when unmapped"
+          }
+        },
+        "required": [
+          "equipment_id",
+          "family"
+        ]
+      },
+      "UphPerformanceMachineOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "families": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UphPerformanceMachineFamily"
+            },
+            "description": "DB/WB category options"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UphPerformanceMachineModel"
+            },
+            "description": "cascade source (family→model)"
+          },
+          "workcenters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "distinct WORKCENTERNAME (工作站)"
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UphPerformanceMachineEquipment"
+            },
+            "description": "full per-equipment map for client-side cascade"
+          }
+        },
+        "required": [
+          "families",
+          "models",
+          "workcenters",
+          "equipment"
         ]
       }
     }

@@ -23,8 +23,12 @@ const SERIES_COLORS = Object.freeze([
 
 // Native M[60] hourly granularity only — no day/hour switch (unlike eap-alarm's
 // trend), per interaction-design.md §Deleted Controls.
+// 'family' groups by GDBA/GWBA (DB/WB 類別); 'model' groups by the real machine
+// model (RESOURCEFAMILYNAME) -- the label "機型" now means the model, matching
+// the redesigned filter bar, so the family axis is labelled 類別.
 const GROUP_BY_OPTIONS = Object.freeze([
-  { value: 'family', label: '機型' },
+  { value: 'family', label: '類別' },
+  { value: 'model', label: '機型' },
   { value: 'equipment_id', label: '機台' },
   { value: 'package', label: 'Package' },
 ]);

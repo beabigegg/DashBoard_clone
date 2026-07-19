@@ -93,6 +93,39 @@ class TestFamilyScope:
 
 
 # ---------------------------------------------------------------------------
+# 機型 (RESOURCEFAMILYNAME) coarse filter -- the real machine-model axis that
+# replaced the GDBA/GWBA-only selector (add-uph-performance-page redesign)
+# ---------------------------------------------------------------------------
+
+class TestModelsFilter:
+    def test_empty_models_yields_no_clause(self):
+        from mes_dashboard.workers.uph_performance_worker import _build_models_exists_filter
+
+        assert _build_models_exists_filter([]) == ("", {})
+        assert _build_models_exists_filter(None) == ("", {})
+
+    def test_models_build_exists_semijoin_on_resourcefamilyname(self):
+        from mes_dashboard.workers.uph_performance_worker import _build_models_exists_filter
+
+        clause, params = _build_models_exists_filter(["DBA_AD832UR", "WBA_iHawk"])
+        assert "EXISTS (SELECT 1 FROM DWH.DW_MES_RESOURCE r" in clause
+        assert "r.RESOURCENAME = e.EQUIPMENT_ID" in clause
+        assert "r.RESOURCEFAMILYNAME" in clause
+        assert ":mdl_0" in clause and ":mdl_1" in clause
+        assert params == {"mdl_0": "DBA_AD832UR", "mdl_1": "WBA_iHawk"}
+        # No embedded newline -- would corrupt the template's header comment
+        # (SQLLoader.load_with_params global replace, ORA-00900 trap).
+        assert "\n" not in clause
+
+    def test_models_participate_in_spool_key(self):
+        from mes_dashboard.services.uph_performance_cache import make_uph_performance_spool_key
+
+        base = make_uph_performance_spool_key("2026-01-01", "2026-01-01")
+        with_model = make_uph_performance_spool_key("2026-01-01", "2026-01-01", models=["DBA_AD832UR"])
+        assert base != with_model, "models must be part of the spool key so model-filtered queries don't collide"
+
+
+# ---------------------------------------------------------------------------
 # UPH-03: family -> PARAMETER_NAME mapping pinned; swap-detection
 # ---------------------------------------------------------------------------
 
