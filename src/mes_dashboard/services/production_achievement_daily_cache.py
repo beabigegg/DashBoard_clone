@@ -82,6 +82,36 @@ logger = logging.getLogger("mes_dashboard.production_achievement_daily_cache")
 
 _DEFAULT_TODAY_STALE_SECONDS = 3600
 
+# Watermark-vs-scheduler-cadence fix (bug: "hourly auto-refresh never picks
+# up new Oracle rows, only manual force-refresh does"): _is_today_spool_stale
+# compares "now" against the spool's "created_at" -- when the LAST WRITE
+# FINISHED (post_aggregate, i.e. AFTER the Oracle fetch completed) -- while
+# spool_warmup_scheduler.py's _scheduler_loop ticks on a FIXED cadence
+# (`_STOP_EVENT.wait(WARMUP_INTERVAL_SECONDS)`, measured from thread start /
+# the previous tick, NOT from when the previously-enqueued job actually
+# finished -- run_warmup_cycle() itself is a fast, synchronous enqueue call,
+# fully decoupled from how long the RQ job takes to run afterward). Any real
+# Oracle fetch takes a non-zero duration `delta` to complete, so a spool that
+# finishes writing at scheduler-tick K is only (interval - delta) seconds old
+# by the very next tick (tick K+1) -- just UNDER a raw `age >= interval`
+# threshold. That next cycle's staleness check therefore reports "not stale
+# yet" and skips the rebuild entirely, even though a full scheduler interval
+# has already elapsed and new Oracle rows may already exist -- and this is
+# NOT a rare timing coincidence: since delta > 0 for any real query, EVERY
+# tick immediately following a successful rebuild is guaranteed to land just
+# under the raw interval, deterministically forcing every warmup cycle to
+# skip (reproduced end-to-end by
+# tests/test_production_achievement_daily_cache.py::TestMultiCycleWarmupIntegration).
+# Subtracting a margin below the raw interval closes that gap: as long as a
+# single day's Oracle fetch (this endpoint's whole scope -- start_date ==
+# end_date == today) completes well within the margin, the very next
+# scheduled tick after ANY successful rebuild is reliably classified stale
+# again. A ratio (not a fixed number of seconds) so a shortened
+# WARMUP_INTERVAL_SECONDS (e.g. in a fast dev/test loop) scales the margin
+# down with it instead of the margin swallowing the whole interval.
+_STALE_MARGIN_RATIO = 0.1
+_STALE_MARGIN_MIN_SECONDS = 30
+
 
 def _is_unified_job_enabled() -> bool:
     """Independent re-read of PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB.
@@ -125,12 +155,20 @@ def _today_stale_threshold_seconds() -> int:
     staleness bound for "today" -- the hourly warmup cycle can only pick up
     newly-arrived Oracle rows if today's cached spool is treated as stale by
     the time the NEXT cycle fires, not just at its multi-hour Redis TTL
-    horizon."""
+    horizon.
+
+    Returns ``WARMUP_INTERVAL_SECONDS`` minus a safety margin (see
+    ``_STALE_MARGIN_RATIO`` above), NOT the raw interval -- comparing against
+    the raw interval is what caused every scheduled warmup cycle to silently
+    no-op (module-level comment above ``_STALE_MARGIN_RATIO`` has the full
+    root-cause writeup)."""
     raw = os.getenv("WARMUP_INTERVAL_SECONDS", str(_DEFAULT_TODAY_STALE_SECONDS))
     try:
-        return max(int(raw), 60)
+        interval = max(int(raw), 60)
     except (TypeError, ValueError):
-        return _DEFAULT_TODAY_STALE_SECONDS
+        interval = _DEFAULT_TODAY_STALE_SECONDS
+    margin = max(int(interval * _STALE_MARGIN_RATIO), _STALE_MARGIN_MIN_SECONDS)
+    return max(interval - margin, 60)
 
 
 def _is_today_spool_stale(query_id: str) -> bool:

@@ -95,6 +95,129 @@ def test_leader_lock_prevents_duplicate_enqueue():
 
 
 # ---------------------------------------------------------------------------
+# Test: enqueue-cooldown dedupes near-simultaneous leader-lock winners
+#
+# Reproduces the observed bug: multiple gunicorn worker processes each call
+# run_warmup_cycle() close together (e.g. all at boot). Because the leader
+# lock is only held for the brief acquire-enqueue-release window (not the
+# full WARMUP_INTERVAL_SECONDS cycle), each worker can win the SAME lock in
+# rapid sequential succession and each enqueue its own duplicate batch of
+# warmup jobs. The cooldown key (_claim_enqueue_cooldown) must ensure only
+# ONE of them actually enqueues.
+# ---------------------------------------------------------------------------
+
+class _FakeCooldownRedis:
+    """Minimal in-memory stand-in for the control-plane Redis client --
+    just enough SET NX EX semantics to exercise the cooldown gate without a
+    real Redis server. Clock is injectable so tests can simulate time
+    passing (a later cycle) without sleeping."""
+
+    def __init__(self, clock):
+        self._clock = clock
+        self._expire_at = {}  # key -> expire timestamp (float) or None (no TTL)
+
+    def set(self, key, value, nx=False, ex=None):
+        now = self._clock()
+        expire_at = self._expire_at.get(key)
+        if nx and expire_at is not None and expire_at > now:
+            return None  # key still present and not yet expired -- NX fails
+        self._expire_at[key] = (now + ex) if ex else None
+        return True
+
+
+def test_cooldown_allows_only_one_enqueue_among_near_simultaneous_workers():
+    """N gunicorn workers each independently winning the (fast-lived) leader
+    lock in rapid succession must still result in exactly ONE enqueue batch
+    within a WARMUP_INTERVAL_SECONDS window."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    call_log: List[str] = []
+
+    def fake_enqueue():
+        call_log.append("enqueue")
+        return len(sched._WARMUP_JOBS)
+
+    fake_clock = {"t": 1_000_000.0}
+    fake_redis = _FakeCooldownRedis(clock=lambda: fake_clock["t"])
+
+    with patch.object(sched, "_enqueue_warmup_jobs", side_effect=fake_enqueue):
+        with patch("mes_dashboard.core.spool_warmup_scheduler.try_acquire_lock", return_value=True):
+            with patch("mes_dashboard.core.spool_warmup_scheduler.release_lock"):
+                with patch("mes_dashboard.core.spool_warmup_scheduler.REDIS_ENABLED", True):
+                    with patch("mes_dashboard.core.spool_warmup_scheduler.get_redis_client", return_value=fake_redis):
+                        # 3 gunicorn workers, each independently winning the
+                        # leader lock (mocked to always succeed, mirroring
+                        # how the real lock behaves once the previous holder
+                        # has already released it) within the same instant.
+                        results = [sched.run_warmup_cycle() for _ in range(3)]
+
+    assert len(call_log) == 1, (
+        f"Expected exactly one enqueue batch across 3 near-simultaneous "
+        f"leader-lock winners, got {len(call_log)}"
+    )
+    assert results == [True, False, False]
+
+
+def test_cooldown_allows_enqueue_again_after_interval_elapses():
+    """A genuine next cycle roughly WARMUP_INTERVAL_SECONDS later must still
+    enqueue -- the cooldown guard must not become a permanent one-shot."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    call_log: List[str] = []
+
+    def fake_enqueue():
+        call_log.append("enqueue")
+        return len(sched._WARMUP_JOBS)
+
+    fake_clock = {"t": 1_000_000.0}
+    fake_redis = _FakeCooldownRedis(clock=lambda: fake_clock["t"])
+
+    with patch.object(sched, "_enqueue_warmup_jobs", side_effect=fake_enqueue):
+        with patch("mes_dashboard.core.spool_warmup_scheduler.try_acquire_lock", return_value=True):
+            with patch("mes_dashboard.core.spool_warmup_scheduler.release_lock"):
+                with patch("mes_dashboard.core.spool_warmup_scheduler.REDIS_ENABLED", True):
+                    with patch("mes_dashboard.core.spool_warmup_scheduler.get_redis_client", return_value=fake_redis):
+                        first = sched.run_warmup_cycle()
+                        second_immediate = sched.run_warmup_cycle()
+                        # Simulate real time passing well past the cooldown window
+                        # (the next hourly tick, or a later boot).
+                        fake_clock["t"] += sched.WARMUP_INTERVAL_SECONDS + 1
+                        third_after_interval = sched.run_warmup_cycle()
+
+    assert first is True
+    assert second_immediate is False
+    assert third_after_interval is True
+    assert len(call_log) == 2, "Both the first and the post-interval cycle must enqueue"
+
+
+def test_cooldown_check_fails_open_when_redis_client_unavailable():
+    """If the cooldown key specifically cannot be checked (Redis client
+    unavailable at that instant), enqueueing must still proceed rather than
+    silently disabling warmup -- the leader lock remains the primary
+    correctness guarantee. (This mirrors the default test environment where
+    REDIS_ENABLED is false at the redis_client module level and
+    get_redis_client() returns None, which is exactly what every other test
+    in this file already relies on implicitly.)"""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    call_log: List[str] = []
+
+    def fake_enqueue():
+        call_log.append("enqueue")
+        return len(sched._WARMUP_JOBS)
+
+    with patch.object(sched, "_enqueue_warmup_jobs", side_effect=fake_enqueue):
+        with patch("mes_dashboard.core.spool_warmup_scheduler.try_acquire_lock", return_value=True):
+            with patch("mes_dashboard.core.spool_warmup_scheduler.release_lock"):
+                with patch("mes_dashboard.core.spool_warmup_scheduler.REDIS_ENABLED", True):
+                    with patch("mes_dashboard.core.spool_warmup_scheduler.get_redis_client", return_value=None):
+                        result = sched.run_warmup_cycle()
+
+    assert result is True
+    assert len(call_log) == 1
+
+
+# ---------------------------------------------------------------------------
 # Test: all expected warmup jobs are present
 # ---------------------------------------------------------------------------
 

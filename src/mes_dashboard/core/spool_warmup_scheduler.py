@@ -5,6 +5,34 @@ Runs inside each gunicorn worker on startup, but only the worker that wins the
 Redis leader lock will enqueue warmup jobs to the RQ warmup queue.  Periodic
 refresh also goes through the same leader lock so jobs are never duplicated.
 
+Leader lock + enqueue-cooldown (two independent Redis keys):
+  The leader lock (``WARMUP_LEADER_LOCK_NAME``) is only held for the brief
+  acquire -> enqueue -> release window, NOT for the full
+  ``WARMUP_INTERVAL_SECONDS`` cycle -- enqueueing itself is fast (just Redis
+  writes), while the actual warmup work runs later/async in an RQ worker.
+  When N gunicorn workers all call ``run_warmup_cycle()`` close together
+  (e.g. all at boot, or because their per-worker interval threads are
+  phase-aligned from a near-simultaneous boot), each one can win the leader
+  lock in rapid SEQUENTIAL succession -- worker 1 acquires/enqueues/releases,
+  then a fraction of a second later worker 2 also acquires the now-free lock
+  and enqueues its own duplicate batch, and so on. The leader lock alone does
+  NOT dedupe this.
+
+  To fix this, ``run_warmup_cycle()`` additionally claims a separate cooldown
+  key (``_claim_enqueue_cooldown()``, a plain ``SET NX EX`` with TTL just
+  under ``WARMUP_INTERVAL_SECONDS``) *after* winning the leader lock and
+  *before* calling ``_enqueue_warmup_jobs()``. Only the first winner within
+  any cooldown window actually enqueues; later winners within the same
+  window skip (logged distinctly from "another worker holds the leader
+  lock"). Once the cooldown key expires, the next genuine cycle enqueues
+  again -- this is not a one-shot guard. If the cooldown key itself cannot be
+  read/written (Redis client unavailable at that instant, distinct from the
+  earlier REDIS_ENABLED/lock-acquisition checks which already gate the top
+  of this function), the cooldown check fails OPEN and enqueueing proceeds
+  as before this fix was added -- the leader lock remains the primary
+  correctness guarantee; skipping enqueue outright here would be a strictly
+  worse failure mode than falling back to pre-fix behavior for that one tick.
+
 Warmup coverage (this change):
   - reject_dataset       — canonical date-range dataset, 90 days
   - yield_alert_dataset  — canonical date-range dataset
@@ -28,6 +56,7 @@ from typing import Optional
 from mes_dashboard.core.exceptions import LockUnavailableError
 from mes_dashboard.core.redis_client import (
     REDIS_ENABLED,
+    get_key,
     get_redis_client,
     try_acquire_lock,
     release_lock,
@@ -46,6 +75,19 @@ WARMUP_LEADER_LOCK_NAME = "spool_warmup_leader"
 WARMUP_LEADER_LOCK_TTL = int(os.getenv("WARMUP_LEADER_LOCK_TTL", "120"))
 WARMUP_INTERVAL_SECONDS = max(int(os.getenv("WARMUP_INTERVAL_SECONDS", "3600")), 60)
 WARMUP_JOB_TIMEOUT = int(os.getenv("WARMUP_JOB_TIMEOUT", "1800"))
+
+# Separate from WARMUP_LEADER_LOCK_NAME: the leader lock is only held for the
+# brief acquire-enqueue-release window, not the whole interval, so it alone
+# does not prevent multiple gunicorn workers from each becoming leader (one
+# after another) within the same interval window -- see module docstring.
+WARMUP_ENQUEUE_COOLDOWN_KEY = get_key("warmup:last_enqueued_at")
+# Small safety margin under the full interval so a legitimate next tick
+# (whose own thread may fire a hair later than exactly WARMUP_INTERVAL_SECONDS
+# after the previous one) is not accidentally swallowed by clock jitter.
+WARMUP_ENQUEUE_COOLDOWN_MARGIN_SECONDS = 5
+WARMUP_ENQUEUE_COOLDOWN_SECONDS = max(
+    WARMUP_INTERVAL_SECONDS - WARMUP_ENQUEUE_COOLDOWN_MARGIN_SECONDS, 1
+)
 
 # ---------------------------------------------------------------------------
 # RQ worker functions (executed inside RQ worker process)
@@ -293,6 +335,45 @@ def _enqueue_warmup_jobs() -> int:
     return enqueued
 
 
+def _claim_enqueue_cooldown() -> bool:
+    """Atomically claim the right to enqueue this cycle via a plain SET NX EX.
+
+    Independent of (and checked AFTER) the leader lock. The leader lock is
+    only held for the brief acquire-enqueue-release window, so multiple
+    gunicorn workers can each legitimately win it in rapid succession within
+    the same WARMUP_INTERVAL_SECONDS window (e.g. all at boot). This cooldown
+    key ensures only the first such winner actually enqueues.
+
+    Returns True if the caller may proceed to enqueue: either no previous
+    enqueue is within the cooldown window (including the very first boot,
+    where the key does not exist yet), or the Redis client is unavailable
+    for this specific check (fails OPEN -- see module docstring for why).
+    Returns False when a previous winner already enqueued within the
+    cooldown window.
+    """
+    conn = get_redis_client()
+    if conn is None:
+        # Cannot verify cooldown state. The leader lock above already
+        # confirmed Redis was reachable moments ago in the normal case; when
+        # it hasn't (e.g. this specific check races a transient blip), fail
+        # open rather than silently disabling warmup -- do not add a new
+        # skip reason beyond the existing REDIS_ENABLED / LockUnavailableError
+        # handling already at the top of run_warmup_cycle().
+        return True
+
+    try:
+        claimed = conn.set(
+            WARMUP_ENQUEUE_COOLDOWN_KEY,
+            str(os.getpid()),
+            nx=True,
+            ex=WARMUP_ENQUEUE_COOLDOWN_SECONDS,
+        )
+        return bool(claimed)
+    except Exception as exc:
+        logger.warning("Warmup scheduler: enqueue-cooldown check failed, proceeding without it (%s)", exc)
+        return True
+
+
 def run_warmup_cycle() -> bool:
     """Try to acquire leader lock and enqueue warmup jobs.
 
@@ -314,6 +395,14 @@ def run_warmup_cycle() -> bool:
         return False
 
     try:
+        if not _claim_enqueue_cooldown():
+            logger.info(
+                "Warmup scheduler: became leader but another worker already enqueued "
+                "within the last %ss (cooldown active), skipping duplicate enqueue",
+                WARMUP_ENQUEUE_COOLDOWN_SECONDS,
+            )
+            return False
+
         count = _enqueue_warmup_jobs()
         logger.info("Warmup scheduler: enqueued %d warmup jobs (leader)", count)
         return True
