@@ -26,7 +26,6 @@ import { formatQty } from '../utils';
 
 use([CanvasRenderer, BarChart, LineChart, GridComponent, LegendComponent, MarkLineComponent, TooltipComponent]);
 
-const QTY_SERIES_NAME = '每日產出數量 (K)';
 const RATE_SERIES_NAME = '累計達成率';
 
 function safeNumber(value: number | null | undefined): number | null {
@@ -43,6 +42,8 @@ interface Props {
   /** Running cumulative achievement rate, already ×100 (e.g. 87.3), parallel to `categories`. */
   rateData?: (number | null | undefined)[];
   categoryAxisName?: string;
+  /** PA-18: the qty noun follows the data source (產出 / 轉出), same as App.vue's metricNoun. */
+  qtyLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -51,9 +52,11 @@ const props = withDefaults(defineProps<Props>(), {
   qtyData: () => [],
   rateData: () => [],
   categoryAxisName: '日期',
+  qtyLabel: '產出',
 });
 
 const hasData = computed(() => props.categories.length > 0);
+const qtySeriesName = computed(() => `每日${props.qtyLabel}數量 (K)`);
 
 function resolveCssVar(varExpr: string): string {
   const match = varExpr.match(/var\((--[\w-]+)\)/);
@@ -112,7 +115,7 @@ const chartOption = computed(() => {
       },
       formatter: (params: AxisTooltipParam[] | AxisTooltipParam) => tooltipFormatter(params),
     },
-    legend: { data: [QTY_SERIES_NAME, RATE_SERIES_NAME], bottom: 0 },
+    legend: { data: [qtySeriesName.value, RATE_SERIES_NAME], bottom: 0 },
     grid: { left: 8, right: 16, top: 24, bottom: 48, containLabel: true },
     xAxis: {
       type: 'category',
@@ -123,7 +126,7 @@ const chartOption = computed(() => {
     yAxis: [
       {
         type: 'value',
-        name: '每日產出數量 (K)',
+        name: qtySeriesName.value,
         position: 'left',
         axisLabel: { formatter: (v: number) => formatQty(v) },
       },
@@ -136,7 +139,7 @@ const chartOption = computed(() => {
     ],
     series: [
       {
-        name: QTY_SERIES_NAME,
+        name: qtySeriesName.value,
         type: 'bar',
         yAxisIndex: 0,
         data: props.qtyData.map((v) => safeNumber(v) ?? 0),

@@ -400,6 +400,7 @@ const cumulativeExpandedColspan = computed(() => 1 + expandedSubstations.value.l
         :categories="comboCategories"
         :qty-data="comboQtyData"
         :rate-data="comboRateData"
+        :qty-label="metricNoun"
         category-axis-name="日期"
       />
 

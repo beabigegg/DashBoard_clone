@@ -26,6 +26,7 @@ import App from '../App.vue';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import PlanAchievementStackedChart from '../components/PlanAchievementStackedChart.vue';
+import CumulativeTrendComboChart from '../components/CumulativeTrendComboChart.vue';
 
 const navigateMock = vi.fn();
 vi.mock('../../core/shell-navigation', () => ({
@@ -163,6 +164,22 @@ describe('production-achievement App.vue', () => {
     await flushPromises();
     expect(wrapper.find('[data-testid="pa-source-moveout"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('[data-testid="pa-source-moveout"]').classes()).toContain('pa-app__source-btn--active');
+  });
+
+  it('PA-18 bugfix: CumulativeTrendComboChart\'s qty-label prop follows the 產出/轉出 source toggle (當月 view was stuck showing 每日產出數量 even in 轉出 mode)', async () => {
+    const wrapper = mountApp();
+    await flushPromises();
+
+    await wrapper.find('[data-testid="pa-mode-month"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findComponent(CumulativeTrendComboChart).props('qtyLabel')).toBe('產出');
+
+    await wrapper.find('[data-testid="pa-source-moveout"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findComponent(CumulativeTrendComboChart).props('qtyLabel')).toBe('轉出');
+    wrapper.unmount();
   });
 
   it('defaults to 當日 mode on landing (no persisted state)', async () => {

@@ -65,6 +65,31 @@ describe('CumulativeTrendComboChart', () => {
     expect(yAxis[1].name).toContain('累計達成率');
   });
 
+  it('PA-18: qty label defaults to 產出 when qtyLabel is not passed', () => {
+    const wrapper = mountChart({ categories: ['2026-07-01'], qtyData: [100], rateData: [90] });
+    const option = getOption(wrapper);
+    const yAxis = option.yAxis as Array<Record<string, unknown>>;
+    const series = option.series as Array<Record<string, unknown>>;
+    const legend = option.legend as { data: string[] };
+    const bar = series.find((s) => s.type === 'bar')!;
+    expect(yAxis[0].name).toBe('每日產出數量 (K)');
+    expect(bar.name).toBe('每日產出數量 (K)');
+    expect(legend.data).toContain('每日產出數量 (K)');
+  });
+
+  it('PA-18: qty label switches to 轉出 (y-axis, bar series name, legend) when qtyLabel="轉出" is passed', () => {
+    const wrapper = mountChart({ categories: ['2026-07-01'], qtyData: [100], rateData: [90], qtyLabel: '轉出' });
+    const option = getOption(wrapper);
+    const yAxis = option.yAxis as Array<Record<string, unknown>>;
+    const series = option.series as Array<Record<string, unknown>>;
+    const legend = option.legend as { data: string[] };
+    const bar = series.find((s) => s.type === 'bar')!;
+    expect(yAxis[0].name).toBe('每日轉出數量 (K)');
+    expect(bar.name).toBe('每日轉出數量 (K)');
+    expect(legend.data).toContain('每日轉出數量 (K)');
+    expect(legend.data).not.toContain('每日產出數量 (K)');
+  });
+
   it('the x-axis category data is the date list, unmodified', () => {
     const wrapper = mountChart({ categories: ['2026-07-01', '2026-07-02', '2026-07-03'], qtyData: [1, 2, 3], rateData: [10, 20, 30] });
     const option = getOption(wrapper);
