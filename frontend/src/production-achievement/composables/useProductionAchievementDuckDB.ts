@@ -65,6 +65,16 @@
  * to do with what it protects). No rounding is applied to the /1000.0
  * division, matching 025.txt's own convention (fractional K values, e.g.
  * 12.345, are expected and correct).
+ *
+ * Change: production-achievement-column-pivot (X-direction 子站 grouping)
+ * Expanded (大項) mode (電鍍/切割) no longer emits a row PER 子站 plus a separate
+ * 大項小計 subtotal row (Y-direction/row-based grouping). It now emits exactly
+ * ONE row per package_lf_group — at the same grain single-layer mode already
+ * uses — carrying an additive `substations` column-pivot breakdown (see
+ * DailyViewRow.substations/CumulativeViewRow.substations). See
+ * computeDailyView/computeCumulativeView's expand branches for the
+ * per_child-CTE + MAX(CASE...) pivot approach that replaced the old
+ * GROUPING SETS query.
  */
 
 import { ref, readonly } from 'vue';
@@ -117,6 +127,22 @@ export interface WorkcenterMergeMapRow {
 
 export type ProductionSourceMode = 'output' | 'moveout';
 
+/** Change: production-achievement-column-pivot. Per-子站 breakdown attached to
+ *  an expanded (大項) mode DailyViewRow — see DailyViewRow.substations. */
+export interface SubstationDailyQty {
+  workcenter_group: string;
+  d_output_qty: number;
+  n_output_qty: number;
+  daily_output_qty: number;
+}
+
+/** Change: production-achievement-column-pivot. Per-子站 breakdown attached to
+ *  an expanded (大項) mode CumulativeViewRow — see CumulativeViewRow.substations. */
+export interface SubstationCumulativeQty {
+  workcenter_group: string;
+  cumulative_actual_qty: number;
+}
+
 /** Oracle-sourced plan/target rows (business-rules.md PA-11, replaces the old
  *  Excel-imported DailyPlanMapRow). Keyed on (output_date, plan_package_group)
  *  ONLY — no station dimension; the same target broadcasts to every station
@@ -134,15 +160,6 @@ export interface PlanMapRow {
 
 export interface DailyViewRow {
   package_lf_group: string;
-  /** The 子站 (merged workcenter_group), present only in expanded (大項) mode
-   *  (PA-19); undefined for a single-layer station selection. On a 大項小計
-   *  subtotal row it carries the 大項 (parent_group) name for the label. */
-  workcenter_group?: string;
-  /** PA-19: true on the per-package 大項小計 row (電鍍/切割 expanded mode). The
-   *  子站 leaf rows show 轉出/產出 actuals only (null plan/achievement); the
-   *  subtotal row carries the 大項-total D/N/合計 plus the parent-keyed 計畫 and
-   *  the 大項-level 達成率. Undefined/false on every leaf and single-layer row. */
-  is_subtotal?: boolean;
   d_output_qty: number;
   n_output_qty: number;
   daily_output_qty: number;
@@ -154,19 +171,31 @@ export interface DailyViewRow {
   d_achievement_rate: number | null;
   /** n_output_qty / shift_plan_qty; null when shift_plan_qty is null or 0. */
   n_achievement_rate: number | null;
+  /** Change: production-achievement-column-pivot (PA-19 column direction).
+   *  Present ONLY in expanded (大項) mode (電鍍/切割) — the per-子站 breakdown
+   *  for the column-grouped detail table, in the SAME stable substation order
+   *  useProductionAchievement.ts's `expandedSubstations` exposes (the single
+   *  source of truth threaded into `computeDailyView`'s `substations` option
+   *  and back out here, so the SQL pivot and the UI header can never drift
+   *  apart). Every row is now at the same package-total grain regardless of
+   *  mode — d_output_qty/n_output_qty/daily_output_qty/achievement_rate above
+   *  already carry the 大項-level totals (what the old row-based expanded mode
+   *  put on a separate 大項小計 subtotal row); `substations` is purely an
+   *  additive breakdown, never a different grain. Undefined in single-layer
+   *  mode. */
+  substations?: SubstationDailyQty[];
 }
 
 export interface CumulativeViewRow {
   package_lf_group: string;
-  /** The 子站 (merged workcenter_group), present only in expanded (大項) mode
-   *  (PA-19). On a 大項小計 subtotal row it carries the 大項 name. */
-  workcenter_group?: string;
-  /** PA-19: true on the per-package 大項小計 row — see DailyViewRow.is_subtotal. */
-  is_subtotal?: boolean;
   cumulative_actual_qty: number;
   cumulative_plan_qty: number | null;
   cumulative_diff_qty: number | null;
   cumulative_achievement_rate: number | null;
+  /** Change: production-achievement-column-pivot — see DailyViewRow.substations.
+   *  Present ONLY in expanded (大項) mode; no D/N split (cumulative view never
+   *  had one). Undefined in single-layer mode. */
+  substations?: SubstationCumulativeQty[];
 }
 
 export interface CumulativeTrendPoint {
@@ -193,9 +222,19 @@ export interface ComputeDailyViewOptions {
    *  parent_group (filter on parent_group, rows split per子站). */
   workcenterGroup: string;
   /** PA-19: when true, `workcenterGroup` is treated as a 大項 (parent_group)
-   *  and each returned row additionally carries its子站 `workcenter_group`,
-   *  grouped by (package_lf_group,子站). Used for 電鍍/切割. */
+   *  and each returned row additionally carries a `substations` column-pivot
+   *  breakdown (see DailyViewRow.substations). Used for 電鍍/切割. */
   expand?: boolean;
+  /** Change: production-achievement-column-pivot. REQUIRED when `expand` is
+   *  true — the ordered list of子站 (merged_workcenter_group) under the
+   *  selected 大項, exactly as useProductionAchievement.ts's
+   *  `expandedSubstations` exposes it (first-seen order from the report's own
+   *  workcenter_merge_map). This is the SINGLE source of truth for both the
+   *  SQL pivot's column order (col0_*, col1_*, ...) and the JS mapping back
+   *  from those positional columns to `substations[].workcenter_group` below
+   *  — never re-derived independently, so the two can never drift apart.
+   *  Ignored when `expand` is false/absent. */
+  substations?: string[];
   /**
    * The single target calendar day ('YYYY-MM-DD'), required so the rollup
    * filters to EXACTLY this output_date (PA-03/PA-06 grouping key). Without
@@ -212,6 +251,8 @@ export interface ComputeCumulativeViewOptions {
   workcenterGroup: string;
   /** PA-19: expanded (大項) mode — see ComputeDailyViewOptions.expand. */
   expand?: boolean;
+  /** REQUIRED when `expand` is true — see ComputeDailyViewOptions.substations. */
+  substations?: string[];
   /** Already-resolved/capped date bounds (useProductionAchievement.ts owns resolveMonthPeriod()/range-end capping). */
   startDate: string;
   endDate: string;
@@ -353,6 +394,80 @@ function buildPlanSourceSideMap(rows: WorkcenterMergeMapRow[]): Map<string, 'inp
     map.set(parent, row.plan_source_side === 'output' ? 'output' : 'input');
   }
   return map;
+}
+
+/**
+ * Change: production-achievement-column-pivot. Positional column aliases
+ * (col0_d, col1_d, ...) for the expanded (大項) mode column-pivot, one per
+ * `metricFields` entry per substation in `substations` (ordered — index i
+ * maps 1:1 to `substations[i]`). Positional aliases avoid using the raw
+ * (often Chinese) substation name as a SQL identifier entirely — no
+ * quoting/encoding risk — the caller maps `col{i}_{suffix}` back to
+ * `substations[i]` in JS using the SAME array, never re-derived.
+ * `sourceExpr` is the fully-qualified column to pivot from (e.g.
+ * `per_child.d_output_qty`); `matchExpr` is the fully-qualified
+ * workcenter_group column to match against (e.g. `per_child.workcenter_group`).
+ */
+function buildPivotColumnsSql(
+  substations: string[],
+  matchExpr: string,
+  metricFields: { suffix: string; sourceExpr: string }[],
+): string {
+  return substations
+    .map((name, i) =>
+      metricFields
+        .map(
+          (f) =>
+            `    MAX(CASE WHEN ${matchExpr} = ${sqlString(name)} THEN ${f.sourceExpr} ELSE 0 END) AS col${i}_${f.suffix}`,
+        )
+        .join(',\n'),
+    )
+    .join(',\n');
+}
+
+/**
+ * Bugfix (post-review): computeDailyView's expanded (大項) branch is a
+ * TWO-level query — an inner `per_child` CTE (package,子站 grain), wrapped by
+ * a `sub` derived table that both re-aggregates per_child up to the package
+ * grain AND pivots per_child's rows into col{i}_{suffix} columns via
+ * buildPivotColumnsSql, wrapped AGAIN by an outer SELECT that computes the
+ * achievement_rate/d_/n_achievement_rate CASE expressions from `sub`'s plain
+ * columns (mirrors the single-layer branch's two-level nesting, needed
+ * because those CASE expressions read daily_plan_qty/shift_plan_qty which
+ * only exist once the plan LEFT JOIN + per-package GROUP BY has run). The
+ * outer SELECT must therefore reference `sub`'s ALREADY-PIVOTED col{i}_*
+ * columns as plain column refs — re-emitting buildPivotColumnsSql's
+ * MAX(CASE WHEN per_child... ) expression there throws a DuckDB
+ * BinderException, since per_child is out of scope outside `sub`. Must be
+ * called with the SAME `substations`/metric-suffix shape buildPivotColumnsSql
+ * built `sub`'s columns from.
+ */
+function buildPivotColumnRefsSql(
+  substations: string[],
+  metricFields: { suffix: string }[],
+): string {
+  return substations
+    .map((_, i) => metricFields.map((f) => `    col${i}_${f.suffix}`).join(',\n'))
+    .join(',\n');
+}
+
+/** Change: production-achievement-column-pivot. Maps the positional
+ *  `col{i}_{suffix}` columns a pivot query returns back into a per-substation
+ *  breakdown array, using the EXACT same ordered `substations` list the SQL
+ *  was built from (see buildPivotColumnsSql) — index and name can never
+ *  mismatch since both sides read from the same array. */
+function mapPivotColumns(
+  row: Record<string, unknown>,
+  substations: string[],
+  metricFields: { suffix: string; outKey: string }[],
+): Record<string, unknown>[] {
+  return substations.map((name, i) => {
+    const entry: Record<string, unknown> = { workcenter_group: name };
+    for (const f of metricFields) {
+      entry[f.outKey] = sf(row[`col${i}_${f.suffix}`]);
+    }
+    return entry;
+  });
 }
 
 function eligibilityErrorMessage(reason: string): string {
@@ -616,78 +731,117 @@ export function useProductionAchievementDuckDB() {
       }));
     }
 
-    // PA-19 expanded (大項) mode (電鍍/切割): filter on parent_group and emit,
-    // per package, one leaf row per子站 (actuals only) PLUS a per-package
-    // 大項小計 row. GROUPING SETS produces both grains in one pass; GROUPING()=1
-    // marks the subtotal grain (子站 aggregated away). The 每日計畫 is keyed on
-    // the 大項/parent (= the selection), NOT the子站 — so it attaches ONLY to the
-    // subtotal row (leaf rows show a null plan/達成率, the parent-total achievement
-    // lives on the小計 row, matching the Excel report). The plan join can touch
-    // leaf grains too, but the is_subtotal CASE nulls it there; quantities are
-    // pre-aggregated in `agg` before the join, and plan_map has at most one row
-    // per (package, day) so no fan-out. ORDER BY puts each package's leaf子站
-    // rows first (is_subtotal 0) then its小計 (is_subtotal 1).
+    // Change: production-achievement-column-pivot (PA-19 column direction).
+    // Expanded (大項) mode (電鍍/切割): filter on parent_group and emit ONE row
+    // per package at the SAME package-total grain the single-layer branch
+    // above already produces (what used to be the row-based 大項小計 subtotal
+    // row) -- plus a `substations` column-pivot breakdown attached to it. A
+    // `per_child` CTE first aggregates to the (package,子站) grain (identical
+    // per-child SUMs the OLD GROUPING SETS leaf grain computed); the outer
+    // pivot query then does BOTH:
+    //   (a) SUM(...) the per_child rows back up to one row per package -- this
+    //       SUM-of-subgroup-sums is mathematically identical to the OLD
+    //       GROUPING SETS package-only (is_subtotal=1) grain, just reshaped
+    //       from a GROUPING SETS pass into a two-level aggregation -- and
+    //   (b) MAX(CASE WHEN workcenter_group = <substation> THEN ... ELSE 0 END)
+    //       pivots each substation's own d/n/daily values into POSITIONAL
+    //       col{i}_d/col{i}_n/col{i}_daily columns (i = substations[i]'s
+    //       index) -- sanitized aliases, never the raw (often Chinese)
+    //       substation name as a SQL identifier. `substations` must be the
+    //       SAME ordered list useProductionAchievement.ts's
+    //       expandedSubstations exposes; mapPivotColumns() below maps
+    //       col{i}_* back to substations[i] using that identical array, so
+    //       index and name can never mismatch.
+    // The plan LEFT JOIN and achievement_rate/shift_plan_qty/d_/n_achievement
+    // -rate CASE expressions are copied verbatim from the single-layer branch
+    // above (same keys: package + exact day; same NULL/zero guards; same
+    // formulas) -- this pivoted row is now at exactly the grain the
+    // single-layer branch already handles, so no is_subtotal branching is
+    // needed anymore. plan_map has at most one row per (package, day), so the
+    // LEFT JOIN before GROUP BY package_lf_group never fans out.
+    const substations = options.substations && options.substations.length ? options.substations : [options.workcenterGroup];
+    const pivotMetricFields = [{ suffix: 'd' }, { suffix: 'n' }, { suffix: 'daily' }];
+    const pivotCols = buildPivotColumnsSql(substations, 'per_child.workcenter_group', [
+      { suffix: 'd', sourceExpr: 'per_child.d_output_qty' },
+      { suffix: 'n', sourceExpr: 'per_child.n_output_qty' },
+      { suffix: 'daily', sourceExpr: 'per_child.daily_output_qty' },
+    ]);
+    // Bugfix (post-review): the outer SELECT reads `sub`'s already-pivoted
+    // col{i}_* columns as plain refs (buildPivotColumnRefsSql), NOT the
+    // per_child-referencing MAX(CASE...) expression (pivotCols) -- per_child
+    // is out of scope in the outer FROM (sub). See buildPivotColumnRefsSql's
+    // doc comment.
+    const pivotColRefs = buildPivotColumnRefsSql(substations, pivotMetricFields);
     const sql = `
-      SELECT
-        agg.package_lf_group AS package_lf_group,
-        agg.workcenter_group AS workcenter_group,
-        agg.is_subtotal AS is_subtotal,
-        agg.d_output_qty AS d_output_qty,
-        agg.n_output_qty AS n_output_qty,
-        agg.daily_output_qty AS daily_output_qty,
-        CASE WHEN agg.is_subtotal = 1 THEN pm.${planCol} ELSE NULL END AS daily_plan_qty,
-        CASE WHEN agg.is_subtotal = 1 THEN CEIL(pm.${planCol} / 2.0) ELSE NULL END AS shift_plan_qty,
-        CASE
-          WHEN agg.is_subtotal = 1 AND pm.${planCol} IS NOT NULL AND pm.${planCol} <> 0
-          THEN CAST(agg.daily_output_qty AS DOUBLE) / pm.${planCol}
-          ELSE NULL
-        END AS achievement_rate,
-        CASE
-          WHEN agg.is_subtotal = 1 AND pm.${planCol} IS NOT NULL AND pm.${planCol} <> 0
-          THEN CAST(agg.d_output_qty AS DOUBLE) / CEIL(pm.${planCol} / 2.0)
-          ELSE NULL
-        END AS d_achievement_rate,
-        CASE
-          WHEN agg.is_subtotal = 1 AND pm.${planCol} IS NOT NULL AND pm.${planCol} <> 0
-          THEN CAST(agg.n_output_qty AS DOUBLE) / CEIL(pm.${planCol} / 2.0)
-          ELSE NULL
-        END AS n_achievement_rate
-      FROM (
+      WITH per_child AS (
         SELECT
           r.package_lf_group AS package_lf_group,
           r.workcenter_group AS workcenter_group,
-          GROUPING(r.workcenter_group) AS is_subtotal,
           SUM(CASE WHEN r.shift_code = 'D' THEN r.actual_output_qty ELSE 0 END) / 1000.0 AS d_output_qty,
           SUM(CASE WHEN r.shift_code = 'N' THEN r.actual_output_qty ELSE 0 END) / 1000.0 AS n_output_qty,
           SUM(r.actual_output_qty) / 1000.0 AS daily_output_qty
         FROM ${ROLLUP_TABLE} r
         WHERE r.parent_group = ${sel}
           AND CAST(r.output_date AS DATE) = CAST(${outputDate} AS DATE)
-        GROUP BY GROUPING SETS ((r.package_lf_group, r.workcenter_group), (r.package_lf_group))
-      ) agg
-      LEFT JOIN ${PLAN_MAP_TABLE} pm
-        ON pm.plan_package_group = agg.package_lf_group
-        AND CAST(pm.output_date AS DATE) = CAST(${outputDate} AS DATE)
-      ORDER BY agg.package_lf_group, agg.is_subtotal, agg.workcenter_group
+        GROUP BY r.package_lf_group, r.workcenter_group
+      )
+      SELECT
+        package_lf_group,
+        d_output_qty,
+        n_output_qty,
+        daily_output_qty,
+        daily_plan_qty,
+        shift_plan_qty,
+        CASE
+          WHEN daily_plan_qty IS NULL THEN NULL
+          WHEN daily_plan_qty = 0 THEN NULL
+          ELSE CAST(daily_output_qty AS DOUBLE) / daily_plan_qty
+        END AS achievement_rate,
+        CASE
+          WHEN shift_plan_qty IS NULL THEN NULL
+          WHEN shift_plan_qty = 0 THEN NULL
+          ELSE CAST(d_output_qty AS DOUBLE) / shift_plan_qty
+        END AS d_achievement_rate,
+        CASE
+          WHEN shift_plan_qty IS NULL THEN NULL
+          WHEN shift_plan_qty = 0 THEN NULL
+          ELSE CAST(n_output_qty AS DOUBLE) / shift_plan_qty
+        END AS n_achievement_rate,
+${pivotColRefs}
+      FROM (
+        SELECT
+          per_child.package_lf_group AS package_lf_group,
+          SUM(per_child.d_output_qty) AS d_output_qty,
+          SUM(per_child.n_output_qty) AS n_output_qty,
+          SUM(per_child.daily_output_qty) AS daily_output_qty,
+          MAX(pm.${planCol}) AS daily_plan_qty,
+          CEIL(MAX(pm.${planCol}) / 2.0) AS shift_plan_qty,
+${pivotCols}
+        FROM per_child
+        LEFT JOIN ${PLAN_MAP_TABLE} pm
+          ON pm.plan_package_group = per_child.package_lf_group
+          AND CAST(pm.output_date AS DATE) = CAST(${outputDate} AS DATE)
+        GROUP BY per_child.package_lf_group
+      ) sub
+      ORDER BY package_lf_group
     `;
     const rows = await _client.sendQuery(sql);
-    return (rows as Record<string, unknown>[]).map((row) => {
-      const isSubtotal = Number(row.is_subtotal) === 1;
-      return {
-        package_lf_group: String(row.package_lf_group ?? ''),
-        // subtotal rows carry the 大項 (selection) name for the小計 label
-        workcenter_group: isSubtotal ? options.workcenterGroup : String(row.workcenter_group ?? ''),
-        is_subtotal: isSubtotal,
-        d_output_qty: sf(row.d_output_qty),
-        n_output_qty: sf(row.n_output_qty),
-        daily_output_qty: sf(row.daily_output_qty),
-        daily_plan_qty: nullableNumber(row.daily_plan_qty),
-        achievement_rate: nullableNumber(row.achievement_rate),
-        shift_plan_qty: nullableNumber(row.shift_plan_qty),
-        d_achievement_rate: nullableNumber(row.d_achievement_rate),
-        n_achievement_rate: nullableNumber(row.n_achievement_rate),
-      };
-    });
+    return (rows as Record<string, unknown>[]).map((row) => ({
+      package_lf_group: String(row.package_lf_group ?? ''),
+      d_output_qty: sf(row.d_output_qty),
+      n_output_qty: sf(row.n_output_qty),
+      daily_output_qty: sf(row.daily_output_qty),
+      daily_plan_qty: nullableNumber(row.daily_plan_qty),
+      achievement_rate: nullableNumber(row.achievement_rate),
+      shift_plan_qty: nullableNumber(row.shift_plan_qty),
+      d_achievement_rate: nullableNumber(row.d_achievement_rate),
+      n_achievement_rate: nullableNumber(row.n_achievement_rate),
+      substations: mapPivotColumns(row, substations, [
+        { suffix: 'd', outKey: 'd_output_qty' },
+        { suffix: 'n', outKey: 'n_output_qty' },
+        { suffix: 'daily', outKey: 'daily_output_qty' },
+      ]) as unknown as SubstationDailyQty[],
+    }));
   }
 
   /**
@@ -758,52 +912,62 @@ export function useProductionAchievementDuckDB() {
         };
       });
     } else {
-      // PA-19 expanded (大項) mode: 子站 leaf rows (actuals only) + per-package
-      // 大項小計 (parent-keyed 累計計畫/達成率). Mirrors computeDailyView's
-      // GROUPING SETS structure — the 累計計畫 attaches ONLY to the subtotal grain
-      // (plan is keyed on the 大項/parent = the selection), leaf子站 rows show a
-      // null plan/差異/達成率.
+      // Change: production-achievement-column-pivot (PA-19 column direction).
+      // Expanded (大項) mode: same per_child CTE + pivot approach as
+      // computeDailyView -- a `per_child` CTE aggregates to the (package,子站)
+      // grain, then the outer query SUMs it back up to one row per package
+      // (mathematically identical to the OLD GROUPING SETS package-only
+      // subtotal grain) while ALSO pivoting each substation's own
+      // cumulative_actual_qty into a positional col{i}_actual column (no D/N
+      // split in cumulative mode). The plan LEFT JOIN/cumulative_plan_qty
+      // formula is copied verbatim from the single-layer branch above (same
+      // key: package + date range; plan_totals has at most one row per
+      // package, so no fan-out).
+      const substations = options.substations && options.substations.length ? options.substations : [options.workcenterGroup];
+      const pivotCols = buildPivotColumnsSql(substations, 'per_child.workcenter_group', [
+        { suffix: 'actual', sourceExpr: 'per_child.cumulative_actual_qty' },
+      ]);
       const rowsSql = `
-        SELECT
-          agg.package_lf_group AS package_lf_group,
-          agg.workcenter_group AS workcenter_group,
-          agg.is_subtotal AS is_subtotal,
-          agg.cumulative_actual_qty AS cumulative_actual_qty,
-          CASE WHEN agg.is_subtotal = 1 THEN plan_totals.cumulative_plan_qty ELSE NULL END AS cumulative_plan_qty
-        FROM (
+        WITH per_child AS (
           SELECT
             r.package_lf_group AS package_lf_group,
             r.workcenter_group AS workcenter_group,
-            GROUPING(r.workcenter_group) AS is_subtotal,
             SUM(r.actual_output_qty) / 1000.0 AS cumulative_actual_qty
           FROM ${ROLLUP_TABLE} r
           WHERE r.parent_group = ${sel}
             AND CAST(r.output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
-          GROUP BY GROUPING SETS ((r.package_lf_group, r.workcenter_group), (r.package_lf_group))
-        ) agg
+          GROUP BY r.package_lf_group, r.workcenter_group
+        )
+        SELECT
+          per_child.package_lf_group AS package_lf_group,
+          SUM(per_child.cumulative_actual_qty) AS cumulative_actual_qty,
+          MAX(plan_totals.cumulative_plan_qty) AS cumulative_plan_qty,
+${pivotCols}
+        FROM per_child
         LEFT JOIN (
           SELECT plan_package_group, CAST(SUM(${planCol}) AS DOUBLE) AS cumulative_plan_qty
           FROM ${PLAN_MAP_TABLE}
           WHERE CAST(output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
           GROUP BY plan_package_group
-        ) plan_totals ON plan_totals.plan_package_group = agg.package_lf_group
-        ORDER BY agg.package_lf_group, agg.is_subtotal, agg.workcenter_group
+        ) plan_totals ON plan_totals.plan_package_group = per_child.package_lf_group
+        GROUP BY per_child.package_lf_group
+        ORDER BY per_child.package_lf_group
       `;
       const rawRows = await _client.sendQuery(rowsSql);
       rows = (rawRows as Record<string, unknown>[]).map((row) => {
-        const isSubtotal = Number(row.is_subtotal) === 1;
         const actual = sf(row.cumulative_actual_qty);
         const cumulativePlan = nullableNumber(row.cumulative_plan_qty);
         const diff = cumulativePlan === null ? null : actual - cumulativePlan;
         const rate = cumulativePlan === null || cumulativePlan === 0 ? null : actual / cumulativePlan;
         return {
           package_lf_group: String(row.package_lf_group ?? ''),
-          workcenter_group: isSubtotal ? options.workcenterGroup : String(row.workcenter_group ?? ''),
-          is_subtotal: isSubtotal,
           cumulative_actual_qty: actual,
           cumulative_plan_qty: cumulativePlan,
           cumulative_diff_qty: diff,
           cumulative_achievement_rate: rate,
+          substations: mapPivotColumns(row, substations, [
+            { suffix: 'actual', outKey: 'cumulative_actual_qty' },
+          ]) as unknown as SubstationCumulativeQty[],
         };
       });
     }

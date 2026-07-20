@@ -52,6 +52,21 @@
 --     tables.sql -- PKG_SAW is now D2 excluded, like TCT/MA/IST) reconciles
 --     切割 to Live exactly (42,070,354 = 42,070,354, both shifts,
 --     2026-07-15).
+--
+--     ADDENDUM (2026-07-20): the PKG_SAW seed-removal half of the above fix
+--     was later reversed at the requester's explicit choice -- PKG_SAW is
+--     merged back into 切割's parent_group (scripts/sql/production_
+--     achievement_tables.sql) as a DISPLAY-ONLY 大項 rollup, mirroring how
+--     電鍍 rolls up 掛鍍/條鍍/滾鍍/委外. This query's own CONSUMEFACTOR
+--     division above is UNCHANGED and still keyed strictly on
+--     FROMWORKCENTER='切割' (PKG_SAW rows still fall to the ELSE branch,
+--     i.e. raw QTY, exactly like Live's own WorkCenter85 column) -- the
+--     re-merge only changes which parent_group PKG_SAW's raw_workcenter_group
+--     resolves to, client-side in useProductionAchievementDuckDB.ts's
+--     _buildRollup(). This dashboard's 切割 大項小計 total will therefore
+--     again diverge from Live's own 025.txt report (which never sums
+--     WorkCenter10+WorkCenter85) by PKG_SAW's volume -- a known, confirmed
+--     tradeoff, not a regression of the reconciliation above.
 --   * PACKAGE_LF: 025.txt calls the Live-only PL/SQL PJ_GET_PACKAGE_NEW_F over
 --     five OLTP tables that have NO DW equivalent; we approximate by reverse-
 --     looking-up DW_MES_LOTWIPHISTORY.PACKAGE_LF via CONTAINERID (documented
@@ -85,6 +100,10 @@
 --     -- i.e. the SAME CONTAINERID scoped_moveout already carries for a TMTT
 --     row). CONTAINERID/PJ_GOODDIEQTY are per-original-lot rows under that
 --     LOTID; summed, they give the carrier's true good-die quantity.
+--
+-- MAX_TXN_TS (added for the UI "資料最新一筆時間" freshness indicator): a
+-- plain extra aggregate on the outer SELECT, unrelated to this query's own
+-- qualifying predicates and NOT part of GROUP BY.
 
 WITH scoped_moveout AS (
     SELECT
@@ -197,7 +216,8 @@ SELECT
             WHEN m.FROMWORKCENTER = '切割' THEN ROUND(m.QTY / NVL(m.CONSUMEFACTOR, 1), 0)
             ELSE m.QTY
         END
-    ) AS ACTUAL_OUTPUT_QTY
+    ) AS ACTUAL_OUTPUT_QTY,
+    MAX(m.TXNDATE) AS MAX_TXN_TS
 FROM scoped_moveout m
 LEFT JOIN container_package cp ON m.CONTAINERID = cp.CONTAINERID
 LEFT JOIN tmtt_gooddie gd ON m.CONTAINERID = gd.CONTAINERID

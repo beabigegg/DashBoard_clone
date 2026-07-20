@@ -50,7 +50,12 @@ const emit = defineEmits<{
 const columns = ref<ColumnDefinition[]>([])
 
 provide('registerColumn', (col: ColumnDefinition) => {
-  columns.value.push(col)
+  const idx = columns.value.findIndex((c) => c.key === col.key)
+  if (idx !== -1) {
+    columns.value[idx] = col
+  } else {
+    columns.value.push(col)
+  }
 })
 provide('unregisterColumn', (key: string) => {
   const idx = columns.value.findIndex((c) => c.key === key)

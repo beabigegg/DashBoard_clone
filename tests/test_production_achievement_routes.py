@@ -298,6 +298,97 @@ class TestReportRoute:
         assert data["workcenter_merge_map"] == []
         assert data["plan_map"] == []
 
+    # ── sync_time / latest_data_timestamp freshness fields on spool-hit ─────
+
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_metadata",
+        return_value={"created_at": 1750000000, "latest_data_ts": "2026-04-02 07:29:59"},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_oracle_plan_rows",
+        return_value=[],
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries",
+        return_value=[],
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_package_lf_map",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_targets_map",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spec_workcenter_mapping",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_spool_hit_includes_sync_time_and_latest_data_timestamp(
+        self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
+        mock_workcenter_merge_map, mock_plan_rows, mock_spool_metadata, auth_client
+    ):
+        """Spool-hit 200 must carry sync_time (metadata "created_at", epoch
+        seconds) and latest_data_timestamp (metadata "latest_data_ts" string)
+        alongside the existing inline arrays, sourced from get_spool_metadata()."""
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["sync_time"] == 1750000000
+        assert data["latest_data_timestamp"] == "2026-04-02 07:29:59"
+        mock_spool_metadata.assert_called_once_with("production_achievement", data["query_id"])
+
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_metadata",
+        return_value=None,
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_oracle_plan_rows",
+        return_value=[],
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries",
+        return_value=[],
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_package_lf_map",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_targets_map",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spec_workcenter_mapping",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_spool_hit_sync_time_and_latest_data_timestamp_none_when_metadata_missing(
+        self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
+        mock_workcenter_merge_map, mock_plan_rows, mock_spool_metadata, auth_client
+    ):
+        """Defensive: get_spool_metadata() returning None (e.g. Redis metadata
+        expired/evicted between the hit check and this call) must not raise --
+        both fields fall back to None instead."""
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["sync_time"] is None
+        assert data["latest_data_timestamp"] is None
+
     # ── AC-1/AC-8: spool miss + no worker -> 503, no sync fallback ──────────
 
     @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=False)

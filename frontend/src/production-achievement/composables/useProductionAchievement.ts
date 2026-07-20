@@ -87,6 +87,16 @@ interface ReportSpoolHit {
   package_lf_map: PackageLfMapRow[];
   workcenter_merge_map: WorkcenterMergeMapRow[];
   plan_map: PlanMapRow[];
+  /** Unix epoch seconds (UTC) this spool's query_id last finished a real
+   *  Oracle sync (Redis spool metadata `created_at`); null in the
+   *  defensive edge case where the metadata was evicted between the
+   *  spool-hit check and the metadata read (production_achievement_routes.py
+   *  api_get_report). */
+  sync_time: number | null;
+  /** "%Y-%m-%d %H:%M:%S" (Oracle-session local time, no TZ suffix) of the
+   *  newest underlying source row (MAX(TRACKOUTTIMESTAMP)/MAX(TXNDATE))
+   *  actually fetched for this query; null when the spool has zero rows. */
+  latest_data_timestamp: string | null;
 }
 
 interface ReportAsyncEnqueued {
@@ -189,16 +199,47 @@ export function useProductionAchievement() {
   // PA-19: parent_group (大項) -> set of子站 (merged_workcenter_group) under it,
   // rebuilt from each report response's workcenter_merge_map. A selection whose
   // parent has >1子站 (電鍍/切割) is rendered EXPANDED in the detail table.
+  //
+  // Change: production-achievement-column-pivot. `_parentChildrenOrder` is the
+  // companion ORDERED array (first-seen order from the report's own
+  // workcenter_merge_map array) — the Set alone has no useful iteration order
+  // for column rendering. This ordered list is the SINGLE source of truth for
+  // substation column order, threaded into BOTH the SQL pivot builder
+  // (useProductionAchievementDuckDB.ts's computeDailyView/computeCumulativeView
+  // `substations` option, via `_recompute` below) and the UI table header
+  // (App.vue, via `expandedSubstations`) — they read the exact same array, so
+  // they can never derive a different order/drift apart from each other.
   const _parentChildren = new Map<string, Set<string>>();
+  const _parentChildrenOrder = new Map<string, string[]>();
+  // `_parentChildren`/`_parentChildrenOrder` are plain (non-reactive) Maps —
+  // Vue's dependency tracking never sees `.clear()`/`.set()` mutations on
+  // them. `isExpandedSelection`/`expandedSubstations` below read this counter
+  // (bumped every rebuild) purely to establish a REACTIVE dependency, so they
+  // correctly re-evaluate after a rebuild even when `filters.workcenter_group`
+  // itself never changes value — e.g. OD-7 landing directly on a persisted
+  // expanded (大項) selection: the very first template access evaluates
+  // BEFORE any report has been fetched (map still empty -> false), and
+  // without this counter that `false` would stay permanently cached forever,
+  // since `filters.workcenter_group` never changes again to re-trigger it.
+  const _parentChildrenVersion = ref(0);
 
   function _rebuildParentChildren(rows: WorkcenterMergeMapRow[]): void {
     _parentChildren.clear();
+    _parentChildrenOrder.clear();
     for (const r of rows) {
       const parent = r.parent_group || r.merged_workcenter_group;
       if (!parent) continue;
-      if (!_parentChildren.has(parent)) _parentChildren.set(parent, new Set());
-      _parentChildren.get(parent)!.add(r.merged_workcenter_group);
+      if (!_parentChildren.has(parent)) {
+        _parentChildren.set(parent, new Set());
+        _parentChildrenOrder.set(parent, []);
+      }
+      const seen = _parentChildren.get(parent)!;
+      if (!seen.has(r.merged_workcenter_group)) {
+        seen.add(r.merged_workcenter_group);
+        _parentChildrenOrder.get(parent)!.push(r.merged_workcenter_group);
+      }
     }
+    _parentChildrenVersion.value++;
   }
 
   function _isExpanded(group: string): boolean {
@@ -206,8 +247,26 @@ export function useProductionAchievement() {
     return !!children && children.size > 1;
   }
 
+  /** Ordered子站 list for `group` (see `_parentChildrenOrder` above); empty when
+   *  `group` is not expanded (or unknown). */
+  function _substationsFor(group: string): string[] {
+    return _parentChildrenOrder.get(group) || [];
+  }
+
   /** Whether the currently-selected station renders as an expanded 大項 (PA-19). */
-  const isExpandedSelection = computed(() => _isExpanded(filters.workcenter_group));
+  const isExpandedSelection = computed(() => {
+    void _parentChildrenVersion.value; // reactive dep -- see _parentChildrenVersion's doc comment
+    return _isExpanded(filters.workcenter_group);
+  });
+
+  /** Change: production-achievement-column-pivot. Ordered子站 list for the
+   *  CURRENTLY selected 大項 — the single source of truth the bespoke
+   *  column-pivoted table header (App.vue) renders from. Empty array when the
+   *  current selection is not expanded. */
+  const expandedSubstations = computed<string[]>(() => {
+    void _parentChildrenVersion.value; // reactive dep -- see _parentChildrenVersion's doc comment
+    return _substationsFor(filters.workcenter_group);
+  });
 
   const dailyRows = ref<DailyViewRow[]>([]);
   const cumulativeRows = ref<CumulativeViewRow[]>([]);
@@ -215,6 +274,18 @@ export function useProductionAchievement() {
   const loading = ref(false);
   const error = ref('');
   const hasQueried = ref(false);
+
+  // ── Freshness indicators (同步時間/資料最新一筆時間) ─────────────────────
+  // Both come straight off the 200 spool-hit response (see ReportSpoolHit
+  // above) — never independently computed/derived on the client. Reset to
+  // null at the START of every runQuery() (same place error/hasQueried
+  // reset), so a stale value from a PRIOR successful query never lingers
+  // visibly through a subsequent failed/in-flight one; populated again only
+  // once a new spool-hit actually lands (in _activateAndRender below).
+  /** Unix epoch seconds (UTC) — see ReportSpoolHit.sync_time. */
+  const syncTime = ref<number | null>(null);
+  /** "%Y-%m-%d %H:%M:%S" — see ReportSpoolHit.latest_data_timestamp. */
+  const latestDataTimestamp = ref<string | null>(null);
 
   const viewKind = computed<'daily' | 'cumulative'>(() =>
     filters.mode === 'today' || filters.mode === 'yesterday' ? 'daily' : 'cumulative',
@@ -461,19 +532,26 @@ export function useProductionAchievement() {
   /** Re-run computeDailyView/computeCumulativeView against the ALREADY-cached
    *  DuckDB tables (no spool re-fetch) for the given mode/date-window. */
   async function _recompute(mode: ProductionAchievementMode, startDate: string, endDate: string, workcenterGroup: string): Promise<void> {
-    // PA-19: a selection whose 大項 has >1子站 (電鍍/切割) renders expanded
-    // (rows split per子站 + 大項小計 computed in the view layer).
+    // PA-19: a selection whose 大項 has >1子站 (電鍍/切割) renders expanded (one
+    // row per package with a column-pivoted per子站 breakdown attached, see
+    // useProductionAchievementDuckDB.ts). `substations` threads the SAME
+    // ordered子站 list `expandedSubstations` exposes into the SQL pivot
+    // builder — looked up by the `workcenterGroup` PARAMETER (not
+    // filters.workcenter_group) so it always matches the selection this exact
+    // recompute call is for, even if a caller passes a value that hasn't
+    // finished propagating to `filters` yet.
     const expand = _isExpanded(workcenterGroup);
+    const substations = expand ? _substationsFor(workcenterGroup) : undefined;
     if (mode === 'today' || mode === 'yesterday') {
       // today/yesterday are always a single day (start_date === end_date,
       // see _resolveSnapshotDates) — outputDate scopes computeDailyView to
       // exactly that day so the preceding day's overnight N-shift tail
       // (captured by this query's own fetch window, PA-03) never bleeds in.
-      dailyRows.value = await duckdb.computeDailyView({ workcenterGroup, outputDate: startDate, expand });
+      dailyRows.value = await duckdb.computeDailyView({ workcenterGroup, outputDate: startDate, expand, substations });
       cumulativeRows.value = [];
       cumulativeTrend.value = [];
     } else {
-      const result = await duckdb.computeCumulativeView({ workcenterGroup, startDate, endDate, expand });
+      const result = await duckdb.computeCumulativeView({ workcenterGroup, startDate, endDate, expand, substations });
       cumulativeRows.value = result.rows;
       cumulativeTrend.value = result.trend;
       dailyRows.value = [];
@@ -482,6 +560,8 @@ export function useProductionAchievement() {
 
   /** Hand the spool-hit response to DuckDB-WASM and render the computed rows. */
   async function _activateAndRender(data: ReportSpoolHit, snapshot: QuerySnapshot): Promise<void> {
+    syncTime.value = data.sync_time ?? null;
+    latestDataTimestamp.value = data.latest_data_timestamp ?? null;
     _rebuildParentChildren(data.workcenter_merge_map || []);
     await duckdb.activate(
       data.spool_download_url,
@@ -500,6 +580,11 @@ export function useProductionAchievement() {
     error.value = '';
     loading.value = true;
     hasQueried.value = true;
+    // Freshness indicators reset up-front (see the field doc comments above)
+    // -- never let a prior successful query's sync_time/latest_data_timestamp
+    // linger visibly through this new in-flight/failed one.
+    syncTime.value = null;
+    latestDataTimestamp.value = null;
     _resetAsyncProgress();
     duckdb.deactivate();
     const mode = filters.mode;
@@ -591,8 +676,35 @@ export function useProductionAchievement() {
    * and it's the only way to force a fresh fetch for 前日/當月 at all, since
    * those aren't covered by the warmup scheduler). Same OD-4 no-op-while-
    * loading guard as every other entry point -- runQuery() itself enforces it.
+   *
+   * PA-18 (bugfix): 重新查詢 must refresh BOTH 產出/轉出, not just whichever
+   * tab is currently active -- otherwise switching to the other tab afterward
+   * can silently show a stale snapshot from before the button was pressed,
+   * with no visual cue that it was never refreshed. The INACTIVE source is
+   * force-refreshed as a fire-and-forget background request: it clears that
+   * source's server-side spool and (if async) enqueues an RQ job the same way
+   * the active tab's request does, but this call is never awaited into
+   * loading/asyncJobProgress/dailyRows -- the inactive tab isn't on screen, so
+   * there's nothing to render yet. The RQ job keeps running server-side
+   * regardless of whether this promise is awaited; by the time (if ever) the
+   * user switches tabs, they either hit the now-warm spool or a normal
+   * miss->202->poll cycle -- either way no longer the pre-refresh snapshot.
+   * Errors are swallowed: a failed background refresh just leaves that tab on
+   * its previous (still-valid-until-TTL) cache, exactly like never having
+   * called refreshQuery() for it -- never surfaced as a user-facing error for
+   * a tab the user isn't even looking at.
    */
   function refreshQuery(): Promise<void> {
+    if (loading.value) return Promise.resolve(); // OD-4: mid-poll refreshQuery is a pure no-op -- must gate
+    // the background other-source call too, not just rely on runQuery()'s own guard below.
+    const otherSource: ProductionSourceMode = filters.source === 'output' ? 'moveout' : 'output';
+    const { start_date, end_date } = _resolveSnapshotDates(filters.mode, new Date());
+    void _fetchReportOnce(
+      { mode: filters.mode, source: otherSource, start_date, end_date, workcenter_group: filters.workcenter_group },
+      true,
+    ).catch(() => {
+      // best-effort only -- see doc comment above
+    });
     return runQuery({ forceRefresh: true });
   }
 
@@ -619,6 +731,25 @@ export function useProductionAchievement() {
     }
   }
 
+  // "同步時間" display label -- epoch seconds (UTC) rendered in the browser's
+  // LOCAL timezone (Intl-free, matches formatLocalDate's plain-Date-component
+  // idiom used everywhere else in this file), "YYYY-MM-DD HH:MM:SS". Null
+  // (no query yet / prior reset / defensive metadata-miss, see the
+  // ReportSpoolHit.sync_time doc comment) renders as an em-dash rather than
+  // an empty string, so the label never silently disappears.
+  const syncTimeLabel = computed<string>(() => {
+    if (syncTime.value === null) return '—';
+    const d = new Date(syncTime.value * 1000);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${formatLocalDate(d)} ${hh}:${mm}:${ss}`;
+  });
+
+  // "資料最新一筆時間" -- already formatted server-side ("%Y-%m-%d %H:%M:%S");
+  // rendered as-is, same null -> em-dash fallback as syncTimeLabel.
+  const latestDataTimestampLabel = computed<string>(() => latestDataTimestamp.value ?? '—');
+
   return {
     filters,
     filterOptions,
@@ -627,10 +758,15 @@ export function useProductionAchievement() {
     cumulativeTrend,
     viewKind,
     isExpandedSelection,
+    expandedSubstations,
     loading,
     error,
     hasQueried,
     asyncJobProgress,
+    syncTime,
+    latestDataTimestamp,
+    syncTimeLabel,
+    latestDataTimestampLabel,
     fetchFilterOptions,
     runQuery,
     refreshQuery,

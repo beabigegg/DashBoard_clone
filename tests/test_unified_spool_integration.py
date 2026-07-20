@@ -365,12 +365,17 @@ class TestProductionHistoryWarmupExclusion:
         assert "production" in docstring.lower()
 
     def test_warmup_job_count_is_exactly_eight(self):
-        """Exactly 8 warmup jobs: reject, yield-alert, hold, resource, resource-history-duckdb,
+        """Exactly 10 warmup jobs: reject, yield-alert, hold, resource, resource-history-duckdb,
         downtime-duckdb, production-achievement-today, production-achievement-yesterday
         (production-achievement-overhaul; named achievement-* not production-achievement-*,
-        see test_warmup_jobs_do_not_contain_production above)."""
+        see test_warmup_jobs_do_not_contain_production above), plus the move-out
+        counterparts production-achievement-moveout-today/-yesterday (PA-18).
+
+        Test name kept as-is (predates PA-18's 2 move-out entries) to avoid an
+        unrelated rename churning this file; the count below is the current,
+        accurate 10."""
         from mes_dashboard.core.spool_warmup_scheduler import _WARMUP_JOBS
-        assert len(_WARMUP_JOBS) == 8
+        assert len(_WARMUP_JOBS) == 10
 
 
 # ===========================================================================

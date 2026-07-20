@@ -191,14 +191,16 @@ def test_downtime_analysis_duckdb_in_warmup_jobs():
 
 
 def test_warmup_jobs_total_count_after_duckdb_additions():
-    """_WARMUP_JOBS must have exactly 8 entries after the two DuckDB
-    additions plus the two production-achievement today/yesterday additions
-    (production-achievement-overhaul, PA-14)."""
+    """_WARMUP_JOBS must have exactly 10 entries after the two DuckDB
+    additions, the two production-achievement 產出 today/yesterday additions
+    (production-achievement-overhaul, PA-14), and the two production-achievement
+    轉出 (move-out) today/yesterday additions (PA-18)."""
     from mes_dashboard.core import spool_warmup_scheduler as sched
 
     count = len(sched._WARMUP_JOBS)
-    assert count == 8, (
-        f"Expected 8 warmup jobs (4 existing + 2 DuckDB + 2 production-achievement), "
+    assert count == 10, (
+        f"Expected 10 warmup jobs (4 existing + 2 DuckDB + 2 production-achievement "
+        f"output + 2 production-achievement moveout), "
         f"got {count}: {[jid for jid, _ in sched._WARMUP_JOBS]!r}"
     )
 
@@ -268,3 +270,89 @@ def test_production_achievement_warmup_job_failure_is_caught_and_logged():
         side_effect=RuntimeError("boom"),
     ):
         job_fns_by_prefix[today_prefix]()  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# PA-18: production-achievement 轉出 (move-out) today/yesterday warmup jobs
+#
+# Mirrors the PA-14 產出 tests above 1:1, targeting the "moveout" entries.
+# Job-id prefixes/fn names use "achievement-moveout" for the same
+# substring-scan-avoidance reason as "achievement" above -- see
+# _warmup_achievement_moveout_today_job's docstring.
+# ---------------------------------------------------------------------------
+
+def test_warmup_jobs_include_production_achievement_moveout_today_and_yesterday():
+    """_WARMUP_JOBS must contain both a production-achievement moveout
+    'today' and 'yesterday' entry (PA-18)."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_id_prefixes = [jid for jid, _ in sched._WARMUP_JOBS]
+    assert any("achievement" in p and "moveout" in p and "today" in p for p in job_id_prefixes), (
+        f"No production-achievement moveout 'today' entry found in _WARMUP_JOBS prefixes: "
+        f"{job_id_prefixes!r}"
+    )
+    assert any("achievement" in p and "moveout" in p and "yesterday" in p for p in job_id_prefixes), (
+        f"No production-achievement moveout 'yesterday' entry found in _WARMUP_JOBS prefixes: "
+        f"{job_id_prefixes!r}"
+    )
+
+
+def test_production_achievement_moveout_warmup_jobs_call_ensure_today_yesterday_loaded():
+    """The two new moveout _WARMUP_JOBS entries must be thin wrappers around
+    ensure_moveout_today_loaded()/ensure_moveout_yesterday_loaded() -- mirrors
+    the existing 8 entries' try/except-log shape (module docstring)."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_fns_by_prefix = dict(sched._WARMUP_JOBS)
+    today_prefix = next(
+        p for p in job_fns_by_prefix if "achievement" in p and "moveout" in p and "today" in p
+    )
+    yesterday_prefix = next(
+        p for p in job_fns_by_prefix if "achievement" in p and "moveout" in p and "yesterday" in p
+    )
+
+    with patch(
+        "mes_dashboard.services.production_achievement_daily_cache.ensure_moveout_today_loaded",
+        return_value="/fake/moveout-today.parquet",
+    ) as mock_today:
+        job_fns_by_prefix[today_prefix]()
+    mock_today.assert_called_once()
+
+    with patch(
+        "mes_dashboard.services.production_achievement_daily_cache.ensure_moveout_yesterday_loaded",
+        return_value="/fake/moveout-yesterday.parquet",
+    ) as mock_yesterday:
+        job_fns_by_prefix[yesterday_prefix]()
+    mock_yesterday.assert_called_once()
+
+
+def test_production_achievement_moveout_warmup_job_failure_is_caught_and_logged():
+    """Mirrors the existing entries' try/except-log shape: an exception from
+    ensure_moveout_today_loaded() must never propagate out of the warmup job
+    wrapper (a scheduler-wide outage in one job must not block the others)."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_fns_by_prefix = dict(sched._WARMUP_JOBS)
+    today_prefix = next(
+        p for p in job_fns_by_prefix if "achievement" in p and "moveout" in p and "today" in p
+    )
+
+    with patch(
+        "mes_dashboard.services.production_achievement_daily_cache.ensure_moveout_today_loaded",
+        side_effect=RuntimeError("boom"),
+    ):
+        job_fns_by_prefix[today_prefix]()  # must not raise
+
+
+def test_production_history_guard_still_passes_with_moveout_entries():
+    """Regression: the moveout job-id prefixes/fn names must not accidentally
+    reintroduce the "production" substring that test_production_history_not_in_warmup_jobs
+    scans for."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_fn_names = [fn.__name__ for _, fn in sched._WARMUP_JOBS]
+    job_id_prefixes = [jid for jid, _ in sched._WARMUP_JOBS]
+    for name in job_fn_names:
+        assert "production" not in name.lower()
+    for prefix in job_id_prefixes:
+        assert "production" not in prefix.lower()

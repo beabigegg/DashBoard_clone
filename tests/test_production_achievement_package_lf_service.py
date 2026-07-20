@@ -189,6 +189,127 @@ class TestGetOraclePackageLfMap:
         assert first == second == {"DFN0603": "DFN2510/0603"}
 
 
+class TestGetOraclePackageLfMapRedisL2:
+    """Redis L2 layer on top of the existing L1(dict)+Oracle cache (mirrors
+    production_achievement_plan_service's L1+L2+Oracle two-tier pattern,
+    parameterized as a single global key instead of per-month)."""
+
+    def test_l1_miss_redis_hit_skips_oracle_and_repopulates_l1(self):
+        import mes_dashboard.services.production_achievement_package_lf_service as svc
+
+        redis_map = {"DFN0603": "DFN2510/0603"}
+        with patch.object(svc, "_read_from_redis", return_value=redis_map):
+            with patch(
+                "mes_dashboard.services.production_achievement_package_lf_service.read_sql_df"
+            ) as mock_sql:
+                result = svc.get_oracle_package_lf_map()
+
+        mock_sql.assert_not_called()
+        assert result == redis_map
+        assert svc._ORACLE_CACHE["map"] == redis_map
+
+    def test_l1_and_redis_miss_queries_oracle_and_writes_both_layers(self):
+        import mes_dashboard.services.production_achievement_package_lf_service as svc
+
+        df = _oracle_lf_df([("DFN0603", "DFN2510/0603")])
+        with patch.object(svc, "_read_from_redis", return_value=None):
+            with patch.object(svc, "_write_to_redis") as mock_write:
+                with patch(
+                    "mes_dashboard.services.production_achievement_package_lf_service.read_sql_df",
+                    return_value=df,
+                ) as mock_sql:
+                    result = svc.get_oracle_package_lf_map()
+
+        mock_sql.assert_called_once()
+        assert result == {"DFN0603": "DFN2510/0603"}
+        assert svc._ORACLE_CACHE["map"] == {"DFN0603": "DFN2510/0603"}
+        mock_write.assert_called_once_with({"DFN0603": "DFN2510/0603"})
+
+    def test_redis_read_failure_fails_open_to_none_and_falls_back_to_oracle(self):
+        """_read_from_redis() itself must swallow Redis errors (never raise)
+        so a Redis outage falls open to the Oracle path, not a 500."""
+        import mes_dashboard.services.production_achievement_package_lf_service as svc
+
+        with patch(
+            "mes_dashboard.services.production_achievement_package_lf_service.REDIS_ENABLED",
+            True,
+        ):
+            with patch(
+                "mes_dashboard.services.production_achievement_package_lf_service.get_redis_client",
+                side_effect=RuntimeError("connection refused"),
+            ):
+                assert svc._read_from_redis() is None
+
+    def test_redis_write_failure_fails_open_without_raising(self):
+        import mes_dashboard.services.production_achievement_package_lf_service as svc
+
+        with patch(
+            "mes_dashboard.services.production_achievement_package_lf_service.REDIS_ENABLED",
+            True,
+        ):
+            with patch(
+                "mes_dashboard.services.production_achievement_package_lf_service.get_redis_client",
+                side_effect=RuntimeError("connection refused"),
+            ):
+                svc._write_to_redis({"DFN0603": "DFN2510/0603"})  # must not raise
+
+    def test_end_to_end_redis_outage_still_returns_oracle_result(self):
+        """Both Redis read and write raise -- get_oracle_package_lf_map()
+        must still succeed via Oracle, matching current (pre-L2) behavior."""
+        import mes_dashboard.services.production_achievement_package_lf_service as svc
+
+        df = _oracle_lf_df([("DFN0603", "DFN2510/0603")])
+        with patch(
+            "mes_dashboard.services.production_achievement_package_lf_service.REDIS_ENABLED",
+            True,
+        ):
+            with patch(
+                "mes_dashboard.services.production_achievement_package_lf_service.get_redis_client",
+                side_effect=RuntimeError("connection refused"),
+            ):
+                with patch(
+                    "mes_dashboard.services.production_achievement_package_lf_service.read_sql_df",
+                    return_value=df,
+                ):
+                    result = svc.get_oracle_package_lf_map()
+
+        assert result == {"DFN0603": "DFN2510/0603"}
+
+    def test_redis_disabled_skips_l2_entirely(self):
+        """REDIS_ENABLED=false: behavior is identical to the pre-L2 pure-L1
+        cache -- Redis client is never touched."""
+        import mes_dashboard.services.production_achievement_package_lf_service as svc
+
+        with patch(
+            "mes_dashboard.services.production_achievement_package_lf_service.REDIS_ENABLED",
+            False,
+        ):
+            with patch(
+                "mes_dashboard.services.production_achievement_package_lf_service.get_redis_client"
+            ) as mock_client:
+                assert svc._read_from_redis() is None
+                svc._write_to_redis({"DFN0603": "DFN2510/0603"})
+
+            mock_client.assert_not_called()
+
+    def test_redis_disabled_get_oracle_package_lf_map_still_queries_oracle(self):
+        import mes_dashboard.services.production_achievement_package_lf_service as svc
+
+        df = _oracle_lf_df([("DFN0603", "DFN2510/0603")])
+        with patch(
+            "mes_dashboard.services.production_achievement_package_lf_service.REDIS_ENABLED",
+            False,
+        ):
+            with patch(
+                "mes_dashboard.services.production_achievement_package_lf_service.read_sql_df",
+                return_value=df,
+            ) as mock_sql:
+                result = svc.get_oracle_package_lf_map()
+
+        mock_sql.assert_called_once()
+        assert result == {"DFN0603": "DFN2510/0603"}
+
+
 class TestGetPackageLfEntries:
     @patch("mes_dashboard.services.production_achievement_package_lf_service.MYSQL_OPS_ENABLED", True)
     @patch("mes_dashboard.services.production_achievement_package_lf_service.get_mysql_connection")

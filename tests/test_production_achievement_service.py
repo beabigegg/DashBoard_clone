@@ -60,24 +60,29 @@ class TestPA05PredicateSQL:
         assert specname_or_processtype in PA05_PREDICATE_SQL
 
     @pytest.mark.parametrize(
-        "specid",
+        "specname",
         [
-            "48812c8000025fd2",
-            "48812c8000025fd4",
-            "48812c8000000025",
-            "48812c8000000026",
-            "48812c8000000027",
-            "48812c8000039e15",
+            "C.C Mold_F",
+            "M.G.P Mold_F",
+            "Auto Mold",
+            "M.G.P Mold",
+            "C.C Mold",
         ],
     )
-    def test_pa05_predicate_includes_each_chengxing_specid(self, specid):
-        """成型 (molding) branch, PA-05 extension -- keyed on SPECID, not
-        SPECNAME (SPECID lives directly on DW_MES_LOTWIPHISTORY)."""
-        assert specid in PA05_PREDICATE_SQL
+    def test_pa05_predicate_includes_each_chengxing_specname(self, specname):
+        """成型 (molding) branch, PA-05a extension -- corrected 2026-07-20 to
+        match 025.txt's own SPECNAME-based predicate verbatim (the original
+        SPECID-keyed version double-counted output by also matching a
+        downstream Mold電漿清洗 Plasma step for the same physical lot)."""
+        assert specname in PA05_PREDICATE_SQL
 
-    def test_pa05_predicate_chengxing_branch_requires_nonzero_trackoutqty(self):
-        assert "WC.SPECID IN" in PA05_PREDICATE_SQL
-        assert "Trackoutqty<>0" in PA05_PREDICATE_SQL
+    def test_pa05_predicate_chengxing_branch_no_longer_uses_specid_or_trackoutqty_guard(self):
+        """Regression guard: the corrected branch is a plain SPECNAME IN (...)
+        with no SPECID indirection and no Trackoutqty<>0 clause -- neither
+        appears anywhere in 025.txt's 成型 predicate."""
+        assert "SPECID" not in PA05_PREDICATE_SQL
+        assert "Trackoutqty" not in PA05_PREDICATE_SQL
+        assert "48812c8000039e15" not in PA05_PREDICATE_SQL
 
 
 class TestGroupingAndWorkcenterGroupResolution:

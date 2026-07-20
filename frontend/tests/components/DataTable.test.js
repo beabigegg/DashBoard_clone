@@ -9,7 +9,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { h, ref } from 'vue';
 import DataTable from '../../src/shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../src/shared-ui/components/DataTableColumn.vue';
 
 describe('DataTable', () => {
   it('renders without crash when data is empty', () => {
@@ -72,5 +74,31 @@ describe('DataTable', () => {
     // isEmpty is false because data.length > 0, so first tbody is rendered
     const tbodies = wrapper.findAll('tbody');
     expect(tbodies.length).toBeGreaterThan(0);
+  });
+
+  it('updates the header text when a DataTableColumn label prop changes after mount', async () => {
+    // Regression test: registerColumn used to fire only in onMounted, so a
+    // dynamically computed label (e.g. switching 產出/轉出 modes) froze at
+    // whatever it was on first render instead of tracking the new value.
+    const label = ref('D班產出 (K)');
+    const wrapper = mount({
+      components: { DataTable, DataTableColumn },
+      setup() {
+        return { label };
+      },
+      render() {
+        return h(DataTable, { data: [{ qty: 1 }] }, () => [
+          h(DataTableColumn, { columnKey: 'qty', label: this.label }),
+        ]);
+      },
+    });
+
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.data-table-th').text()).toContain('D班產出 (K)');
+
+    label.value = 'D班轉出 (K)';
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('.data-table-th').text()).toContain('D班轉出 (K)');
   });
 });

@@ -56,6 +56,13 @@ function jsonResponse(body: unknown, status = 200) {
   } as unknown as Response;
 }
 
+// production-achievement-sync-time: sync_time (epoch seconds) / latest_data_timestamp
+// ("%Y-%m-%d %H:%M:%S") are always present on a real 200 spool-hit response
+// (production_achievement_routes.py api_get_report) — included here so every
+// existing test below already exercises the real response shape.
+const SYNC_TIME_EPOCH = 1750000000; // 2025-06-15T16:26:40Z
+const LATEST_DATA_TIMESTAMP = '2026-07-14 07:29:59';
+
 const SPOOL_HIT_BODY = {
   success: true,
   data: {
@@ -66,9 +73,25 @@ const SPOOL_HIT_BODY = {
     package_lf_map: [],
     workcenter_merge_map: [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input' }],
     plan_map: [{ output_date: '2026-07-14', plan_package_group: 'SOD-123FL', planqty_input: 300, planqty_output: 250 }],
+    sync_time: SYNC_TIME_EPOCH,
+    latest_data_timestamp: LATEST_DATA_TIMESTAMP,
   },
   meta: {},
 };
+
+/** Mirrors useProductionAchievement.ts's syncTimeLabel formatting exactly
+ *  (local Date components, never toISOString) so the expectation is
+ *  timezone-agnostic regardless of the test runner's TZ. */
+function expectedSyncTimeLabel(epochSeconds: number): string {
+  const d = new Date(epochSeconds * 1000);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+}
 
 // Raw row returned by computeDailyView's SELECT — this same object is BOTH
 // the mocked client.sendQuery result AND the expected dailyRows.value entry
@@ -193,6 +216,118 @@ describe('useProductionAchievement — runQuery mode branching + auto-run + asyn
     expect(cumulativeRows.value).toEqual([]);
   });
 
+  it('production-achievement-sync-time: runQuery populates syncTime/latestDataTimestamp (and their formatted labels) from the spool-hit response', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
+
+    const { syncTime, latestDataTimestamp, syncTimeLabel, latestDataTimestampLabel, runQuery } = useProductionAchievement();
+    // Before any query: no data yet, so both fall back to the em-dash label.
+    expect(syncTime.value).toBeNull();
+    expect(latestDataTimestamp.value).toBeNull();
+    expect(syncTimeLabel.value).toBe('—');
+    expect(latestDataTimestampLabel.value).toBe('—');
+
+    await runQuery();
+
+    expect(syncTime.value).toBe(SYNC_TIME_EPOCH);
+    expect(latestDataTimestamp.value).toBe(LATEST_DATA_TIMESTAMP);
+    expect(syncTimeLabel.value).toBe(expectedSyncTimeLabel(SYNC_TIME_EPOCH));
+    expect(latestDataTimestampLabel.value).toBe(LATEST_DATA_TIMESTAMP);
+  });
+
+  it('production-achievement-sync-time: null sync_time/latest_data_timestamp on the response (defensive metadata-miss / empty spool) render as the em-dash fallback, never "null"/"undefined"', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    const nullFreshnessBody = {
+      ...SPOOL_HIT_BODY,
+      data: { ...SPOOL_HIT_BODY.data, sync_time: null, latest_data_timestamp: null },
+    };
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse(nullFreshnessBody));
+
+    const { syncTime, latestDataTimestamp, syncTimeLabel, latestDataTimestampLabel, runQuery } = useProductionAchievement();
+    await runQuery();
+
+    expect(syncTime.value).toBeNull();
+    expect(latestDataTimestamp.value).toBeNull();
+    expect(syncTimeLabel.value).toBe('—');
+    expect(latestDataTimestampLabel.value).toBe('—');
+  });
+
+  it('production-achievement-sync-time: a subsequent runQuery() resets syncTime/latestDataTimestamp to null SYNCHRONOUSLY before the new response lands -- a stale value from a prior successful query never lingers through a new in-flight query', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
+
+    const { syncTime, latestDataTimestamp, runQuery } = useProductionAchievement();
+    await runQuery();
+    expect(syncTime.value).toBe(SYNC_TIME_EPOCH); // sanity: first query populated it
+
+    // Second query: hold its /report fetch on a manually-controlled promise
+    // (never a permanently-unresolved one -- resolved + awaited at the end
+    // of this test so nothing leaks into later tests) so the assertion below
+    // observes state strictly BETWEEN runQuery()'s synchronous reset lines
+    // (which run before its first internal `await`) and the second
+    // response landing.
+    let resolveSecondFetch!: (value: Response) => void;
+    const secondFetch = new Promise<Response>((resolve) => {
+      resolveSecondFetch = resolve;
+    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementationOnce(() => secondFetch);
+
+    const pending = runQuery(); // synchronous reset lines have already run by the time this returns
+    expect(syncTime.value).toBeNull();
+    expect(latestDataTimestamp.value).toBeNull();
+
+    // Cleanup: let the second query actually complete so no dangling
+    // unresolved promise/timer survives into subsequent tests.
+    resolveSecondFetch(jsonResponse(SPOOL_HIT_BODY));
+    await pending;
+    expect(syncTime.value).toBe(SYNC_TIME_EPOCH);
+  });
+
+  it('production-achievement-column-pivot: isExpandedSelection/expandedSubstations correctly reflect an expanded 大項 even when landing DIRECTLY on it via OD-7 persisted state (regression: the very FIRST template access happens before any query has populated the parent/children map, which used to permanently cache a stale false/[] since the map itself is a plain non-reactive Map)', async () => {
+    sessionStorage.setItem(
+      'production-achievement:last-report-state',
+      JSON.stringify({ mode: 'today', source: 'moveout', workcenter_group: '電鍍' }),
+    );
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    const EXPANDED_BODY = {
+      success: true,
+      data: {
+        query_id: 'exp1',
+        spool_download_url: '/api/spool/production_achievement_moveout/exp1.parquet',
+        spec_workcenter_map: [],
+        targets_map: [],
+        package_lf_map: [],
+        workcenter_merge_map: [
+          { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍', plan_source_side: 'input' },
+          { raw_workcenter_group: '條鍍', merged_workcenter_group: '條鍍', parent_group: '電鍍', plan_source_side: 'input' },
+        ],
+        plan_map: [],
+      },
+      meta: {},
+    };
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonResponse(EXPANDED_BODY));
+
+    const { isExpandedSelection, expandedSubstations, runQuery } = useProductionAchievement();
+    // Reading BEFORE the first query resolves is exactly the scenario a
+    // template's initial render exercises -- the parent/children map is
+    // still empty at this point (no report has completed yet).
+    expect(isExpandedSelection.value).toBe(false);
+    expect(expandedSubstations.value).toEqual([]);
+
+    await runQuery();
+
+    expect(isExpandedSelection.value).toBe(true);
+    expect(expandedSubstations.value).toEqual(['掛鍍', '條鍍']);
+  });
+
   it('month/range modes compute the CumulativeView (computeCumulativeView) — including a single-day range (OD-2)', async () => {
     const client = await mockedDuckDbClient();
     client.sendQuery.mockResolvedValue([]);
@@ -229,9 +364,15 @@ describe('useProductionAchievement — runQuery mode branching + auto-run + asyn
     await runQuery();
     await refreshQuery();
 
-    expect(reportUrls).toHaveLength(2);
+    // 1 (initial runQuery, no force_refresh) + 2 (refreshQuery: the visible
+    // active-source request AND the fire-and-forget background request for
+    // the OTHER source -- see refreshQuery's doc comment, PA-18 bugfix).
+    expect(reportUrls).toHaveLength(3);
     expect(reportUrls[0]).not.toContain('force_refresh');
-    expect(reportUrls[1]).toContain('force_refresh=true');
+    const refreshUrls = reportUrls.slice(1);
+    expect(refreshUrls.every((u) => u.includes('force_refresh=true'))).toBe(true);
+    expect(refreshUrls.some((u) => u.includes('source=output'))).toBe(true);
+    expect(refreshUrls.some((u) => u.includes('source=moveout'))).toBe(true);
   });
 
   it('refreshQuery on a spool-miss carries refresh_plan=true through the tail re-fetch WITHOUT resending force_refresh=true (avoids re-clearing the just-computed spool)', async () => {
@@ -239,13 +380,21 @@ describe('useProductionAchievement — runQuery mode branching + auto-run + asyn
     client.sendQuery.mockResolvedValue([]);
 
     const JOB_ID = 'pa-job-refresh-tail';
-    const reportUrls: string[] = [];
+    // Track the ACTIVE source's (output, the default) report URLs separately
+    // from the background other-source (moveout) fire-and-forget call --
+    // refreshQuery now fires both (PA-18 bugfix), and the background one must
+    // not perturb the active source's enqueue->poll->tail-refetch assertions
+    // below (it gets a single benign spool-hit and is otherwise ignored).
+    const outputReportUrls: string[] = [];
     let jobPollCount = 0;
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       const u = String(url);
       if (u.includes('/api/production-achievement/report')) {
-        reportUrls.push(u);
-        if (reportUrls.length === 1) {
+        if (u.includes('source=moveout')) {
+          return Promise.resolve(jsonResponse(SPOOL_HIT_BODY)); // background call — result discarded, not polled
+        }
+        outputReportUrls.push(u);
+        if (outputReportUrls.length === 1) {
           return Promise.resolve(
             jsonResponse({
               success: true,
@@ -270,16 +419,16 @@ describe('useProductionAchievement — runQuery mode branching + auto-run + asyn
     const { refreshQuery } = useProductionAchievement();
     await refreshQuery();
 
-    expect(reportUrls).toHaveLength(2);
+    expect(outputReportUrls).toHaveLength(2);
     // Original request: force_refresh=true (clears the spool, always 202s).
-    expect(reportUrls[0]).toContain('force_refresh=true');
+    expect(outputReportUrls[0]).toContain('force_refresh=true');
     // Tail re-fetch after job completion: must NOT resend force_refresh=true
     // (would re-clear the spool the job just finished computing and loop
     // forever) but MUST carry refresh_plan=true so the achievement-rate
     // denominator (plan_map) refreshes together with the now-fresh actual
     // output, instead of silently serving a stale plan cache.
-    expect(reportUrls[1]).not.toContain('force_refresh');
-    expect(reportUrls[1]).toContain('refresh_plan=true');
+    expect(outputReportUrls[1]).not.toContain('force_refresh');
+    expect(outputReportUrls[1]).toContain('refresh_plan=true');
   });
 
   it('refreshQuery is ignored (OD-4 no-op) while a poll is already in flight', async () => {

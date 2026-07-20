@@ -182,6 +182,46 @@ def _warmup_achievement_yesterday_job() -> None:
         logger.warning("Warmup [production_achievement_yesterday] failed: %s", exc)
 
 
+def _warmup_achievement_moveout_today_job() -> None:
+    """RQ worker function: warm today's (今日) production-achievement 轉出
+    (move-out) DailyView spool (PA-18). Mirrors
+    _warmup_achievement_today_job's shape exactly, calling
+    ``ensure_moveout_today_loaded()`` (services/production_achievement_daily_cache.py)
+    instead of the 產出 entry point.
+
+    NOTE: named "achievement-moveout", not "production_achievement" -- same
+    naming rationale as _warmup_achievement_today_job (avoids the
+    production-HISTORY keyword-scan guard, test_production_history_not_in_warmup_jobs).
+    """
+    try:
+        from mes_dashboard.services.production_achievement_daily_cache import (
+            ensure_moveout_today_loaded,
+        )
+        spool_path = ensure_moveout_today_loaded()
+        logger.info(
+            "Warmup [production_achievement_moveout_today] complete spool_path=%s", spool_path
+        )
+    except Exception as exc:
+        logger.warning("Warmup [production_achievement_moveout_today] failed: %s", exc)
+
+
+def _warmup_achievement_moveout_yesterday_job() -> None:
+    """RQ worker function: warm yesterday's (前日) production-achievement
+    轉出 (move-out) DailyView spool (PA-18). See
+    _warmup_achievement_moveout_today_job for details.
+    """
+    try:
+        from mes_dashboard.services.production_achievement_daily_cache import (
+            ensure_moveout_yesterday_loaded,
+        )
+        spool_path = ensure_moveout_yesterday_loaded()
+        logger.info(
+            "Warmup [production_achievement_moveout_yesterday] complete spool_path=%s", spool_path
+        )
+    except Exception as exc:
+        logger.warning("Warmup [production_achievement_moveout_yesterday] failed: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Warmup job registry
 # production-history is intentionally absent — it must NOT be added here.
@@ -204,6 +244,12 @@ _WARMUP_JOBS = [
     # docstring.
     ("warmup-achievement-today", _warmup_achievement_today_job),
     ("warmup-achievement-yesterday", _warmup_achievement_yesterday_job),
+    # 轉出 (move-out) source counterpart of the two entries above (PA-18) --
+    # same "achievement" naming rationale, kept AFTER the 產出 entries so
+    # existing substring-scan test lookups (e.g. `next(... "achievement" in p
+    # and "today" in p ...)`) keep resolving to the 產出 entries first.
+    ("warmup-achievement-moveout-today", _warmup_achievement_moveout_today_job),
+    ("warmup-achievement-moveout-yesterday", _warmup_achievement_moveout_yesterday_job),
     # production-history intentionally absent — do NOT add here (task 3.4).
 ]
 

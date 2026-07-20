@@ -53,6 +53,20 @@
   @apply flex items-center gap-2;
 }
 
+/* Freshness readout (同步時間/資料最新一筆時間, production-achievement-sync-time)
+ * -- grouped inside .pa-app__header-actions (not a separate ui-card-header
+ * flex child) so it sits alongside 重新查詢/設定 on the trailing side rather
+ * than splitting the header's space-between into 3 unevenly-spaced items. */
+.theme-production-achievement .pa-app__freshness {
+  @apply flex flex-col items-end gap-0.5 mr-2;
+}
+
+.theme-production-achievement .pa-app__freshness-item {
+  @apply text-xs;
+  color: theme('colors.text.muted');
+  white-space: nowrap;
+}
+
 /* 設定 button (PA-17): stays visibly red even combined with the muted
  * `.ui-btn--sm` base (a two-class compound selector outranks `.ui-btn--sm`'s
  * own single-class background/color, which otherwise wins on source order —
@@ -181,12 +195,95 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
-/* PA-19: the per-package 大項小計 (subtotal) row in expanded 電鍍/切割 mode.
- * DataTable is shared (no row-level class hook), so the emphasis is applied to
- * the cell content span the App's #cell slot renders — bold to set the小計
- * apart from its子站 leaf rows above it. */
-.theme-production-achievement .pa-app__subtotal-cell {
+/* Change: production-achievement-column-pivot. Bespoke column-pivoted
+ * expanded (電鍍/切割) detail table (App.vue's `pa-app__expanded-*` markup) --
+ * DataTable's row/column model has no notion of per-substation COLUMNS (only
+ * rows), so this is a hand-rolled `<table>` local to this page. Horizontal
+ * scroll + a sticky first (Package Group) column mirror DataTable's own
+ * `.data-table-scroll` pattern (shared-ui/components/DataTable.vue) -- a 電鍍
+ * row (4子站 x 3 cols + 7 total cols = 19 columns) or 切割 row (2x3+7=13) is
+ * wide enough to need both. */
+.theme-production-achievement .pa-app__expanded-table-wrap {
+  overflow-x: auto;
+}
+
+.theme-production-achievement .pa-app__expanded-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: theme('colors.text.primary');
+}
+
+.theme-production-achievement .pa-app__expanded-th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 10px 12px;
+  font-size: 12px;
   font-weight: 700;
+  color: theme('colors.text.subtle');
+  text-align: left;
+  white-space: nowrap;
+  background: theme('colors.surface.muted');
+  box-shadow: 0 1px 0 theme('colors.stroke.soft');
+}
+
+.theme-production-achievement .pa-app__expanded-th--right {
+  text-align: right;
+}
+
+/* Sticky first column (Package Group) -- needs a HIGHER z-index than a plain
+ * sticky-top header so the top-left corner cell stays above both the
+ * scrolled-away body columns AND the sticky header row. */
+.theme-production-achievement .pa-app__expanded-th--sticky {
+  left: 0;
+  z-index: 15;
+}
+
+.theme-production-achievement .pa-app__expanded-row {
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+
+.theme-production-achievement .pa-app__expanded-row:nth-child(even) {
+  background: theme('colors.surface.muted');
+}
+
+.theme-production-achievement .pa-app__expanded-row:hover {
+  background: theme('colors.surface.hover');
+}
+
+.theme-production-achievement .pa-app__expanded-td {
+  padding: 9px 12px;
+  font-size: 13px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.theme-production-achievement .pa-app__expanded-td--right {
+  text-align: right;
+}
+
+/* Sticky first column body cells inherit the row's own background (striping
+ * / hover) rather than hardcoding white, so they never visually desync from
+ * the rest of that row while horizontally scrolled. */
+.theme-production-achievement .pa-app__expanded-td--sticky {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: inherit;
+}
+
+/* Trailing 大項-level total columns (D/N/每日/計畫/達成率總計) -- bold to set
+ * them apart from the per-子站 breakdown columns to their left, mirroring the
+ * old row-based 大項小計's bold treatment. */
+.theme-production-achievement .pa-app__expanded-td--total {
+  font-weight: 700;
+}
+
+.theme-production-achievement .pa-app__expanded-empty-cell {
+  padding: 0;
+  text-align: center;
 }
 
 /* Scoped override for the global `.ui-card { overflow: hidden }` rule so the

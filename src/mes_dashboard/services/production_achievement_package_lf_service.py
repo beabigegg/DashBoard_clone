@@ -27,6 +27,7 @@ every one of the ~46 Oracle-known codes.
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -35,8 +36,10 @@ from typing import Any, Dict, List, Optional
 from mes_dashboard.config.constants import (
     CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE,
 )
+from mes_dashboard.core.cache_plane import snapshot_redis_ttl
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED, get_mysql_connection
+from mes_dashboard.core.redis_client import get_key, get_redis_client, REDIS_ENABLED
 from mes_dashboard.sql import SQLLoader
 
 logger = logging.getLogger("mes_dashboard.production_achievement_package_lf_service")
@@ -44,9 +47,17 @@ logger = logging.getLogger("mes_dashboard.production_achievement_package_lf_serv
 _UNCLASSIFIED_SENTINEL = "(未分類)"
 
 _ORACLE_CACHE_TTL_SECONDS = CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE
+# L2 outlives L1 (mirrors production_achievement_plan_service.py and every
+# other Redis-L2 cache in this codebase) so a process whose L1 just expired
+# still gets a Redis hit instead of both tiers lapsing at ~the same moment.
+_REDIS_TTL_SECONDS = snapshot_redis_ttl(_ORACLE_CACHE_TTL_SECONDS)
 # {"map": {raw: oracle_group}, "loaded_at": epoch_seconds} once populated
 _ORACLE_CACHE: Dict[str, Any] = {}
 _ORACLE_CACHE_LOCK = threading.Lock()
+
+
+def _redis_key() -> str:
+    return get_key("production_achievement_package_lf_oracle_cache")
 
 
 class MySQLUnavailableError(RuntimeError):
@@ -117,16 +128,56 @@ def _query_oracle_package_lf_map() -> Dict[str, str]:
     }
 
 
+def _read_from_redis() -> "Dict[str, str] | None":
+    if not REDIS_ENABLED:
+        return None
+    try:
+        client = get_redis_client()
+        if client is None:
+            return None
+        raw = client.get(_redis_key())
+        if raw is None:
+            return None
+        return json.loads(raw)
+    except Exception as exc:
+        logger.warning(
+            "production_achievement_package_lf_service: Redis read failed: %s", exc
+        )
+        return None
+
+
+def _write_to_redis(oracle_map: Dict[str, str]) -> None:
+    if not REDIS_ENABLED:
+        return
+    try:
+        client = get_redis_client()
+        if client is None:
+            return
+        client.setex(
+            _redis_key(), _REDIS_TTL_SECONDS, json.dumps(oracle_map, ensure_ascii=False)
+        )
+    except Exception as exc:
+        logger.warning(
+            "production_achievement_package_lf_service: Redis write failed: %s", exc
+        )
+
+
 def get_oracle_package_lf_map(force_refresh: bool = False) -> Dict[str, str]:
     """Return {raw_package_lf: oracle_merged_group} straight from
     ``DWH.MES_WIP_OUTPUTPLAN_DETAIL`` (the D1 default layer, PA-09).
 
     Cached globally (this is a static ~46-row reference table, not date-
     partitioned like PA-11's plan rows) with TTL
-    ``CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE``. Degrades to {}
-    on Oracle failure (or to the last-known-good cached value if one exists)
-    -- never raises, matching every other Oracle-sourced cache in this
-    feature.
+    ``CACHE_TTL_PRODUCTION_ACHIEVEMENT_PACKAGE_LF_ORACLE``, using the
+    L1(memory)+L2(Redis)+Oracle two-tier pattern (mirrors
+    production_achievement_plan_service._get_month_rows()): an L1 hit within
+    TTL returns immediately without touching Redis; an L1 miss/expiry (and
+    not force_refresh) falls through to Redis -- a hit there repopulates L1
+    and is returned without querying Oracle; only a miss on both tiers (or
+    force_refresh=True) queries Oracle, writing the result back to both L1
+    and L2 on success. Degrades to {} on Oracle failure (or to the
+    last-known-good L1 value if one exists) -- never raises, matching every
+    other Oracle-sourced cache in this feature.
     """
     with _ORACLE_CACHE_LOCK:
         if (
@@ -135,6 +186,14 @@ def get_oracle_package_lf_map(force_refresh: bool = False) -> Dict[str, str]:
             and time.time() - _ORACLE_CACHE["loaded_at"] < _ORACLE_CACHE_TTL_SECONDS
         ):
             return _ORACLE_CACHE["map"]
+
+    if not force_refresh:
+        redis_map = _read_from_redis()
+        if redis_map is not None:
+            with _ORACLE_CACHE_LOCK:
+                _ORACLE_CACHE["map"] = redis_map
+                _ORACLE_CACHE["loaded_at"] = time.time()
+            return redis_map
 
     try:
         oracle_map = _query_oracle_package_lf_map()
@@ -152,6 +211,7 @@ def get_oracle_package_lf_map(force_refresh: bool = False) -> Dict[str, str]:
     with _ORACLE_CACHE_LOCK:
         _ORACLE_CACHE["map"] = oracle_map
         _ORACLE_CACHE["loaded_at"] = time.time()
+    _write_to_redis(oracle_map)
     return oracle_map
 
 

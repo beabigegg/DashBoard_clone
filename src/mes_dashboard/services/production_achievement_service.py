@@ -51,8 +51,7 @@ PA05_PREDICATE_SQL = (
     "OR (WC.SPECNAME IN ('1DB') AND weh.processtypename IN ('2DB_DB')) "
     "OR (WC.SPECNAME IN ('DBCB') AND weh.processtypename IN ('DBCB_CB')) "
     "OR (WC.SPECNAME IN ('2DBCBRO','1DBCBRO','CBRO') AND weh.processtypename IN ('CBA_RO')) "
-    "OR (WC.SPECID IN ('48812c8000025fd2','48812c8000025fd4','48812c8000000025','48812c8000000026',"
-    "'48812c8000000027','48812c8000039e15') AND weh.Trackoutqty<>0)"
+    "OR WC.SPECNAME IN ('C.C Mold_F','M.G.P Mold_F','Auto Mold','M.G.P Mold','C.C Mold')"
 )
 
 _TWO_SHIFT_HIST_START = "20191231"  # exclusive lower edge of the historical window
@@ -281,9 +280,10 @@ def get_filter_options() -> Dict[str, Any]:
     its sub-stations in the detail table. A raw workcenter_group absent from
     ``production_achievement_workcenter_merge_map`` is still excluded (D2
     exclude-by-absence, PA-10); a single-layer station's parent_group is itself,
-    so the two lists coincide for every station except 電鍍 (切割 was a second
-    two-layer exception until the PKG_SAW fix -- see production_achievement_
-    moveout.sql's header comment -- and is now single-layer too).
+    so the two lists coincide for every station except 電鍍 and 切割 (切割's
+    PKG_SAW merge is a display-only presentation choice re-instated 2026-07-20
+    -- see production_achievement_moveout.sql's header comment for the full
+    history).
     """
     parent_groups = get_workcenter_parent_groups()
     return {

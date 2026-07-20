@@ -34,11 +34,12 @@ _DDL_PATH = (
 )
 
 # PA-19 taxonomy: raw -> (merged 子站, parent 大項). 電鍍 is two-layer. 切割
-# was a second two-layer station (parent of 切割/PKG_SAW) until the
-# production-achievement-moveout PKG_SAW fix (2026-07): PKG_SAW is Live's
-# own separate report column, never part of 切割 -- see
-# production_achievement_moveout.sql's header comment. 切割 is now
-# single-layer like every other station here, and PKG_SAW moved to _EXCLUDED.
+# is a second two-layer station (parent of 切割/PKG_SAW) again as of
+# 2026-07-20 -- the production-achievement-moveout PKG_SAW fix had un-merged
+# it (PKG_SAW is Live's own separate report column, never summed with 切割
+# in 025.txt), but the requester explicitly asked for PKG_SAW's moveout to
+# roll into 切割's DISPLAY total, mirroring 電鍍's 子站 rollup -- see
+# production_achievement_moveout.sql's header comment for the full history.
 _SEEDED = [
     ("焊接_WB", "焊接_WB", "焊接_WB"),
     ("焊接_DW", "焊接_WB", "焊接_WB"),
@@ -53,6 +54,7 @@ _SEEDED = [
     ("FQC", "FQC", "FQC"),
     ("成品入庫", "成品入庫", "成品入庫"),
     ("切割", "切割", "切割"),
+    ("PKG_SAW", "PKG_SAW", "切割"),
     ("掛鍍", "掛鍍", "電鍍"),
     ("條鍍", "條鍍", "電鍍"),
     ("滾鍍", "滾鍍", "電鍍"),
@@ -64,14 +66,13 @@ _SEEDED = [
 # 'input' for everything else -- derived from 025.txt's station column order).
 _OUTPUT_SIDE_PARENTS = {"TMTT", "品檢", "FQC", "成品入庫"}
 
-# Raw workcenters intentionally NOT seeded (D2 default-deny). 切割/成品入庫 were
-# previously excluded but are now INCLUDED (PA-19), so they left this list.
-# PKG_SAW moved back INTO this list by the production-achievement-moveout
-# PKG_SAW fix (2026-07) -- it is Live's own separate report column
-# (WorkCenter85), never summed into 切割.
+# Raw workcenters intentionally NOT seeded (D2 default-deny). 切割/成品入庫/
+# PKG_SAW were previously excluded (PKG_SAW as recently as the
+# production-achievement-moveout PKG_SAW fix) but are now all INCLUDED
+# (PA-19), so they left this list.
 _EXCLUDED = [
     "TCT", "MA", "IST", "補鍍", "點測", "可靠性", "預備站", "成品倉",
-    "CP線邊倉", "已CP入庫", "已CP倉", "DS線邊倉", "PKG_SAW",
+    "CP線邊倉", "已CP入庫", "已CP倉", "DS線邊倉",
 ]
 
 
@@ -92,12 +93,11 @@ class TestResolveWorkcenterMergeGroupD2Semantics:
         """INNER JOIN semantics: a raw value with NO row in the map is
         EXCLUDED (resolves to None) -- never falls back to itself (that
         would be D1's package_lf_map semantics). TCT/MA/IST/補鍍 stay excluded
-        under PA-19 (切割 is now INCLUDED, so no longer a good example; PKG_SAW
-        moved back to excluded by the PKG_SAW fix, see _EXCLUDED)."""
+        under PA-19 (切割/PKG_SAW are both INCLUDED now, so no longer good
+        examples here, see _EXCLUDED)."""
         mapping = {raw: merged for raw, merged, _ in _SEEDED}
         assert resolve_workcenter_merge_group("TCT", mapping) is None
         assert resolve_workcenter_merge_group("補鍍", mapping) is None
-        assert resolve_workcenter_merge_group("PKG_SAW", mapping) is None
 
     def test_inner_join_not_left_join_semantics(self):
         """Guard against the easiest copy-paste inversion (business-rules.md
@@ -144,17 +144,18 @@ class TestSeedDataInDDLScript:
                 f"{raw!r} must be excluded from the seed block (D2 default-deny)"
             )
 
-    def test_electroplating_two_layer_children_roll_up_to_parent(self):
-        """PA-19: 掛鍍/條鍍/滾鍍/委外 -> 電鍍 (the one remaining two-layer
-        station). BANDL/TOTAI both merge to the '委外' 子站 (Excel
-        presentation-layer merge). 切割 is single-layer (parent = itself) --
-        see the PKG_SAW fix note on _SEEDED/_EXCLUDED above."""
+    def test_electroplating_and_saw_two_layer_children_roll_up_to_parents(self):
+        """PA-19: two two-layer 大項. 掛鍍/條鍍/滾鍍/委外 -> 電鍍 (BANDL/TOTAI
+        both merge to the '委外' 子站, Excel presentation-layer merge).
+        PKG_SAW -> 切割, a display-only presentation merge re-instated
+        2026-07-20 -- see the note on _SEEDED above."""
         by_raw = {raw: (merged, parent) for raw, merged, parent in _SEEDED}
         for raw in ("掛鍍", "條鍍", "滾鍍"):
             assert by_raw[raw] == (raw, "電鍍")
         assert by_raw["BANDL"] == ("委外", "電鍍")
         assert by_raw["TOTAI"] == ("委外", "電鍍")
         assert by_raw["切割"] == ("切割", "切割")
+        assert by_raw["PKG_SAW"] == ("PKG_SAW", "切割")
 
     def test_seeded_plan_source_side_matches_025txt_derived_classification(self):
         """PA-20: TMTT-and-after (TMTT/品檢/FQC/成品入庫) seed 'output';

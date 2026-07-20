@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List
@@ -89,6 +90,7 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
         self.params = params
         self._spool_key: str = ""
         self._spool_path: str = ""
+        self._query_started_at: "float | None" = None
 
     def pre_query(self) -> None:
         """Parse start_date/end_date, compute the canonical spool key, and
@@ -110,7 +112,7 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
         from mes_dashboard.services.production_achievement_service import (
             make_canonical_pa_spool_id,
         )
-        from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR
+        from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR, set_inflight_state
 
         start_date = str(self.params.get("start_date", "")).strip()
         end_date = str(self.params.get("end_date", "")).strip()
@@ -118,6 +120,17 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
         self._spool_key = make_canonical_pa_spool_id(start_date, end_date)
         spool_dir = QUERY_SPOOL_DIR / _NAMESPACE
         self._spool_path = str(spool_dir / f"{self._spool_key}.parquet")
+
+        # Race-condition fix (query_spool_store's CAS write, see
+        # post_aggregate below): record the wall-clock time THIS job started
+        # querying Oracle for this spool key, and publish inflight state so
+        # the warmup scheduler (production_achievement_daily_cache.py) can
+        # avoid enqueuing a duplicate concurrent job for the same key.
+        self._query_started_at = time.time()
+        set_inflight_state(
+            _NAMESPACE, self._spool_key,
+            {"started_at": self._query_started_at, "job_id": self.job_id},
+        )
 
         # Build whole-day TIME chunks: TRACKOUTTIMESTAMP in [start_date, chunk_end_excl).
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
@@ -207,6 +220,7 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
                 compression="snappy",
             )
             row_count = 0
+            latest_data_ts = None
         else:
             parquet_glob = str(chunk_dir / "chunk-*.parquet")
             con = duckdb.connect()
@@ -231,6 +245,16 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
                 row_count = con.execute(
                     f"SELECT COUNT(*) FROM read_parquet('{spool_path}')"
                 ).fetchone()[0]
+                # Data-freshness indicator (UI "資料最新一筆時間") -- global max
+                # across ALL chunk parquets for this job, NOT part of the
+                # canonical 5-column spool schema itself (data-shape-contract
+                # lock); carried out-of-band via register_spool_file's
+                # extra_metadata below.
+                max_ts_row = con.execute(
+                    f"SELECT MAX(MAX_TRACKOUT_TS) FROM read_parquet('{parquet_glob}')"
+                ).fetchone()
+                max_ts = max_ts_row[0] if max_ts_row else None
+                latest_data_ts = max_ts.strftime("%Y-%m-%d %H:%M:%S") if max_ts is not None else None
             finally:
                 con.close()
 
@@ -247,12 +271,28 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
             register_spool_file(
                 _NAMESPACE, self._spool_key, Path(spool_path),
                 row_count, ttl_seconds=QUERY_SPOOL_TTL_SECONDS,
+                extra_metadata={
+                    "latest_data_ts": latest_data_ts,
+                    "query_started_at": self._query_started_at,
+                },
+                cas_field="query_started_at",
+                cas_value=self._query_started_at,
             )
         except Exception as reg_exc:
             logger.warning(
                 "ProductionAchievementJob.post_aggregate: spool registration failed: %s",
                 reg_exc,
             )
+
+        # Job is done regardless of whether register_spool_file's write won
+        # or lost the CAS race -- always clear inflight state so the warmup
+        # scheduler's duplicate-job guard (production_achievement_daily_cache.py)
+        # never wedges on a stale "still running" marker. No try/finally
+        # around the above: on an unhandled exception this simply never
+        # runs, and inflight state's own TTL (_INFLIGHT_KEY_TTL_SECONDS)
+        # self-expires within 5 minutes -- an accepted tradeoff, not a leak.
+        from mes_dashboard.core.query_spool_store import clear_inflight_state
+        clear_inflight_state(_NAMESPACE, self._spool_key)
 
         return spool_path
 

@@ -8,6 +8,16 @@ spool-miss async path, ``workers/production_achievement_worker.py``) via a
 Oracle path (design.md Key Decisions: that would duplicate ADR-0016's
 seam-safe chunk/``post_aggregate`` correctness into a drift-prone twin).
 
+Covers BOTH the 產出 (output) source (``ensure_today_loaded`` /
+``ensure_yesterday_loaded``, this module's original scope) and the 轉出
+(move-out) source (``ensure_moveout_today_loaded`` /
+``ensure_moveout_yesterday_loaded``, PA-18) -- the two sources have
+identical today/yesterday warm-cache characteristics (today = growing
+window needs hourly staleness re-checks; yesterday = closed day is fresh
+forever once cached), so the moveout functions mirror the 產出 ones
+1:1 against ``ProductionAchievementMoveoutJob`` and
+``PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE`` instead.
+
 Redis-orphan-key trap: ``ProductionAchievementJob.progress_report()``
 (inherited) calls ``async_query_job_service.update_job_progress()``, which
 does an UNCONDITIONAL Redis ``HSET`` with NO TTL and NO existence check
@@ -57,8 +67,13 @@ import time
 from datetime import date, timedelta
 from typing import Optional
 
-from mes_dashboard.core.query_spool_store import get_spool_file_path, get_spool_metadata
+from mes_dashboard.core.query_spool_store import (
+    get_inflight_state,
+    get_spool_file_path,
+    get_spool_metadata,
+)
 from mes_dashboard.services.production_achievement_service import (
+    PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE,
     PRODUCTION_ACHIEVEMENT_SPOOL_NAMESPACE,
     make_canonical_pa_spool_id,
 )
@@ -175,6 +190,22 @@ def _ensure_day_loaded(day: date, *, is_today: bool = False) -> Optional[str]:
             query_id,
         )
 
+    # Race-condition fix companion (query_spool_store's CAS write in
+    # workers/production_achievement_worker.py): this scheduler-only guard
+    # skips STARTING a new warmup job for a query_id that already has one
+    # inflight (either a previous warmup cycle still running, or a
+    # user-triggered force_refresh job) -- it never blocks/short-circuits
+    # force_refresh itself (routes.py enqueues unconditionally, on purpose;
+    # the CAS write is what protects its result from being clobbered by a
+    # stale warmup, not this check).
+    if get_inflight_state(PRODUCTION_ACHIEVEMENT_SPOOL_NAMESPACE, query_id) is not None:
+        logger.info(
+            "production_achievement_daily_cache: skipped duplicate warmup for %s, "
+            "already inflight",
+            query_id,
+        )
+        return spool_path
+
     job = _build_warmup_job(
         job_id=f"warmup-pa-{date_str}",
         params={"start_date": date_str, "end_date": date_str},
@@ -193,3 +224,112 @@ def ensure_yesterday_loaded() -> Optional[str]:
     """Ensure yesterday's DailyView (前日) spool is warm. Returns the spool
     path, or None if the flag is off and the spool is missing."""
     return _ensure_day_loaded(date.today() - timedelta(days=1))
+
+
+# ---------------------------------------------------------------------------
+# 轉出 (move-out) source -- same today/yesterday warm-cache shape as 產出
+# above, applied to ``ProductionAchievementMoveoutJob``
+# (workers/production_achievement_moveout_worker.py, PA-18) instead of
+# ``ProductionAchievementJob``. Kept as parallel functions (not a shared
+# parametrized helper) so the existing 產出 functions/tests above -- which
+# patch ``_build_warmup_job``/``_is_today_spool_stale`` by name -- are left
+# completely untouched.
+# ---------------------------------------------------------------------------
+
+
+def _build_warmup_moveout_job(job_id: str, params: dict):
+    """Lazily import the moveout worker module and instantiate the
+    progress-report-suppressing subclass. Only ever called AFTER
+    ``_is_unified_job_enabled()`` has already returned True -- see
+    ``_build_warmup_job`` above for the full rationale (identical here,
+    just for ``ProductionAchievementMoveoutJob``).
+    """
+    from mes_dashboard.workers.production_achievement_moveout_worker import (
+        ProductionAchievementMoveoutJob,
+    )
+
+    class _WarmupProductionAchievementMoveoutJob(ProductionAchievementMoveoutJob):
+        """``progress_report()``-suppressing subclass (PA-14/PA-18).
+
+        See module docstring for the Redis-orphan-key trap this override
+        prevents. Must NEVER call ``update_job_progress`` -- a complete
+        no-op is required, not merely a cheaper implementation.
+        """
+
+        def progress_report(self, pct: int) -> None:
+            pass
+
+    return _WarmupProductionAchievementMoveoutJob(job_id=job_id, params=params)
+
+
+def _is_moveout_today_spool_stale(query_id: str) -> bool:
+    """Moveout counterpart of ``_is_today_spool_stale`` -- reads spool
+    metadata from ``PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE`` instead
+    of the 產出 namespace. Same staleness threshold
+    (``_today_stale_threshold_seconds``) and same fail-open-to-stale
+    behavior on missing/unparsable metadata."""
+    metadata = get_spool_metadata(PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE, query_id)
+    if not metadata:
+        return True
+    created_at = int(metadata.get("created_at") or 0)
+    if not created_at:
+        return True
+    age_seconds = int(time.time()) - created_at
+    return age_seconds >= _today_stale_threshold_seconds()
+
+
+def _ensure_moveout_day_loaded(day: date, *, is_today: bool = False) -> Optional[str]:
+    """Moveout counterpart of ``_ensure_day_loaded`` -- identical control
+    flow, but resolves the spool via
+    ``PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE``, keys the query id
+    with ``source="moveout"``, and (on miss/stale) builds+runs
+    ``ProductionAchievementMoveoutJob`` via ``_build_warmup_moveout_job``."""
+    date_str = day.strftime("%Y-%m-%d")
+    query_id = make_canonical_pa_spool_id(date_str, date_str, source="moveout")
+
+    spool_path = get_spool_file_path(PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE, query_id)
+    if spool_path is not None and not (is_today and _is_moveout_today_spool_stale(query_id)):
+        return spool_path
+
+    if not _is_unified_job_enabled():
+        logger.debug(
+            "production_achievement_daily_cache: flag off, skipping moveout warmup for %s",
+            date_str,
+        )
+        return spool_path
+
+    if spool_path is not None:
+        logger.info(
+            "production_achievement_daily_cache: today's moveout spool %s is stale, rebuilding",
+            query_id,
+        )
+
+    # Race-condition fix companion, moveout counterpart -- see
+    # _ensure_day_loaded above for the full rationale (identical here, just
+    # against PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE).
+    if get_inflight_state(PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE, query_id) is not None:
+        logger.info(
+            "production_achievement_daily_cache: skipped duplicate moveout warmup for %s, "
+            "already inflight",
+            query_id,
+        )
+        return spool_path
+
+    job = _build_warmup_moveout_job(
+        job_id=f"warmup-pa-moveout-{date_str}",
+        params={"start_date": date_str, "end_date": date_str},
+    )
+    return job.run()
+
+
+def ensure_moveout_today_loaded() -> Optional[str]:
+    """Ensure today's DailyView (今日) 轉出 spool is warm AND fresh (rebuilt
+    if stale per ``_is_moveout_today_spool_stale``). Returns the spool path,
+    or None if the flag is off and the spool is missing."""
+    return _ensure_moveout_day_loaded(date.today(), is_today=True)
+
+
+def ensure_moveout_yesterday_loaded() -> Optional[str]:
+    """Ensure yesterday's DailyView (前日) 轉出 spool is warm. Returns the
+    spool path, or None if the flag is off and the spool is missing."""
+    return _ensure_moveout_day_loaded(date.today() - timedelta(days=1))

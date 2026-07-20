@@ -371,6 +371,7 @@ class TestNoPandasAndNoCallers:
                 "material_trace_duckdb_runtime",
                 "downtime_worker",
                 "production_achievement_worker",
+                "production_achievement_moveout_worker",
                 "uph_performance_worker",
             },
             "oracle_arrow_reader": {

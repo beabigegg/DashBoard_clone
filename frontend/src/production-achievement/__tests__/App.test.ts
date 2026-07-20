@@ -59,6 +59,12 @@ function jsonResponse(body: unknown, status = 200) {
   } as unknown as Response;
 }
 
+// production-achievement-sync-time: sync_time (epoch seconds) / latest_data_timestamp
+// ("%Y-%m-%d %H:%M:%S") are always present on a real 200 spool-hit response
+// (production_achievement_routes.py api_get_report).
+const SYNC_TIME_EPOCH = 1750000000;
+const LATEST_DATA_TIMESTAMP = '2026-07-14 07:29:59';
+
 const SPOOL_HIT_BODY = {
   success: true,
   data: {
@@ -69,9 +75,25 @@ const SPOOL_HIT_BODY = {
     package_lf_map: [],
     workcenter_merge_map: [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', plan_source_side: 'input' }],
     plan_map: [{ output_date: '2026-07-14', plan_package_group: 'SOD-123FL', planqty_input: 400, planqty_output: 350 }],
+    sync_time: SYNC_TIME_EPOCH,
+    latest_data_timestamp: LATEST_DATA_TIMESTAMP,
   },
   meta: {},
 };
+
+/** Mirrors useProductionAchievement.ts's syncTimeLabel formatting exactly
+ *  (local Date components, never toISOString) so the expectation is
+ *  timezone-agnostic regardless of the test runner's TZ. */
+function expectedSyncTimeLabel(epochSeconds: number): string {
+  const d = new Date(epochSeconds * 1000);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+}
 
 // PA-21: shift_plan_qty = CEIL(daily_plan_qty / 2); d_/n_achievement_rate =
 // each shift's own actual / shift_plan_qty. Row 1 deliberately illustrates
@@ -338,6 +360,48 @@ describe('production-achievement App.vue', () => {
     wrapper.unmount();
   });
 
+  it('production-achievement-sync-time: renders 同步時間/資料最新一筆時間 in the 查詢條件 header after a successful query, sourced from the spool-hit response', async () => {
+    const client = await getDuckClient();
+    client.sendQuery
+      .mockResolvedValueOnce([]) // spec map
+      .mockResolvedValueOnce([]) // targets map
+      .mockResolvedValueOnce([]) // package_lf map
+      .mockResolvedValueOnce([]) // workcenter_merge map
+      .mockResolvedValueOnce([]) // daily_plan map
+      .mockResolvedValueOnce([]) // rollup_raw create
+      .mockResolvedValueOnce([]) // rollup create
+      .mockResolvedValueOnce(DAILY_ROWS); // computeDailyView SELECT
+
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/filter-options')) {
+        return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['焊接_DB'] }, meta: {} }));
+      }
+      if (u.includes('/api/production-achievement/report')) {
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    // Before any query lands, the readout is present but shows the em-dash
+    // fallback (never blank, never the literal string "null").
+    const wrapper = mountApp();
+    const freshnessBeforeLoad = wrapper.find('[data-testid="pa-freshness"]');
+    expect(freshnessBeforeLoad.exists()).toBe(true);
+    expect(freshnessBeforeLoad.text()).toContain('同步時間：—');
+    expect(freshnessBeforeLoad.text()).toContain('資料最新一筆時間：—');
+
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+
+    const freshness = wrapper.find('[data-testid="pa-freshness"]');
+    expect(freshness.exists()).toBe(true);
+    expect(freshness.text()).toContain(`同步時間：${expectedSyncTimeLabel(SYNC_TIME_EPOCH)}`);
+    expect(freshness.text()).toContain(`資料最新一筆時間：${LATEST_DATA_TIMESTAMP}`);
+    wrapper.unmount();
+  });
+
   it('PA-21: D/N shift chart series divide each shift by its OWN shift_plan_qty, never the full daily_plan_qty (regression for the fixed under-reporting bug)', async () => {
     const client = await getDuckClient();
     client.sendQuery
@@ -382,23 +446,30 @@ describe('production-achievement App.vue', () => {
     wrapper.unmount();
   });
 
-  it('PA-19: expanded 大項 (電鍍) KPI 實際合計 sums LEAF 子站 rows only — the 大項小計 rollup row is never double-counted', async () => {
+  it('production-achievement-column-pivot: expanded 大項 (電鍍) mode KPI totals read the SINGLE per-package pivoted row directly (no more leaf-vs-subtotal split to filter)', async () => {
     // Land directly on 電鍍 (轉出) so the initial auto-run renders expanded mode.
     sessionStorage.setItem(
       'production-achievement:last-report-state',
       JSON.stringify({ mode: 'today', source: 'moveout', workcenter_group: '電鍍' }),
     );
     const client = await getDuckClient();
-    // GROUPING SETS output for the daily expand SELECT: 2 子站 leaves (no plan)
-    // + 1 大項小計 (summed actuals + the parent-keyed plan). Every setup/CREATE
-    // sendQuery returns []; only the expand daily SELECT gets the rows.
+    // Column-pivoted daily expand SELECT (per_child CTE + col{i}_* positional
+    // pivot columns) now returns exactly ONE row per package -- top-level
+    // fields already carry the 大項-level totals (what the old row-based
+    // GROUPING SETS subtotal row used to carry); col0_*/col1_* carry the
+    // per-子站 (掛鍍/條鍍) breakdown. Every setup/CREATE sendQuery returns [];
+    // only the expand daily SELECT gets rows.
     client.sendQuery.mockImplementation((sql: string) => {
       const s = String(sql);
-      if (s.includes('GROUPING SETS') && s.includes('achievement_rate')) {
+      if (s.includes('WITH per_child AS') && s.includes('achievement_rate')) {
         return Promise.resolve([
-          { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', is_subtotal: 0, d_output_qty: 200, n_output_qty: 100, daily_output_qty: 300, daily_plan_qty: null, achievement_rate: null },
-          { package_lf_group: 'PKG-1', workcenter_group: '條鍍', is_subtotal: 0, d_output_qty: 60, n_output_qty: 40, daily_output_qty: 100, daily_plan_qty: null, achievement_rate: null },
-          { package_lf_group: 'PKG-1', workcenter_group: null, is_subtotal: 1, d_output_qty: 260, n_output_qty: 140, daily_output_qty: 400, daily_plan_qty: 500, achievement_rate: 0.8 },
+          {
+            package_lf_group: 'PKG-1',
+            d_output_qty: 260, n_output_qty: 140, daily_output_qty: 400,
+            daily_plan_qty: 500, shift_plan_qty: 250, achievement_rate: 0.8, d_achievement_rate: 1.04, n_achievement_rate: 0.56,
+            col0_d: 200, col0_n: 100, col0_daily: 300,
+            col1_d: 60, col1_n: 40, col1_daily: 100,
+          },
         ]);
       }
       return Promise.resolve([]);
@@ -439,11 +510,86 @@ describe('production-achievement App.vue', () => {
 
     const kpiCards = wrapper.findAllComponents(SummaryCard);
     const byLabel = Object.fromEntries(kpiCards.map((c) => [c.props('label'), c.props('value')]));
-    // LEAF sum only: 300 + 100 = 400 (NOT 800 with the 大項小計 double-counted).
+    // Single package-total row: 200+60=260 D班, 100+40=140 N班, 260+140=400 合計.
     expect(byLabel['實際轉出合計 (K)']).toBe(400);
-    // Only the 大項小計 row carries a plan, so 計畫合計 = its plan (no leaf plans).
     expect(byLabel['計畫合計 (K)']).toBe(500);
     expect(byLabel['整體達成率']).toBeCloseTo(80.0, 5);
+    wrapper.unmount();
+  });
+
+  it('production-achievement-column-pivot: expanded 大項 mode renders the bespoke column-pivoted table (not DataTable) with one header column PER 子站 PER metric, plus trailing 大項-total columns', async () => {
+    sessionStorage.setItem(
+      'production-achievement:last-report-state',
+      JSON.stringify({ mode: 'today', source: 'moveout', workcenter_group: '電鍍' }),
+    );
+    const client = await getDuckClient();
+    client.sendQuery.mockImplementation((sql: string) => {
+      const s = String(sql);
+        if (s.includes('WITH per_child AS') && s.includes('achievement_rate')) {
+        return Promise.resolve([
+          {
+            package_lf_group: 'PKG-1',
+            d_output_qty: 260, n_output_qty: 140, daily_output_qty: 400,
+            daily_plan_qty: 500, shift_plan_qty: 250, achievement_rate: 0.8, d_achievement_rate: 1.04, n_achievement_rate: 0.56,
+            col0_d: 200, col0_n: 100, col0_daily: 300,
+            col1_d: 60, col1_n: 40, col1_daily: 100,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const MOVEOUT_BODY = {
+      success: true,
+      data: {
+        query_id: 'mv2',
+        spool_download_url: '/api/spool/production_achievement_moveout/mv2.parquet',
+        spec_workcenter_map: [],
+        targets_map: [],
+        package_lf_map: [],
+        workcenter_merge_map: [
+          { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍', plan_source_side: 'input' },
+          { raw_workcenter_group: '條鍍', merged_workcenter_group: '條鍍', parent_group: '電鍍', plan_source_side: 'input' },
+        ],
+        plan_map: [{ output_date: '2026-07-14', plan_package_group: 'PKG-1', planqty_input: 500, planqty_output: 450 }],
+        source: 'moveout',
+      },
+      meta: {},
+    };
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/filter-options')) {
+        return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['電鍍', '焊接_DB'] }, meta: {} }));
+      }
+      if (u.includes('/api/production-achievement/report')) {
+        return Promise.resolve(jsonResponse(MOVEOUT_BODY));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    const wrapper = mountApp();
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+
+    // Bespoke table, not DataTable (which is globally stubbed to `true` in
+    // mountApp() -- if the real DataTable rendered here, it would show as an
+    // empty stub tag instead of this hand-rolled table's data-testid).
+    const expandedTable = wrapper.find('[data-testid="pa-expanded-daily-table"]');
+    expect(expandedTable.exists()).toBe(true);
+    expect(wrapper.find('[data-testid="pa-report-table"]').exists()).toBe(false);
+
+    const headerText = expandedTable.find('thead').text();
+    expect(headerText).toContain('掛鍍 D班轉出 (K)');
+    expect(headerText).toContain('條鍍 D班轉出 (K)');
+    expect(headerText).toContain('電鍍 D班轉出總計 (K)');
+    expect(headerText).toContain('每日計畫 (K)');
+
+    const rowText = expandedTable.find('[data-testid="pa-expanded-row"]').text();
+    expect(rowText).toContain('PKG-1');
+    // 掛鍍's own D班 breakdown (200) AND the 電鍍-level D班總計 (260) both render.
+    expect(rowText).toContain('200');
+    expect(rowText).toContain('260');
     wrapper.unmount();
   });
 

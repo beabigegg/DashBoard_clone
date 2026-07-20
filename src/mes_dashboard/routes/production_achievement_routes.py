@@ -40,7 +40,11 @@ from mes_dashboard.core.permissions import (
     get_owner_token,
     login_required,
 )
-from mes_dashboard.core.query_spool_store import clear_spooled_df, get_spool_file_path
+from mes_dashboard.core.query_spool_store import (
+    clear_spooled_df,
+    get_spool_file_path,
+    get_spool_metadata,
+)
 from mes_dashboard.core.response import (
     SERVICE_UNAVAILABLE,
     error_response,
@@ -255,6 +259,20 @@ def api_get_report():
         except Exception as exc:
             return internal_error(str(exc))
 
+        # Freshness indicators (defensive against metadata being None -- should
+        # not normally happen since get_spool_file_path() just confirmed a hit,
+        # but Redis metadata could expire/evict between the two calls):
+        #   sync_time            -- epoch seconds this spool last finished a
+        #                            real Oracle sync (metadata "created_at").
+        #   latest_data_timestamp -- "%Y-%m-%d %H:%M:%S" string of the newest
+        #                            underlying TRACKOUTTIMESTAMP/TXNDATE row
+        #                            in that sync (worker-computed
+        #                            "latest_data_ts"), independent of DW ETL
+        #                            replication lag from sync_time.
+        spool_metadata = get_spool_metadata(spool_namespace, query_id)
+        sync_time = spool_metadata.get("created_at") if spool_metadata else None
+        latest_data_timestamp = spool_metadata.get("latest_data_ts") if spool_metadata else None
+
         return success_response({
             "query_id": query_id,
             "spool_download_url": f"/api/spool/{spool_namespace}/{query_id}.parquet",
@@ -264,6 +282,8 @@ def api_get_report():
             "package_lf_map": package_lf_map,
             "workcenter_merge_map": workcenter_merge_map,
             "plan_map": plan_map,
+            "sync_time": sync_time,
+            "latest_data_timestamp": latest_data_timestamp,
         })
 
     # ── Spool-miss + no worker available: 503, no sync fallback ─────────────

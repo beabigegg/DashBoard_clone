@@ -93,6 +93,23 @@ const chartOption = computed(() => {
   return {
     tooltip: {
       trigger: 'axis',
+      confine: true,
+      // Bugfix: the 累計達成率 line rides near the TOP of the plot area (it
+      // hugs the 100% 計畫 markLine), and ECharts' default tooltip position
+      // follows the cursor -- when hovering a bar anywhere in its upper
+      // portion, the floating tooltip HTML div renders directly on top of
+      // that same region and visually covers the line underneath it (this
+      // is a DOM-overlap issue, not a series blur/downplay: ECharts' own
+      // axisPointer highlight dispatches with `notBlur: true`, confirmed
+      // against node_modules/echarts/lib/component/axisPointer/axisTrigger.js
+      // -- the line itself is never actually hidden by the chart engine).
+      // Anchor the tooltip near the BOTTOM of the plot area instead, clear
+      // of the line's usual vertical position; `confine` then clamps it
+      // horizontally so it never spills outside the chart container.
+      position(point: [number, number], _params: unknown, _dom: unknown, _rect: unknown, size: { viewSize: [number, number]; contentSize: [number, number] }) {
+        const y = size.viewSize[1] - size.contentSize[1] - 8;
+        return [point[0], Math.max(y, 8)];
+      },
       formatter: (params: AxisTooltipParam[] | AxisTooltipParam) => tooltipFormatter(params),
     },
     legend: { data: [QTY_SERIES_NAME, RATE_SERIES_NAME], bottom: 0 },
@@ -137,6 +154,19 @@ const chartOption = computed(() => {
         lineStyle: { color: rateColor, width: 2 },
         itemStyle: { color: rateColor },
         smooth: false,
+        // Bugfix: same known ECharts issue already worked around in
+        // admin-shared/components/TrendChart.vue -- hovering must not put the
+        // series into an emphasis/blur state at all: on some hardware-
+        // accelerated browsers the re-composite blanks the WHOLE polyline
+        // (only the crosshair/tooltip survive; a data-point symbol's
+        // onHoverStateChange propagates its hover state onto the whole line,
+        // echarts/lib/chart/line/LineView.js `_changePolyState`). Disabling
+        // emphasis outright is the proven fix (matches TrendChart.vue
+        // verbatim) -- a plain `blur.lineStyle.opacity:1` style override is
+        // NOT sufficient, since this is a compositor-level rendering glitch,
+        // not just a low-opacity style value. The axis tooltip itself is
+        // unaffected either way.
+        emphasis: { disabled: true },
         markLine: {
           silent: true,
           symbol: 'none',

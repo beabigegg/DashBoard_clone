@@ -22,6 +22,28 @@
  * 設定 button navigates to the standalone /production-achievement-settings
  * mini-app (D4, no drawer entry); OD-7 mode/station preservation across that
  * round-trip is handled inside useProductionAchievement.ts (sessionStorage).
+ *
+ * Change: production-achievement-column-pivot (X-direction 子站 grouping).
+ * Expanded (大項) mode (電鍍/切割) used to render Y-direction (row-based): one
+ * row per (Package Group,子站) leaf pair PLUS a per-package 大項小計 subtotal
+ * row. It now renders X-direction (column-based), matching the Excel
+ * reference report: one row per Package Group with separate COLUMNS per子站
+ * (e.g. "掛鍍 D班轉出", "條鍍 D班轉出", ...) plus trailing columns for the
+ * 大項-level totals — DataTable.vue's row/column model has no notion of
+ * per-substation COLUMNS (only rows), so this is a bespoke hand-rolled
+ * `<table>` local to this page (see the `pa-app__expanded-*` markup below),
+ * NOT a DataTable extension. The single-layer (`!isExpandedSelection`)
+ * DataTable path is completely untouched.
+ *
+ * Change: production-achievement-sync-time. Small freshness readout in the
+ * 查詢條件 card header ("同步時間" / "資料最新一筆時間", data-testid
+ * `pa-freshness`) sourced from useProductionAchievement's syncTimeLabel/
+ * latestDataTimestampLabel — both already null-safe (em-dash fallback) and
+ * reset at the start of every runQuery(), so they only ever reflect the
+ * MOST RECENTLY completed successful query, never a stale prior one shown
+ * through a subsequent in-flight/failed query. Shown uniformly across all 4
+ * modes (當日/前日/當月/自訂區間) since the backend returns both fields on
+ * every 200 spool-hit regardless of mode — there is no mode-specific gating.
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useProductionAchievement, type ProductionAchievementMode, type ProductionSourceMode } from './composables/useProductionAchievement';
@@ -29,6 +51,7 @@ import { navigateToRuntimeRoute } from '../core/shell-navigation';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import DataTable from '../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
+import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
@@ -51,6 +74,9 @@ const {
   hasQueried,
   asyncJobProgress,
   isExpandedSelection,
+  expandedSubstations,
+  syncTimeLabel,
+  latestDataTimestampLabel,
   fetchFilterOptions,
   runQuery,
   refreshQuery,
@@ -158,37 +184,26 @@ function planOf(row: ViewRow): number | null {
 function rateOf(row: ViewRow): number | null {
   return 'achievement_rate' in row ? row.achievement_rate : row.cumulative_achievement_rate;
 }
-// PA-19: the per-package 大項小計 row (expanded 電鍍/切割 mode) is a ROLLUP of its
-// 子站 leaf rows — it must be excluded from any SUM(actual) so the leaf rows are
-// counted exactly once. It is the ONLY row carrying the 大項 plan, so plan sums
-// key off it naturally.
-function isSubtotalRow(row: ViewRow): boolean {
-  return 'is_subtotal' in row && row.is_subtotal === true;
-}
 
-// ── KPI cards (OD-11): SUM(actual)/SUM(plan) over the SAME rows already
-// rendered in the table/chart below — never an independent re-aggregation.
-// actual sums the LEAF rows only (subtotal rows would double-count); plan sums
-// the rows that carry a plan (subtotal rows in expanded mode, leaf rows in
-// single-layer) — the two are consistent since a leaf never carries a plan in
-// expanded mode. ──
-const totalActual = computed(() =>
-  currentRows.value.filter((r) => !isSubtotalRow(r)).reduce((sum, r) => sum + Number(actualOf(r) || 0), 0),
-);
+// -- KPI cards (OD-11): SUM(actual)/SUM(plan) over the SAME rows already
+// rendered in the table/chart below -- never an independent re-aggregation.
+// Change: production-achievement-column-pivot -- every row (both single-layer
+// AND expanded 大項 mode) is now uniformly at the package-total grain (no more
+// leaf-vs-subtotal distinction to filter out), so this sums ALL rows directly.
+const totalActual = computed(() => currentRows.value.reduce((sum, r) => sum + Number(actualOf(r) || 0), 0));
 const rowsWithPlan = computed(() => currentRows.value.filter((r) => planOf(r) !== null));
 const totalPlan = computed(() =>
   rowsWithPlan.value.length === 0 ? null : rowsWithPlan.value.reduce((sum, r) => sum + Number(planOf(r) || 0), 0),
 );
 const overallRate = computed(() => (totalPlan.value === null || totalPlan.value === 0 ? null : totalActual.value / totalPlan.value));
 
-// ── PlanAchievementStackedChart (daily mode only: x=package group, D班/N班 stacked %) ──
-// In expanded 大項 mode (PA-19) the達成率 lives on the per-package 大項小計 rows
-// (子站 leaf rows have no plan), so the chart plots those — one bar per package,
-// keyed on the plain package label (subtotals are already unique per package).
-// Single-layer mode charts every row.
-const chartRows = computed(() =>
-  isExpandedSelection.value ? dailyRows.value.filter((r) => r.is_subtotal === true) : dailyRows.value,
-);
+// -- PlanAchievementStackedChart (daily mode only: x=package group, D班/N班 stacked %) --
+// Change: production-achievement-column-pivot -- dailyRows.value is now already
+// exactly one row per package in BOTH single-layer and expanded 大項 mode (the
+// achievement_rate/d_achievement_rate/n_achievement_rate fields always carry
+// the package-total, whichever mode), so no per-mode filtering is needed here
+// anymore.
+const chartRows = computed(() => dailyRows.value);
 const chartCategories = computed(() => chartRows.value.map((r) => r.package_lf_group));
 // Y-axis stays % (single axis; 計畫 is the y=100 markLine, not a second
 // scale). Each series carries its own qtyData so the chart's "% (QTY)"
@@ -218,6 +233,34 @@ const chartSeries = computed(() => [
 const comboCategories = computed(() => cumulativeTrend.value.map((t) => t.output_date));
 const comboQtyData = computed(() => cumulativeTrend.value.map((t) => t.actual_qty));
 const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievementRateForChart(t.cumulative_achievement_rate)));
+
+// ── Column-pivoted expanded (大項) detail table (production-achievement
+// -column-pivot) — bespoke markup, NOT DataTable (see the script-block header
+// comment). Each row's `substations` array is matched to `expandedSubstations`
+// (the shared ordered列表) BY NAME, defensively, in case the array a row
+// carries is ever in a different order than the header's — never assumed to
+// be positionally aligned. A substation missing from a row's own
+// `substations` array (should not normally happen — every substation under
+// the selected 大項 is always represented, defaulting to 0 in the SQL pivot)
+// also defaults to 0 here as a second line of defense.
+const DAILY_SUBSTATION_FIELDS = ['d_output_qty', 'n_output_qty', 'daily_output_qty'] as const;
+type DailySubstationField = (typeof DAILY_SUBSTATION_FIELDS)[number];
+
+function substationDailyValue(row: DailyViewRow, substation: string, field: DailySubstationField): number {
+  const entry = (row.substations || []).find((s) => s.workcenter_group === substation);
+  return entry ? entry[field] : 0;
+}
+
+function substationCumulativeValue(row: CumulativeViewRow, substation: string): number {
+  const entry = (row.substations || []).find((s) => s.workcenter_group === substation);
+  return entry ? entry.cumulative_actual_qty : 0;
+}
+
+// colspan for the expanded-table empty-state row: 1 (Package Group) + 3 per
+// substation (D/N/每日 or 累計, daily has 3 cols per sub, cumulative has 1) +
+// the trailing parent-total columns.
+const dailyExpandedColspan = computed(() => 1 + expandedSubstations.value.length * 3 + 7);
+const cumulativeExpandedColspan = computed(() => 1 + expandedSubstations.value.length + 4);
 </script>
 
 <template>
@@ -227,6 +270,10 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
       <div class="ui-card-header">
         <span class="ui-card-title">查詢條件</span>
         <div class="pa-app__header-actions">
+          <div class="pa-app__freshness" data-testid="pa-freshness">
+            <span class="pa-app__freshness-item">同步時間：{{ syncTimeLabel }}</span>
+            <span class="pa-app__freshness-item">資料最新一筆時間：{{ latestDataTimestampLabel }}</span>
+          </div>
           <button
             v-if="showRefreshButton"
             type="button"
@@ -361,61 +408,137 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
           <span class="ui-card-title">生產達成率明細</span>
         </div>
         <div class="ui-card-body">
-          <DataTable
-            v-if="viewKind === 'daily'"
-            :data="(dailyRows as unknown as Record<string, unknown>[])"
-            :loading="loading"
-            empty-type="filter-empty"
-            data-testid="pa-report-table"
-          >
-            <!-- Sorting is disabled in expanded 大項 mode so the per-package
-                 子站→小計 grouping stays intact (a generic column sort would
-                 scatter 大項小計 rows away from their子站). -->
-            <DataTableColumn v-if="isExpandedSelection" column-key="workcenter_group" label="子站" :sortable="false" />
-            <DataTableColumn column-key="package_lf_group" label="Package Group" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="d_output_qty" :label="`D班${metricNoun} (K)`" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="n_output_qty" :label="`N班${metricNoun} (K)`" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="daily_output_qty" :label="`每日${metricNoun} (K)`" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="daily_plan_qty" label="每日計畫 (K)" align="right" :sortable="!isExpandedSelection" />
-            <!-- 班達成率 (PA-21): each shift's output ÷ its own shift target
-                 (CEIL(每日計畫/2)) — the same values the grouped chart bars plot,
-                 shown per-shift alongside the whole-day 每日達成率. -->
-            <DataTableColumn column-key="d_achievement_rate" label="D班達成率" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="n_achievement_rate" label="N班達成率" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="achievement_rate" label="每日達成率" align="right" :sortable="!isExpandedSelection" />
-            <template #cell="{ columnKey, value, row }">
-              <span :class="{ 'pa-app__subtotal-cell': (row as Record<string, unknown>).is_subtotal === true }">
-                <template v-if="columnKey === 'workcenter_group' && (row as Record<string, unknown>).is_subtotal === true">▸ 小計 {{ value }}</template>
-                <template v-else-if="['d_output_qty', 'n_output_qty', 'daily_output_qty', 'daily_plan_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
+          <!-- Single-layer station (未展開): unchanged DataTable path. -->
+          <template v-if="!isExpandedSelection">
+            <DataTable
+              v-if="viewKind === 'daily'"
+              :data="(dailyRows as unknown as Record<string, unknown>[])"
+              :loading="loading"
+              empty-type="filter-empty"
+              data-testid="pa-report-table"
+            >
+              <DataTableColumn column-key="package_lf_group" label="Package Group" />
+              <DataTableColumn column-key="d_output_qty" :label="`D班${metricNoun} (K)`" align="right" />
+              <DataTableColumn column-key="n_output_qty" :label="`N班${metricNoun} (K)`" align="right" />
+              <DataTableColumn column-key="daily_output_qty" :label="`每日${metricNoun} (K)`" align="right" />
+              <DataTableColumn column-key="daily_plan_qty" label="每日計畫 (K)" align="right" />
+              <!-- 班達成率 (PA-21): each shift's output ÷ its own shift target
+                   (CEIL(每日計畫/2)) — the same values the grouped chart bars plot,
+                   shown per-shift alongside the whole-day 每日達成率. -->
+              <DataTableColumn column-key="d_achievement_rate" label="D班達成率" align="right" />
+              <DataTableColumn column-key="n_achievement_rate" label="N班達成率" align="right" />
+              <DataTableColumn column-key="achievement_rate" label="每日達成率" align="right" />
+              <template #cell="{ columnKey, value }">
+                <template v-if="['d_output_qty', 'n_output_qty', 'daily_output_qty', 'daily_plan_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
                 <template v-else-if="['achievement_rate', 'd_achievement_rate', 'n_achievement_rate'].includes(columnKey)">{{ formatAchievementRate(value as number | null) }}</template>
                 <template v-else>{{ value }}</template>
-              </span>
-            </template>
-          </DataTable>
+              </template>
+            </DataTable>
 
-          <DataTable
-            v-else
-            :data="(cumulativeRows as unknown as Record<string, unknown>[])"
-            :loading="loading"
-            empty-type="filter-empty"
-            data-testid="pa-report-table"
-          >
-            <!-- Sort disabled in expanded 大項 mode — see the daily table above. -->
-            <DataTableColumn v-if="isExpandedSelection" column-key="workcenter_group" label="子站" :sortable="false" />
-            <DataTableColumn column-key="package_lf_group" label="Package Group" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="cumulative_plan_qty" label="累計計畫 (K)" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="cumulative_actual_qty" :label="`累計${metricNoun} (K)`" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="cumulative_diff_qty" label="累計差異 (K)" align="right" :sortable="!isExpandedSelection" />
-            <DataTableColumn column-key="cumulative_achievement_rate" label="累計達成率" align="right" :sortable="!isExpandedSelection" />
-            <template #cell="{ columnKey, value, row }">
-              <span :class="{ 'pa-app__subtotal-cell': (row as Record<string, unknown>).is_subtotal === true }">
-                <template v-if="columnKey === 'workcenter_group' && (row as Record<string, unknown>).is_subtotal === true">▸ 小計 {{ value }}</template>
-                <template v-else-if="['cumulative_plan_qty', 'cumulative_actual_qty', 'cumulative_diff_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
+            <DataTable
+              v-else
+              :data="(cumulativeRows as unknown as Record<string, unknown>[])"
+              :loading="loading"
+              empty-type="filter-empty"
+              data-testid="pa-report-table"
+            >
+              <DataTableColumn column-key="package_lf_group" label="Package Group" />
+              <DataTableColumn column-key="cumulative_plan_qty" label="累計計畫 (K)" align="right" />
+              <DataTableColumn column-key="cumulative_actual_qty" :label="`累計${metricNoun} (K)`" align="right" />
+              <DataTableColumn column-key="cumulative_diff_qty" label="累計差異 (K)" align="right" />
+              <DataTableColumn column-key="cumulative_achievement_rate" label="累計達成率" align="right" />
+              <template #cell="{ columnKey, value }">
+                <template v-if="['cumulative_plan_qty', 'cumulative_actual_qty', 'cumulative_diff_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
                 <template v-else-if="columnKey === 'cumulative_achievement_rate'">{{ formatAchievementRate(value as number | null) }}</template>
                 <template v-else>{{ value }}</template>
-              </span>
-            </template>
-          </DataTable>
+              </template>
+            </DataTable>
+          </template>
+
+          <!-- Expanded 大項 (電鍍/切割): bespoke column-pivoted table — one row per
+               Package Group, separate COLUMNS per子站 (production-achievement
+               -column-pivot; NOT DataTable, see script-block header comment). -->
+          <template v-else>
+            <div v-if="viewKind === 'daily'" class="pa-app__expanded-table-wrap">
+              <table class="pa-app__expanded-table" data-testid="pa-expanded-daily-table">
+                <thead>
+                  <tr>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--sticky">Package Group</th>
+                    <template v-for="sub in expandedSubstations" :key="`h-${sub}`">
+                      <th class="pa-app__expanded-th pa-app__expanded-th--right">{{ sub }} D班{{ metricNoun }} (K)</th>
+                      <th class="pa-app__expanded-th pa-app__expanded-th--right">{{ sub }} N班{{ metricNoun }} (K)</th>
+                      <th class="pa-app__expanded-th pa-app__expanded-th--right">{{ sub }} 每日{{ metricNoun }} (K)</th>
+                    </template>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">{{ filters.workcenter_group }} D班{{ metricNoun }}總計 (K)</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">{{ filters.workcenter_group }} N班{{ metricNoun }}總計 (K)</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">{{ filters.workcenter_group }} 每日{{ metricNoun }}總計 (K)</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">每日計畫 (K)</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">D班達成率</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">N班達成率</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">每日達成率</th>
+                  </tr>
+                </thead>
+                <tbody v-if="dailyRows.length">
+                  <tr v-for="row in dailyRows" :key="row.package_lf_group" class="pa-app__expanded-row" data-testid="pa-expanded-row">
+                    <td class="pa-app__expanded-td pa-app__expanded-td--sticky">{{ row.package_lf_group }}</td>
+                    <template v-for="sub in expandedSubstations" :key="`d-${row.package_lf_group}-${sub}`">
+                      <td class="pa-app__expanded-td pa-app__expanded-td--right">{{ formatQty(substationDailyValue(row, sub, 'd_output_qty')) }}</td>
+                      <td class="pa-app__expanded-td pa-app__expanded-td--right">{{ formatQty(substationDailyValue(row, sub, 'n_output_qty')) }}</td>
+                      <td class="pa-app__expanded-td pa-app__expanded-td--right">{{ formatQty(substationDailyValue(row, sub, 'daily_output_qty')) }}</td>
+                    </template>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatQty(row.d_output_qty) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatQty(row.n_output_qty) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatQty(row.daily_output_qty) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatQty(row.daily_plan_qty) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatAchievementRate(row.d_achievement_rate) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatAchievementRate(row.n_achievement_rate) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatAchievementRate(row.achievement_rate) }}</td>
+                  </tr>
+                </tbody>
+                <tbody v-else>
+                  <tr>
+                    <td :colspan="dailyExpandedColspan" class="pa-app__expanded-empty-cell">
+                      <EmptyState type="filter-empty" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-else class="pa-app__expanded-table-wrap">
+              <table class="pa-app__expanded-table" data-testid="pa-expanded-cumulative-table">
+                <thead>
+                  <tr>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--sticky">Package Group</th>
+                    <th v-for="sub in expandedSubstations" :key="`h-${sub}`" class="pa-app__expanded-th pa-app__expanded-th--right">{{ sub }} 累計{{ metricNoun }} (K)</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">累計計畫 (K)</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">{{ filters.workcenter_group }} 累計{{ metricNoun }}總計 (K)</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">累計差異 (K)</th>
+                    <th class="pa-app__expanded-th pa-app__expanded-th--right">累計達成率</th>
+                  </tr>
+                </thead>
+                <tbody v-if="cumulativeRows.length">
+                  <tr v-for="row in cumulativeRows" :key="row.package_lf_group" class="pa-app__expanded-row" data-testid="pa-expanded-row">
+                    <td class="pa-app__expanded-td pa-app__expanded-td--sticky">{{ row.package_lf_group }}</td>
+                    <td v-for="sub in expandedSubstations" :key="`c-${row.package_lf_group}-${sub}`" class="pa-app__expanded-td pa-app__expanded-td--right">
+                      {{ formatQty(substationCumulativeValue(row, sub)) }}
+                    </td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatQty(row.cumulative_plan_qty) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatQty(row.cumulative_actual_qty) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatQty(row.cumulative_diff_qty) }}</td>
+                    <td class="pa-app__expanded-td pa-app__expanded-td--right pa-app__expanded-td--total">{{ formatAchievementRate(row.cumulative_achievement_rate) }}</td>
+                  </tr>
+                </tbody>
+                <tbody v-else>
+                  <tr>
+                    <td :colspan="cumulativeExpandedColspan" class="pa-app__expanded-empty-cell">
+                      <EmptyState type="filter-empty" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
         </div>
       </div>
     </template>

@@ -134,4 +134,41 @@ describe('CumulativeTrendComboChart', () => {
     expect(html).not.toContain('null%');
     expect(html).not.toContain('NaN%');
   });
+
+  it('bugfix: tooltip is confined and anchored near the bottom of the plot area, never following the cursor to the top where the 累計達成率 line rides (would otherwise visually cover it)', () => {
+    const wrapper = mountChart({ categories: ['A', 'B'], qtyData: [100, 200], rateData: [90, 103] });
+    const option = getOption(wrapper);
+    const tooltip = option.tooltip as {
+      confine: boolean;
+      position: (
+        point: [number, number],
+        params: unknown,
+        dom: unknown,
+        rect: unknown,
+        size: { viewSize: [number, number]; contentSize: [number, number] },
+      ) => [number, number];
+    };
+    expect(tooltip.confine).toBe(true);
+
+    // Same cursor X regardless of hover Y (top of chart, near a bar's tip,
+    // where the line rides) — the returned Y must stay pinned near the
+    // bottom of the viewSize, independent of where the cursor actually is.
+    const size = { viewSize: [600, 300] as [number, number], contentSize: [120, 60] as [number, number] };
+    const [xNearTop, yNearTop] = tooltip.position([250, 10], {}, {}, {}, size);
+    const [xNearBottom, yNearBottom] = tooltip.position([250, 280], {}, {}, {}, size);
+    expect(xNearTop).toBe(250);
+    expect(xNearBottom).toBe(250);
+    expect(yNearTop).toBe(yNearBottom); // position is independent of the hovered Y
+    expect(yNearTop).toBeGreaterThan(size.viewSize[1] / 2); // anchored in the lower half
+    expect(yNearTop).toBeLessThanOrEqual(size.viewSize[1] - size.contentSize[1]); // tooltip box still fits inside viewSize
+  });
+
+  it('bugfix: the 累計達成率 line disables emphasis entirely (matches admin-shared/components/TrendChart.vue\'s proven fix for the same ECharts hover-blanks-the-whole-line issue), not just a blur-state opacity override', () => {
+    const wrapper = mountChart({ categories: ['A', 'B'], qtyData: [100, 200], rateData: [90, 103] });
+    const option = getOption(wrapper);
+    const series = option.series as Array<Record<string, unknown>>;
+    const line = series.find((s) => s.type === 'line')!;
+    const emphasis = line.emphasis as { disabled: boolean };
+    expect(emphasis.disabled).toBe(true);
+  });
 });

@@ -62,17 +62,20 @@ pytestmark = pytest.mark.stress
 
 def _write_chunk_parquet(chunk_dir: Path, name: str, rows: list[dict]) -> None:
     """Write a fake per-chunk parquet using the raw Oracle-cursor column names
-    (SHIFT_CODE, OUTPUT_DATE, SPECNAME, PACKAGE_LF, ACTUAL_OUTPUT_QTY) that
-    OracleArrowReader/production_achievement.sql would actually produce
-    (PACKAGE_LF added as the 5th nullable column, production-achievement-overhaul,
-    PA-09 -- mirrors tests/test_production_achievement_unified_job.py's own
-    _write_chunk_parquet, which was updated for the same schema bump)."""
+    (SHIFT_CODE, OUTPUT_DATE, SPECNAME, PACKAGE_LF, ACTUAL_OUTPUT_QTY,
+    MAX_TRACKOUT_TS) that OracleArrowReader/production_achievement.sql would
+    actually produce (PACKAGE_LF added as the 5th nullable column,
+    production-achievement-overhaul, PA-09; MAX_TRACKOUT_TS is the freshness-
+    indicator aggregate input column -- mirrors tests/test_production_
+    achievement_unified_job.py's own _write_chunk_parquet, which was updated
+    for the same schema bumps)."""
     table = pa.table({
         "OUTPUT_DATE": pa.array([r["OUTPUT_DATE"] for r in rows], type=pa.date32()),
         "SHIFT_CODE": pa.array([r["SHIFT_CODE"] for r in rows], type=pa.string()),
         "SPECNAME": pa.array([r["SPECNAME"] for r in rows], type=pa.string()),
         "PACKAGE_LF": pa.array([r.get("PACKAGE_LF") for r in rows], type=pa.string()),
         "ACTUAL_OUTPUT_QTY": pa.array([r["ACTUAL_OUTPUT_QTY"] for r in rows], type=pa.int64()),
+        "MAX_TRACKOUT_TS": pa.array([r.get("MAX_TRACKOUT_TS") for r in rows], type=pa.timestamp("us")),
     })
     pq.write_table(table, str(chunk_dir / name))
 
@@ -686,17 +689,18 @@ class TestSpoolKeyCollision:
 
 
 # ---------------------------------------------------------------------------
-# R-7: Warmup-scheduler 8-job registry fairness (production-achievement-
-# overhaul, PA-14) -- the 2 NEW hourly _warmup_achievement_{today,yesterday}_job
-# entries running ALONGSIDE the 6 pre-existing _WARMUP_JOBS entries
-# (reject_dataset/yield_alert_dataset/hold_dataset/resource_dataset/
-# resource_history_duckdb/downtime_duckdb), confirming no cross-job
-# monopolization: a slow (or faulting) job must never starve the others'
-# scheduled slots, and no job type is structurally privileged at enqueue
-# time. Distinct from TestCrossWorkerFairness above (which probes the
+# R-7: Warmup-scheduler 10-job registry fairness (production-achievement-
+# overhaul, PA-14; move-out counterpart, PA-18) -- the 4 NEW hourly
+# _warmup_achievement_{today,yesterday}_job / _warmup_achievement_moveout_
+# {today,yesterday}_job entries running ALONGSIDE the 6 pre-existing
+# _WARMUP_JOBS entries (reject_dataset/yield_alert_dataset/hold_dataset/
+# resource_dataset/resource_history_duckdb/downtime_duckdb), confirming no
+# cross-job monopolization: a slow (or faulting) job must never starve the
+# others' scheduled slots, and no job type is structurally privileged at
+# enqueue time. Distinct from TestCrossWorkerFairness above (which probes the
 # shared heavy_query_slot semaphore with ONE generic sibling stub): this
 # class exercises the REAL spool_warmup_scheduler._WARMUP_JOBS registry --
-# all 8 real worker_fn callables -- at the exact granularity the single
+# all 10 real worker_fn callables -- at the exact granularity the single
 # `rq worker warmup` process (scripts/start_server.sh start_rq_warmup_worker,
 # no --burst/no worker-count flag: exactly one process, strictly FIFO) uses
 # to dispatch work.
@@ -722,15 +726,20 @@ def _record(events: List[Tuple[float, str, str]], lock: threading.Lock, name: st
 
 @pytest.mark.stress
 class TestWarmupSchedulerEightJobsNoMonopolization:
-    """_WARMUP_JOBS now has 8 entries (6 pre-existing + 2 new production-
-    achievement today/yesterday, PA-14). This class proves the 2 new
-    entries neither starve nor are starved by the 6 pre-existing ones, at
-    both the enqueue layer (_enqueue_warmup_jobs) and the execution layer
-    (the worker_fn callables actually running)."""
+    """_WARMUP_JOBS now has 10 entries (6 pre-existing + 2 production-
+    achievement today/yesterday, PA-14 + 2 production-achievement move-out
+    today/yesterday, PA-18). This class proves the 4 newer entries neither
+    starve nor are starved by the 6 pre-existing ones, at both the enqueue
+    layer (_enqueue_warmup_jobs) and the execution layer (the worker_fn
+    callables actually running).
+
+    Class name/"eight" wording predates PA-18's 2 move-out entries and is
+    kept as-is to avoid an unrelated rename churning this file; the counts
+    below are the current, accurate 10."""
 
     def test_enqueue_config_identical_across_all_eight_job_types(self, monkeypatch):
         """_enqueue_warmup_jobs() must submit IDENTICAL job_timeout/
-        result_ttl/failure_ttl for all 8 _WARMUP_JOBS entries -- no job
+        result_ttl/failure_ttl for all 10 _WARMUP_JOBS entries -- no job
         type (old or new) gets a structurally longer leash that could let
         it monopolize the single-worker `rq worker warmup` process (exactly
         one such process is started; jobs execute strictly FIFO -- a
@@ -739,8 +748,9 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
         preempts it)."""
         import mes_dashboard.core.spool_warmup_scheduler as sched
 
-        assert len(sched._WARMUP_JOBS) == 8, (
-            f"Expected 8 _WARMUP_JOBS entries (6 pre-existing + 2 production-achievement); "
+        assert len(sched._WARMUP_JOBS) == 10, (
+            f"Expected 10 _WARMUP_JOBS entries (6 pre-existing + 2 production-achievement "
+            f"+ 2 production-achievement move-out); "
             f"got {len(sched._WARMUP_JOBS)}: {[jid for jid, _ in sched._WARMUP_JOBS]!r}"
         )
 
@@ -759,8 +769,8 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
 
         count = sched._enqueue_warmup_jobs()
 
-        assert count == 8, f"Expected 8 successful enqueues, got {count}: {enqueue_calls}"
-        assert len(enqueue_calls) == 8
+        assert count == 10, f"Expected 10 successful enqueues, got {count}: {enqueue_calls}"
+        assert len(enqueue_calls) == 10
 
         timeouts = {c["job_timeout"] for c in enqueue_calls}
         result_ttls = {c["result_ttl"] for c in enqueue_calls}
@@ -772,12 +782,15 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
         fn_names = {c["fn"] for c in enqueue_calls}
         assert "_warmup_achievement_today_job" in fn_names
         assert "_warmup_achievement_yesterday_job" in fn_names
+        assert "_warmup_achievement_moveout_today_job" in fn_names
+        assert "_warmup_achievement_moveout_yesterday_job" in fn_names
 
     def test_enqueue_loop_reaches_all_eight_jobs_despite_one_enqueue_fault(self, monkeypatch):
         """A single job's queue.enqueue() call raising (simulated Redis
-        blip) must not prevent the REMAINING 7 of 8 from being attempted --
-        the 2 new achievement jobs are enqueued AFTER the faulting sibling
-        in _WARMUP_JOBS list order and must still be reached."""
+        blip) must not prevent the REMAINING 9 of 10 from being attempted --
+        the achievement/achievement-moveout jobs are enqueued AFTER the
+        faulting sibling in _WARMUP_JOBS list order and must still be
+        reached."""
         import mes_dashboard.core.spool_warmup_scheduler as sched
 
         attempted: List[str] = []
@@ -797,30 +810,31 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
 
         count = sched._enqueue_warmup_jobs()
 
-        assert len(attempted) == 8, f"Expected all 8 jobs attempted, got {len(attempted)}: {attempted}"
-        assert count == 7, f"Expected 7 successful enqueues (1 faulted), got {count}"
+        assert len(attempted) == 10, f"Expected all 10 jobs attempted, got {len(attempted)}: {attempted}"
+        assert count == 9, f"Expected 9 successful enqueues (1 faulted), got {count}"
         assert "_warmup_achievement_today_job" in attempted
         assert "_warmup_achievement_yesterday_job" in attempted
+        assert "_warmup_achievement_moveout_today_job" in attempted
+        assert "_warmup_achievement_moveout_yesterday_job" in attempted
 
     def test_eight_worker_fns_concurrent_slow_sibling_does_not_delay_achievement_jobs(
         self, monkeypatch, tmp_path
     ):
-        """All 8 REAL _WARMUP_JOBS worker_fn callables invoked CONCURRENTLY
+        """All 10 REAL _WARMUP_JOBS worker_fn callables invoked CONCURRENTLY
         via threads. One of the 6 pre-existing sibling jobs is deliberately
-        SLOW (simulates a large-dataset warmup cycle); the 2 NEW
-        production-achievement jobs run their REAL ensure_today_loaded()/
-        ensure_yesterday_loaded() -> ProductionAchievementJob.run() path
-        (Oracle fan-out mocked, same idiom as TestSemaphoreWiringStress
-        above). Threads (rather than a real single-worker RQ FIFO queue)
-        are the right fairness probe here because the worker_fn wrapper
-        functions are plain, independent callables with no shared lock
-        between them -- if this test found one blocking another, that
-        WOULD be a genuine monopolization bug (an accidental shared
-        resource), since production's single-worker FIFO ordering is a
-        capacity/ordering property, not a correctness one, and is
-        unaffected either way.
+        SLOW (simulates a large-dataset warmup cycle); the 4 production-
+        achievement (output + move-out) jobs run their REAL
+        ensure_*_loaded() -> ProductionAchievementJob.run() path (Oracle
+        fan-out mocked, same idiom as TestSemaphoreWiringStress above).
+        Threads (rather than a real single-worker RQ FIFO queue) are the
+        right fairness probe here because the worker_fn wrapper functions
+        are plain, independent callables with no shared lock between them
+        -- if this test found one blocking another, that WOULD be a
+        genuine monopolization bug (an accidental shared resource), since
+        production's single-worker FIFO ordering is a capacity/ordering
+        property, not a correctness one, and is unaffected either way.
 
-        Asserts: all 8 underlying calls complete; the two achievement
+        Asserts: all 10 underlying calls complete; the four achievement
         jobs' own enter->exit duration is not inflated by the
         concurrently-running slow sibling (no accidental blocking on a
         shared resource/lock)."""
@@ -904,9 +918,25 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
                 production_achievement_daily_cache.ensure_yesterday_loaded,
             ),
         )
+        # PA-18 move-out counterparts (see class docstring) -- same real-path
+        # idiom as the two 產出 entries above.
+        monkeypatch.setattr(
+            production_achievement_daily_cache, "ensure_moveout_today_loaded",
+            _record(
+                events, lock, "achievement_moveout_today",
+                production_achievement_daily_cache.ensure_moveout_today_loaded,
+            ),
+        )
+        monkeypatch.setattr(
+            production_achievement_daily_cache, "ensure_moveout_yesterday_loaded",
+            _record(
+                events, lock, "achievement_moveout_yesterday",
+                production_achievement_daily_cache.ensure_moveout_yesterday_loaded,
+            ),
+        )
 
         job_fns = dict(sched._WARMUP_JOBS)
-        assert len(job_fns) == 8
+        assert len(job_fns) == 10
 
         errors: List[str] = []
         errors_lock = threading.Lock()
@@ -931,17 +961,18 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
         expected_names = {
             "reject_dataset", "yield_alert_dataset", "hold_dataset", "resource_dataset",
             "resource_history_duckdb", "downtime_duckdb", "achievement_today", "achievement_yesterday",
+            "achievement_moveout_today", "achievement_moveout_yesterday",
         }
         observed_names = {e[2] for e in events}
         assert observed_names == expected_names, (
-            f"Not all 8 underlying calls were invoked exactly once: {sorted(observed_names)}"
+            f"Not all 10 underlying calls were invoked exactly once: {sorted(observed_names)}"
         )
 
-        # Bounded total wall-clock: the 8 worker_fns ran CONCURRENTLY
+        # Bounded total wall-clock: the 10 worker_fns ran CONCURRENTLY
         # (bounded by the slowest, ~0.35s, plus generous scheduling margin)
         # -- not serialized end-to-end, which would push this well past 1s.
         assert elapsed < _SLOW_SECONDS + 5.0, (
-            f"8 warmup worker_fns took {elapsed:.2f}s wall-clock -- expected roughly "
+            f"10 warmup worker_fns took {elapsed:.2f}s wall-clock -- expected roughly "
             f"bounded by the slowest (~{_SLOW_SECONDS}s); suggests serialization/"
             "monopolization instead of independent concurrent execution"
         )
@@ -953,18 +984,16 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
             assert enters and exits, f"{name}: missing enter/exit event pair"
             durations[name] = exits[0] - enters[0]
 
-        # No-starvation: the two achievement jobs must not be measurably
-        # blocked behind the concurrently-running slow hold_dataset job.
-        assert durations["achievement_today"] < _SLOW_SECONDS, (
-            f"achievement_today took {durations['achievement_today']:.2f}s -- "
-            f"appears blocked behind the slow hold_dataset job ({_SLOW_SECONDS}s)"
-        )
-        assert durations["achievement_yesterday"] < _SLOW_SECONDS, (
-            f"achievement_yesterday took {durations['achievement_yesterday']:.2f}s -- "
-            f"appears blocked behind the slow hold_dataset job ({_SLOW_SECONDS}s)"
-        )
+        # No-starvation: none of the four achievement jobs must be
+        # measurably blocked behind the concurrently-running slow
+        # hold_dataset job.
+        for name in ("achievement_today", "achievement_yesterday", "achievement_moveout_today", "achievement_moveout_yesterday"):
+            assert durations[name] < _SLOW_SECONDS, (
+                f"{name} took {durations[name]:.2f}s -- "
+                f"appears blocked behind the slow hold_dataset job ({_SLOW_SECONDS}s)"
+            )
         print(
-            f"\n[warmup-8-fairness] elapsed={elapsed:.2f}s "
+            f"\n[warmup-10-fairness] elapsed={elapsed:.2f}s "
             f"durations={ {k: round(v, 3) for k, v in durations.items()} }"
         )
 
@@ -1049,8 +1078,25 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
                 production_achievement_daily_cache.ensure_yesterday_loaded,
             ),
         )
+        # PA-18 move-out counterparts (see class docstring) -- same real-path
+        # idiom as the two 產出 entries above.
+        monkeypatch.setattr(
+            production_achievement_daily_cache, "ensure_moveout_today_loaded",
+            _record(
+                events, lock, "achievement_moveout_today",
+                production_achievement_daily_cache.ensure_moveout_today_loaded,
+            ),
+        )
+        monkeypatch.setattr(
+            production_achievement_daily_cache, "ensure_moveout_yesterday_loaded",
+            _record(
+                events, lock, "achievement_moveout_yesterday",
+                production_achievement_daily_cache.ensure_moveout_yesterday_loaded,
+            ),
+        )
 
         job_fns = dict(sched._WARMUP_JOBS)
+        assert len(job_fns) == 10
         errors: List[str] = []
         errors_lock = threading.Lock()
 
@@ -1075,20 +1121,21 @@ class TestWarmupSchedulerEightJobsNoMonopolization:
         expected_all = {
             "reject_dataset", "yield_alert_dataset", "hold_dataset", "resource_dataset",
             "resource_history_duckdb", "downtime_duckdb", "achievement_today", "achievement_yesterday",
+            "achievement_moveout_today", "achievement_moveout_yesterday",
         }
         enters = {e[2] for e in events if e[1] == "enter"}
         exits = {e[2] for e in events if e[1] == "exit"}
 
-        assert enters == expected_all, f"Not all 8 underlying calls were attempted: {sorted(enters)}"
+        assert enters == expected_all, f"Not all 10 underlying calls were attempted: {sorted(enters)}"
         # hold_dataset's underlying call faulted before reaching the
         # wrapper's own "exit" record line -- every OTHER job (crucially
-        # BOTH new achievement jobs) recorded a normal exit.
+        # all four achievement jobs) recorded a normal exit.
         assert "hold_dataset" not in exits, "hold_dataset should have faulted before its exit record"
         assert exits == expected_all - {"hold_dataset"}, (
             f"Some non-faulting job failed to complete when a sibling faulted "
             f"concurrently: missing={expected_all - {'hold_dataset'} - exits}"
         )
-        print(f"\n[warmup-8-fault-isolation] enters={sorted(enters)} exits={sorted(exits)}")
+        print(f"\n[warmup-10-fault-isolation] enters={sorted(enters)} exits={sorted(exits)}")
 
 
 # ---------------------------------------------------------------------------

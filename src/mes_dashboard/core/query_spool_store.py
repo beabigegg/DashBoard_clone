@@ -91,6 +91,13 @@ QUERY_SPOOL_ORPHAN_GRACE_SECONDS = max(
 )
 _SPOOL_SCHEMA_VERSION = 1
 _VALID_ID_RE = re.compile(r"^[A-Za-z0-9._-]{4,128}$")
+# Core register_spool_file() metadata keys that a caller's extra_metadata
+# must never be able to clobber (see register_spool_file docstring).
+_RESERVED_SPOOL_METADATA_KEYS = frozenset({
+    "schema_version", "namespace", "query_id", "relative_path",
+    "row_count", "column_count", "columns_hash", "created_at",
+    "expires_at", "file_size_bytes",
+})
 
 _WORKER_THREAD: threading.Thread | None = None
 _STOP_EVENT = threading.Event()
@@ -492,12 +499,46 @@ def register_spool_file(
     row_count: int,
     *,
     ttl_seconds: Optional[int] = None,
+    extra_metadata: "dict[str, Any] | None" = None,
+    cas_field: "str | None" = None,
+    cas_value: "float | int | None" = None,
 ) -> bool:
     """Register an already-written parquet file in the spool metadata store.
 
     Moves *src_path* to the canonical spool location and creates the Redis
     metadata pointer. Returns True on success. This avoids reloading the full
     DataFrame into memory (use after streaming writes via ParquetWriter).
+
+    *extra_metadata*, when provided, is merged into the Redis metadata dict
+    alongside the core fields below. Reserved core keys (schema_version,
+    namespace, query_id, relative_path, row_count, column_count,
+    columns_hash, created_at, expires_at, file_size_bytes) are always
+    filtered out of *extra_metadata* first so a caller can never accidentally
+    clobber them. Fully backward compatible: omitted, behavior is unchanged.
+
+    *cas_field*/*cas_value* (both keyword-only, opt-in ONLY as a pair -- both
+    must be non-None): turns this call into a Compare-And-Swap write keyed on
+    a caller-supplied monotonic "version" (e.g. when the Oracle query for
+    this result STARTED, not when this write happens) instead of an
+    unconditional overwrite. Before moving the file into place, the
+    currently-registered metadata (if any) is read; if it already carries a
+    non-None value under *cas_field* that is STRICTLY GREATER than
+    *cas_value*, a newer-versioned result has already won and this write is
+    skipped entirely (parquet is left untouched, Redis metadata is
+    untouched) -- the function returns False and logs at INFO so a CAS skip
+    is distinguishable in logs from the pre-existing failure paths above
+    (which log at WARNING). This exists to fix a real race: two jobs for the
+    SAME query_id/date-range can be enqueued at different times and can
+    FINISH (i.e. call this function) in either order -- e.g. an
+    early-starting scheduled warmup job queued behind a later
+    user-triggered force-refresh job. Since MES production data for a fixed
+    date range only grows over time (append-only), the job whose Oracle
+    query STARTED later is guaranteed to have seen equal-or-more data, so it
+    must win the write regardless of which one happens to CALL this function
+    last -- comparing wall-clock write time (the pre-existing unconditional
+    behavior) would let the earlier/staler query clobber the newer one
+    purely because its queue happened to drain later. Omitted (the
+    default), this is unchanged: a plain unconditional overwrite.
     """
     if not QUERY_SPOOL_ENABLED:
         return False
@@ -511,6 +552,24 @@ def register_spool_file(
     if client is None:
         logger.warning("Redis unavailable, skip register_spool_file for query_id=%s", safe_query_id)
         return False
+
+    if cas_field is not None and cas_value is not None:
+        existing_metadata = get_spool_metadata(namespace, safe_query_id)
+        existing_cas_value = existing_metadata.get(cas_field) if existing_metadata else None
+        if existing_cas_value is not None:
+            try:
+                is_stale_write = existing_cas_value > cas_value
+            except TypeError:
+                # Malformed/non-comparable existing value -- fail open (proceed
+                # with the write) rather than block registration indefinitely.
+                is_stale_write = False
+            if is_stale_write:
+                logger.info(
+                    "register_spool_file: skipped stale write (query_id=%s, cas_field=%s, "
+                    "existing cas_value=%s > this cas_value=%s)",
+                    safe_query_id, cas_field, existing_cas_value, cas_value,
+                )
+                return False
 
     ttl = max(int(ttl_seconds or QUERY_SPOOL_TTL_SECONDS), 60)
 
@@ -539,6 +598,10 @@ def register_spool_file(
             "expires_at": now_ts + ttl,
             "file_size_bytes": int(dest.stat().st_size),
         }
+        if extra_metadata:
+            metadata.update(
+                {k: v for k, v in extra_metadata.items() if k not in _RESERVED_SPOOL_METADATA_KEYS}
+            )
         client.setex(
             get_key(_meta_key(namespace, safe_query_id)),
             ttl,

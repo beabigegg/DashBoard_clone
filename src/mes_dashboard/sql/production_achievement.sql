@@ -21,8 +21,14 @@
 --
 -- PA-05 effective-output predicate (business-rules.md) is preserved verbatim
 -- below — every SPECNAME/processtypename/WORKFLOWNAME branch, not simplified.
--- Extended 2026-07-15 (PA-05a) with a 成型 (molding) branch keyed on SPECID
--- instead of SPECNAME -- see that branch's own inline comment.
+-- Extended 2026-07-15 (PA-05a) with a 成型 (molding) branch; corrected
+-- 2026-07-20 to match 025.txt's own SPECNAME-based version exactly (the
+-- original SPECID-keyed version double-counted output -- see that branch's
+-- own inline comment for the full investigation).
+--
+-- MAX_TRACKOUT_TS (added for the UI "資料最新一筆時間" freshness indicator):
+-- a plain extra aggregate on the outer SELECT, unrelated to the PA-05
+-- qualifying predicate itself and NOT part of GROUP BY.
 --
 -- Parameters (bound via oracledb named params):
 --   :start_date     - YYYY-MM-DD (inclusive)
@@ -147,7 +153,8 @@ SELECT
     END AS OUTPUT_DATE,
     weh.SPECNAME AS SPECNAME,
     weh.PACKAGE_LF AS PACKAGE_LF,
-    SUM(weh.TRACKOUTQTY) AS ACTUAL_OUTPUT_QTY
+    SUM(weh.TRACKOUTQTY) AS ACTUAL_OUTPUT_QTY,
+    MAX(weh.TRACKOUTTIMESTAMP) AS MAX_TRACKOUT_TS
 FROM DWH.DW_MES_LOTWIPHISTORY weh
 LEFT JOIN workflow_info wb ON weh.CONTAINERID = wb.CONTAINERID
 -- Rework exclusion (business-rules.md PA-05 supplement, production-achievement-
@@ -177,14 +184,29 @@ WHERE weh.TRACKOUTTIMESTAMP >= TO_TIMESTAMP(:start_date,     'YYYY-MM-DD')
     OR (weh.SPECNAME IN ('1DB') AND weh.processtypename IN ('2DB_DB'))
     OR (weh.SPECNAME IN ('DBCB') AND weh.processtypename IN ('DBCB_CB'))
     OR (weh.SPECNAME IN ('2DBCBRO','1DBCBRO','CBRO') AND weh.processtypename IN ('CBA_RO'))
-    -- 成型 (molding) station qualifying predicate (PA-05 extension, 2026-07-15).
-    -- Keyed on SPECID (not SPECNAME) per the source report's own 成型 sheet
-    -- query -- SPECID lives directly on DW_MES_LOTWIPHISTORY (same table,
-    -- adjacent column to SPECNAME; no join needed, confirmed against
-    -- data/table_schema_info.json). No WORKFLOWNAME/processtypename
-    -- dependency, unlike the 焊接 branches above. TRACKOUTQTY<>0 is a no-op
-    -- for SUM(TRACKOUTQTY) but kept verbatim for source parity.
-    OR (weh.SPECID IN ('48812c8000025fd2','48812c8000025fd4','48812c8000000025','48812c8000000026','48812c8000000027','48812c8000039e15') AND weh.TRACKOUTQTY <> 0)
+    -- 成型 (molding) station qualifying predicate (PA-05 extension, 2026-07-15;
+    -- corrected 2026-07-20). ADDENDUM: the original 2026-07-15 version keyed
+    -- this branch on SPECID (6 values, sourced from a separate "成型 sheet"
+    -- report, NOT 025.txt) instead of SPECNAME. Real-DB investigation
+    -- (2026-07-20, 成型/SOT-223 N-shift reconciliation) found this SPECID list
+    -- included '48812c8000039e15' (Mold電漿清洗 Plasma, a post-mold plasma-
+    -- clean step) alongside '48812c8000000025' (Auto Mold) -- the SAME
+    -- physical lot tracks out through BOTH steps in sequence, so summing both
+    -- as independent qualifying rows double-counted every lot's output
+    -- (confirmed exactly 2x: system reported 559,104 vs the correct 279,328,
+    -- 44 rows split evenly 22/22 across the two SPECIDs, same CONTAINERIDs in
+    -- both). The other two SPECIDs in that list ('48812c8000025fd2',
+    -- '48812c8000025fd4') matched zero rows in DW_MES_LOTWIPHISTORY over the
+    -- trailing 365 days -- unverifiable dead weight, also not in 025.txt.
+    -- Reverted to 025.txt's own 成型 predicate verbatim (line ~237):
+    -- `WC.SPECNAME IN ('C.C Mold_F','M.G.P Mold_F','Auto Mold','M.G.P Mold','C.C Mold')`
+    -- -- weh.SPECNAME is already a direct column on this same table (used by
+    -- every other branch above), so this is not just a correctness fix but
+    -- also removes the unnecessary SPECID indirection. 'C.C Mold_F'/
+    -- 'M.G.P Mold_F' currently match zero live rows (no recent volume) but
+    -- are kept because 025.txt lists them -- do not trim the list to only
+    -- the 3 currently-active names.
+    OR weh.SPECNAME IN ('C.C Mold_F','M.G.P Mold_F','Auto Mold','M.G.P Mold','C.C Mold')
   )
 GROUP BY
     CASE

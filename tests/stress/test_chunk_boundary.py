@@ -509,7 +509,8 @@ def _pa_write_chunk_parquet(chunk_dir, name: str, rows: list) -> None:
     """Write a fake per-chunk parquet using the RAW Oracle-cursor column
     names, mirroring tests/test_production_achievement_unified_job.py's
     _write_chunk_parquet (PACKAGE_LF as the 5th nullable column,
-    production-achievement-overhaul PA-09)."""
+    production-achievement-overhaul PA-09; MAX_TRACKOUT_TS as the freshness-
+    indicator aggregate input column)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
 
@@ -519,6 +520,7 @@ def _pa_write_chunk_parquet(chunk_dir, name: str, rows: list) -> None:
         "SPECNAME": pa.array([r["SPECNAME"] for r in rows], type=pa.string()),
         "PACKAGE_LF": pa.array([r.get("PACKAGE_LF") for r in rows], type=pa.string()),
         "ACTUAL_OUTPUT_QTY": pa.array([r["ACTUAL_OUTPUT_QTY"] for r in rows], type=pa.int64()),
+        "MAX_TRACKOUT_TS": pa.array([r.get("MAX_TRACKOUT_TS") for r in rows], type=pa.timestamp("us")),
     })
     pq.write_table(table, str(chunk_dir / name))
 

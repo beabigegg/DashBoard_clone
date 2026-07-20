@@ -221,6 +221,90 @@ class TestIsTodaySpoolStale:
         assert cache_mod._is_today_spool_stale("some-query-id") is True
 
 
+class TestInflightStateDedup:
+    """Race-condition fix companion (query_spool_store CAS write in
+    workers/production_achievement_worker.py): a query_id already inflight
+    (previous warmup cycle still running, OR a user-triggered force_refresh
+    job) must never get a second, duplicate warmup job started."""
+
+    def test_inflight_skips_build_warmup_job(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path", lambda namespace, query_id: None
+        )
+        monkeypatch.setattr(
+            cache_mod, "get_inflight_state",
+            lambda namespace, query_id: {"started_at": 123.0, "job_id": "warmup-pa-x"},
+        )
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_job", mock_build)
+
+        result = cache_mod.ensure_today_loaded()
+
+        assert result is None  # mirrors get_spool_file_path's None return
+        mock_build.assert_not_called()
+
+    def test_inflight_skips_build_warmup_job_returns_existing_stale_path(self, monkeypatch):
+        """When already-inflight AND an existing (stale) spool_path is
+        present, the existing path is returned as-is -- no rebuild is
+        triggered while a job for the same key is already running."""
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path",
+            lambda namespace, query_id: "/stale/spool/path.parquet",
+        )
+        monkeypatch.setattr(cache_mod, "_is_today_spool_stale", lambda query_id: True)
+        monkeypatch.setattr(
+            cache_mod, "get_inflight_state",
+            lambda namespace, query_id: {"started_at": 123.0, "job_id": "warmup-pa-x"},
+        )
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_job", mock_build)
+
+        result = cache_mod.ensure_today_loaded()
+
+        assert result == "/stale/spool/path.parquet"
+        mock_build.assert_not_called()
+
+    def test_not_inflight_triggers_build_warmup_job_as_before(self, monkeypatch):
+        """get_inflight_state returning None must not change pre-existing
+        cache-miss behavior -- _build_warmup_job still runs exactly once."""
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path", lambda namespace, query_id: None
+        )
+        monkeypatch.setattr(
+            cache_mod, "get_inflight_state", lambda namespace, query_id: None
+        )
+
+        run_calls = []
+
+        class _FakeJob:
+            def __init__(self, job_id, params):
+                self.job_id = job_id
+                self.params = params
+
+            def run(self):
+                run_calls.append((self.job_id, self.params))
+                return "/fake/spool/path.parquet"
+
+        monkeypatch.setattr(
+            cache_mod, "_build_warmup_job",
+            lambda job_id, params: _FakeJob(job_id, params),
+        )
+
+        result = cache_mod.ensure_today_loaded()
+
+        assert result == "/fake/spool/path.parquet"
+        assert len(run_calls) == 1
+
+
 class TestFlagOffKillSwitch:
     def test_flag_off_no_ops_without_importing_worker_module(self, monkeypatch):
         """Independent re-read of PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB
@@ -281,6 +365,340 @@ class TestProgressReportOverride:
         # hand-written parallel Oracle path (design.md Key Decisions).
         assert isinstance(job, ProductionAchievementJob)
         assert type(job) is not ProductionAchievementJob
+
+        with patch(
+            "mes_dashboard.services.async_query_job_service.update_job_progress"
+        ) as mock_update_progress:
+            job.progress_report(50)
+
+        mock_update_progress.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 轉出 (move-out) source -- mirrors every 產出 test class above 1:1, PA-18.
+# ---------------------------------------------------------------------------
+
+
+class TestMoveoutCacheHitShortCircuits:
+    def test_cache_hit_returns_without_run_or_oracle_call(self, monkeypatch):
+        """A pre-existing, still-FRESH moveout spool must short-circuit
+        BEFORE any job is built (proving zero .run()/Oracle calls -- building
+        the job is the only path that could reach Oracle)."""
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path",
+            lambda namespace, query_id: "/existing/moveout/spool/path.parquet",
+        )
+        monkeypatch.setattr(cache_mod, "_is_moveout_today_spool_stale", lambda query_id: False)
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_moveout_job", mock_build)
+
+        assert cache_mod.ensure_moveout_today_loaded() == "/existing/moveout/spool/path.parquet"
+        assert cache_mod.ensure_moveout_yesterday_loaded() == "/existing/moveout/spool/path.parquet"
+        mock_build.assert_not_called()
+
+
+class TestMoveoutCacheMissTriggersJobRun:
+    def test_cache_miss_triggers_job_run_exactly_once(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path", lambda namespace, query_id: None
+        )
+
+        run_calls = []
+
+        class _FakeJob:
+            def __init__(self, job_id, params):
+                self.job_id = job_id
+                self.params = params
+
+            def run(self):
+                run_calls.append((self.job_id, self.params))
+                return "/fake/moveout/spool/path.parquet"
+
+        monkeypatch.setattr(
+            cache_mod, "_build_warmup_moveout_job",
+            lambda job_id, params: _FakeJob(job_id, params),
+        )
+
+        result = cache_mod.ensure_moveout_today_loaded()
+
+        assert result == "/fake/moveout/spool/path.parquet"
+        assert len(run_calls) == 1
+        job_id, params = run_calls[0]
+        today_str = date.today().strftime("%Y-%m-%d")
+        assert job_id == f"warmup-pa-moveout-{today_str}"
+        assert params == {"start_date": today_str, "end_date": today_str}
+
+    def test_ensure_moveout_yesterday_loaded_uses_yesterday_date(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path", lambda namespace, query_id: None
+        )
+
+        run_calls = []
+
+        class _FakeJob:
+            def __init__(self, job_id, params):
+                self.job_id = job_id
+                self.params = params
+
+            def run(self):
+                run_calls.append((self.job_id, self.params))
+                return "/fake/moveout/spool/path.parquet"
+
+        monkeypatch.setattr(
+            cache_mod, "_build_warmup_moveout_job",
+            lambda job_id, params: _FakeJob(job_id, params),
+        )
+
+        cache_mod.ensure_moveout_yesterday_loaded()
+
+        yesterday_str = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+        assert run_calls == [
+            (
+                f"warmup-pa-moveout-{yesterday_str}",
+                {"start_date": yesterday_str, "end_date": yesterday_str},
+            )
+        ]
+
+
+class TestMoveoutTodayStaleSpoolRebuilds:
+    """Same growing-window staleness fix as 產出, applied to 轉出: an
+    existing-but-stale spool for TODAY must be rebuilt (not short-circuited),
+    while the identical existing-spool state for YESTERDAY still
+    short-circuits untouched."""
+
+    def test_stale_today_spool_triggers_rebuild(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path",
+            lambda namespace, query_id: "/stale/moveout/spool/path.parquet",
+        )
+        monkeypatch.setattr(cache_mod, "_is_moveout_today_spool_stale", lambda query_id: True)
+
+        run_calls = []
+
+        class _FakeJob:
+            def __init__(self, job_id, params):
+                self.job_id = job_id
+                self.params = params
+
+            def run(self):
+                run_calls.append((self.job_id, self.params))
+                return "/fresh/moveout/spool/path.parquet"
+
+        monkeypatch.setattr(
+            cache_mod, "_build_warmup_moveout_job",
+            lambda job_id, params: _FakeJob(job_id, params),
+        )
+
+        result = cache_mod.ensure_moveout_today_loaded()
+
+        assert result == "/fresh/moveout/spool/path.parquet"
+        assert len(run_calls) == 1
+
+    def test_stale_today_spool_with_flag_off_returns_existing_stale_path(self, monkeypatch):
+        """Kill switch still wins: with the flag off, a stale-but-existing
+        moveout spool is served as-is (no rebuild capability) rather than
+        losing the data entirely."""
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "off")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path",
+            lambda namespace, query_id: "/stale/moveout/spool/path.parquet",
+        )
+        monkeypatch.setattr(cache_mod, "_is_moveout_today_spool_stale", lambda query_id: True)
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_moveout_job", mock_build)
+
+        assert cache_mod.ensure_moveout_today_loaded() == "/stale/moveout/spool/path.parquet"
+        mock_build.assert_not_called()
+
+    def test_yesterday_never_consults_staleness_check(self, monkeypatch):
+        """A closed moveout day (yesterday) must short-circuit on ANY
+        existing spool without ever calling the today-only staleness
+        check."""
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path",
+            lambda namespace, query_id: "/existing/moveout/spool/path.parquet",
+        )
+        mock_stale = MagicMock(return_value=True)
+        monkeypatch.setattr(cache_mod, "_is_moveout_today_spool_stale", mock_stale)
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_moveout_job", mock_build)
+
+        assert cache_mod.ensure_moveout_yesterday_loaded() == "/existing/moveout/spool/path.parquet"
+        mock_stale.assert_not_called()
+        mock_build.assert_not_called()
+
+
+class TestIsMoveoutTodaySpoolStale:
+    def test_fresh_metadata_is_not_stale(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("WARMUP_INTERVAL_SECONDS", "3600")
+        monkeypatch.setattr(cache_mod.time, "time", lambda: 10_000.0)
+        monkeypatch.setattr(
+            cache_mod, "get_spool_metadata",
+            lambda namespace, query_id: {"created_at": 10_000 - 60},  # 1 minute old
+        )
+
+        assert cache_mod._is_moveout_today_spool_stale("some-query-id") is False
+
+    def test_old_metadata_is_stale(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("WARMUP_INTERVAL_SECONDS", "3600")
+        monkeypatch.setattr(cache_mod.time, "time", lambda: 10_000.0)
+        monkeypatch.setattr(
+            cache_mod, "get_spool_metadata",
+            lambda namespace, query_id: {"created_at": 10_000 - 3601},  # just over 1h old
+        )
+
+        assert cache_mod._is_moveout_today_spool_stale("some-query-id") is True
+
+    def test_missing_metadata_is_stale(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setattr(cache_mod, "get_spool_metadata", lambda namespace, query_id: None)
+
+        assert cache_mod._is_moveout_today_spool_stale("some-query-id") is True
+
+    def test_missing_created_at_is_stale(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setattr(cache_mod, "get_spool_metadata", lambda namespace, query_id: {})
+
+        assert cache_mod._is_moveout_today_spool_stale("some-query-id") is True
+
+
+class TestMoveoutInflightStateDedup:
+    """Moveout counterpart of TestInflightStateDedup, PA-18."""
+
+    def test_inflight_skips_build_warmup_moveout_job(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path", lambda namespace, query_id: None
+        )
+        monkeypatch.setattr(
+            cache_mod, "get_inflight_state",
+            lambda namespace, query_id: {"started_at": 456.0, "job_id": "warmup-pa-moveout-x"},
+        )
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_moveout_job", mock_build)
+
+        result = cache_mod.ensure_moveout_today_loaded()
+
+        assert result is None
+        mock_build.assert_not_called()
+
+    def test_not_inflight_triggers_build_warmup_moveout_job_as_before(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path", lambda namespace, query_id: None
+        )
+        monkeypatch.setattr(
+            cache_mod, "get_inflight_state", lambda namespace, query_id: None
+        )
+
+        run_calls = []
+
+        class _FakeJob:
+            def __init__(self, job_id, params):
+                self.job_id = job_id
+                self.params = params
+
+            def run(self):
+                run_calls.append((self.job_id, self.params))
+                return "/fake/moveout/spool/path.parquet"
+
+        monkeypatch.setattr(
+            cache_mod, "_build_warmup_moveout_job",
+            lambda job_id, params: _FakeJob(job_id, params),
+        )
+
+        result = cache_mod.ensure_moveout_today_loaded()
+
+        assert result == "/fake/moveout/spool/path.parquet"
+        assert len(run_calls) == 1
+
+
+class TestMoveoutFlagOffKillSwitch:
+    def test_flag_off_no_ops_without_importing_worker_module(self, monkeypatch):
+        """Independent re-read of PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB
+        BEFORE the lazy moveout worker import: with the flag off, the
+        moveout worker module must NEVER be imported. Proven by sabotaging
+        sys.modules so ANY import attempt raises ImportError immediately --
+        if the flag-off path incorrectly imported the worker anyway, this
+        test would fail with an ImportError instead of passing cleanly."""
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "off")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path", lambda namespace, query_id: None
+        )
+        monkeypatch.setitem(
+            sys.modules, "mes_dashboard.workers.production_achievement_moveout_worker", None
+        )
+
+        result = cache_mod.ensure_moveout_today_loaded()
+        assert result is None
+
+    def test_flag_off_never_calls_build_warmup_moveout_job(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "off")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path", lambda namespace, query_id: None
+        )
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_moveout_job", mock_build)
+
+        assert cache_mod.ensure_moveout_today_loaded() is None
+        assert cache_mod.ensure_moveout_yesterday_loaded() is None
+        mock_build.assert_not_called()
+
+
+class TestMoveoutProgressReportOverride:
+    def test_progress_report_override_never_calls_update_job_progress(self):
+        """PA-18 Redis-orphan-key trap (moveout counterpart of PA-14):
+        ProductionAchievementMoveoutJob.progress_report() (inherited from
+        BaseChunkedDuckDBJob) calls async_query_job_service.update_job_progress(),
+        an UNCONDITIONAL Redis HSET with no TTL and no existence check. The
+        warm-cache subclass's progress_report() override must be a complete
+        no-op so calling .run() directly (bypassing enqueue_query_job's TTL
+        registration) never leaks an orphaned, un-expiring Redis key."""
+        from mes_dashboard.services.production_achievement_daily_cache import (
+            _build_warmup_moveout_job,
+        )
+        from mes_dashboard.workers.production_achievement_moveout_worker import (
+            ProductionAchievementMoveoutJob,
+        )
+
+        job = _build_warmup_moveout_job(
+            job_id="warmup-pa-moveout-2026-07-13",
+            params={"start_date": "2026-07-13", "end_date": "2026-07-13"},
+        )
+
+        # Genuine subclass reusing ProductionAchievementMoveoutJob -- not a
+        # hand-written parallel Oracle path.
+        assert isinstance(job, ProductionAchievementMoveoutJob)
+        assert type(job) is not ProductionAchievementMoveoutJob
 
         with patch(
             "mes_dashboard.services.async_query_job_service.update_job_progress"
