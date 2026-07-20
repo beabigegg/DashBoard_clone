@@ -29,10 +29,6 @@ cd frontend && npm run css:check      # CSS 治理合規檢查
 # Lint / Type
 ruff check .                          # Python linter
 cd frontend && npm run type-check     # TypeScript 型別檢查（vue-tsc --noEmit）
-
-# CDD
-cdd-kit validate                      # 驗證所有 contracts
-cdd-kit detect-stack                  # 偵測專案技術棧
 ```
 
 ## Architecture
@@ -66,61 +62,9 @@ frontend/
 
 ---
 
-This repository follows the Contract-Driven Delivery workflow.
+`contracts/` documents intended API, business-rule, CSS, env, and data-shape behavior; `specs/archive/` holds historical change records. Both are reference material — read them when useful. This repo no longer drives changes through the cdd-kit CLI (`/cdd-new`, `cdd-kit gate`, etc.); it was left in a broken/unmaintained state, so treat any leftover mention of it in docs/tests/CI as historical, not something to invoke.
 
-- `contracts/` is the single source of truth for what the system should do.
-- `tests/` proves the contracts hold.
-- `specs/changes/<id>/` records why decisions were made (passive archive — read only when investigating history).
-- To start any non-trivial change, use `/cdd-new <description>` in Claude Code.
-
-## CDD Kit Commands
-
-| command | when to use |
-|---|---|
-| `/cdd-new <description>` | start a new tracked change (scaffolds all artifacts, runs full agent flow) |
-| `/cdd-resume <id>` | continue an in-progress change after a session break |
-| `/cdd-close <id>` | close a completed change: promote learnings, archive |
-| `cdd-kit list` | show all active changes and their status |
-| `cdd-kit gate <id>` | verify a change is gate-ready (run before PR) |
-| `cdd-kit gate <id> --strict` | full gate with pending-task enforcement (pre-commit default) |
-| `cdd-kit archive <id>` | physically move a completed change to `specs/archive/<year>/` |
-| `cdd-kit abandon <id> --reason <text>` | mark a change as abandoned; preserves directory for git history |
-| `cdd-kit validate` | run all contract validators |
-| `cdd-kit detect-stack` | detect the project tech stack |
-
-## Context Governance
-
-For context-governed changes, read `specs/changes/<change-id>/context-manifest.md` before using file-reading or broad search tools.
-
-- Read only paths allowed by the manifest or approved expansions.
-- If more context is needed, stop and write a Context Expansion Request in the manifest (`cdd-kit context request`).
-- The full agent-log format (including `files-read:` schema) is defined in
-  `~/.claude/skills/contract-driven-delivery/references/agent-log-protocol.md`.
-  Read that once; do not paraphrase it elsewhere.
-
-<!-- cdd-kit:learnings:start -->
-### Promoted Learnings
-
-**CDD Kit operations** — see `docs/cdd-kit-patterns.md`:
-- No CI cdd-kit version pin — upgrade locally after any `spec traceability` failure
-- `ci-gates.md` requires literal "workflow" / "promotion policy" / "rollback policy" headers
-- Tasks 6.2/6.3 `done` at local Tier-1 pass; 6.4 `skipped` when no nightly/weekly gates defined
-- Version entries: `contracts/CHANGELOG.md` only, never per-contract files
-- `context-manifest.md` Allowed Paths: directories only, no globs
-- `pip install jsonschema` before `cdd-kit validate --contracts`
-- Zero-caller/flag-off concurrency code: `tier-floor-override` in `tasks.yml` (≥20 chars); expires on first real caller or flag flip-on; keyword-scan false positives get a permanent override
-- Concurrent backend+frontend agents both calling `cdd-kit test run` race on `test-evidence.yml` — last agent re-runs combining both stacks
-- Concurrent uncommitted changes bumping the same contract's schema-version: `validate --versions` diffs working tree vs git HEAD, not changelog prose
-- `cdd-kit contract endpoint set` only mutates table cells, never prose sections — a hook-blocked prose note is a legitimate deferral if documented elsewhere
-- Stage only the specific `specs/changes/<id>/`, never all of `specs/changes/`
-- `gate --strict` only runs the changed-area ladder — grep + run full pytest locally before pushing a removal/shape change
-- Full pytest regenerates the whole contract sample set — `git checkout tests/contract/samples/` then re-stage only your change's samples
-- Any `schema-version` bump to `api-contract.md` requires re-running `cdd-kit openapi export` for both output paths
-- ADR 0012: `data-shape:` citation resolver needs the exact heading `## Invalid Data Behavior`; Form-1 can't cite into `type: array` items — cite the array field, put column detail in the rationale text
-- ADR 0012 §2 citation resolver cannot resolve interaction-design.md field citations against an untyped `GenericSuccessResponse`/prose response schema — every endpoint a NEW page's interaction-design.md cites fields from needs a typed `## Schemas` entry in api-contract.md *before* the citations are written, or `gate --strict` hard-fails — see contracts/api/api-contract.md §Schemas and ADR 0012
-- `cdd-kit boundary check` (raw CI step, not via `cdd-kit gate`) ignores `CDD_BASE_SHA` — always pass `--base <sha>` explicitly or it scans the entire contracted surface every run; it also had no `shadow_mode` awareness (unlike `cdd-kit gate`'s wrapping) until this repo's CI step was fixed to read `.cdd/policy.yml` and downgrade a failing exit to an advisory warning when `shadow_mode: true` — see docs/cdd-kit-patterns.md §cdd-kit boundary check --base
-- `cdd-kit accept confirm`/`--autonomous` is never honored by `gate --strict` — an acceptance-oracle change only passes the real pre-commit hook via a human running `accept confirm`/`relock` in a real TTY, or `--no-verify` with explicit user consent (never by hand-editing `.cdd/acceptance-lock.json`) — see docs/cdd-kit-patterns.md §ADR 0010 Acceptance Oracle
-- acceptance.yml's hardcoded-expect scanner flags any case's leaf `expect` value found anywhere in the file, even from an undriven case — keep generic/small-cardinality `expect` leaves off undriven cases, or convert to a `rule` (not scanned) — see docs/cdd-kit-patterns.md §ADR 0010 Acceptance Oracle
+## Engineering notes
 
 **Frontend patterns** — see `docs/architecture/frontend-patterns.md`:
 - TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS
@@ -212,5 +156,3 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Resilience specs: use `page.goto(...).catch(()=>{})`, not `page.request.post()` (`loginViaApi`) — not interceptable, throws ECONNREFUSED in CI
 - Playwright no-server skip: `<50`-char body-text check must GATE (return early, before calling) `waitForFunction` at all — never just shorten its timeout value, since `waitForFunction` does not reliably honor `timeout` on a frame whose navigation just failed; `pageRendered` must check app-specific content, not `bodyText.length > 100`
 - Async-gated route unit tests: mock `is_async_available()=True` + enqueue fn, not spool-hit mocks — CI has no Redis
-
-<!-- cdd-kit:learnings:end -->
