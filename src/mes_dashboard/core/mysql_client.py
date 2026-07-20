@@ -51,6 +51,11 @@ def create_mysql_engine():
         max_overflow=_MYSQL_MAX_OVERFLOW,
         pool_pre_ping=True,
         pool_recycle=1800,
+        connect_args={
+            "connect_timeout": 5,
+            "read_timeout": 10,
+            "write_timeout": 10,
+        },
     )
 
 
