@@ -11,10 +11,13 @@ Design (design.md Key Decisions; ADR-0017):
     requires_cross_chunk_reduction=False (append path, like EapAlarmJob --
     each event row is independent, no seam-straddling aggregation;
     ADR-0017 Decision-2). post_aggregate is a plain concat of chunk
-    parquets plus two enrichment bridges (ADR-0017 Decision-3):
-      LOT_ID       -> DW_MES_CONTAINER  (Package/Type/PJ_BOP/PJ_FUNCTION)
+    parquets plus three enrichment bridges (ADR-0017 Decision-3):
+      LOT_ID       -> DW_MES_CONTAINER  (Package/Type/PJ_BOP/PJ_FUNCTION,
+                       PRODUCTNAME)
       EQUIPMENT_ID -> DW_MES_RESOURCE   (WORKCENTERNAME, OBJECTCATEGORY='ASSEMBLY')
-    Both bridges mirror eap_alarm_worker.py's _safe_lot_product_df pattern
+      PRODUCTNAME  -> DWH.MES_PRODUCT   (DIE_COUNT/WIRE_COUNT), chained off
+                       the first bridge's resolved PRODUCTNAME
+    All three bridges mirror eap_alarm_worker.py's _safe_lot_product_df pattern
     (chunked IN-list lookups over distinct keys, best-effort degrade to
     empty/NULL on failure -- never fails the job).
   - DB/WB label (UPH-05) is computed in Python via
@@ -209,11 +212,14 @@ SELECT
     TRIM(c.PRODUCTLINENAME) AS PACKAGE,
     TRIM(c.PJ_TYPE)         AS PJ_TYPE,
     TRIM(c.PJ_BOP)          AS PJ_BOP,
-    TRIM(c.PJ_FUNCTION)     AS PJ_FUNCTION
+    TRIM(c.PJ_FUNCTION)     AS PJ_FUNCTION,
+    TRIM(c.PRODUCTNAME)     AS PRODUCTNAME
 FROM DWH.DW_MES_CONTAINER c
 WHERE c.CONTAINERNAME IN ({placeholders})
 """
-_LOT_PRODUCT_COLUMNS = ["LOT_ID", "PACKAGE", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION"]
+# PRODUCTNAME is the join key for the third (MES_PRODUCT) enrichment bridge --
+# resolved here first, then chained into _safe_mes_product_df().
+_LOT_PRODUCT_COLUMNS = ["LOT_ID", "PACKAGE", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION", "PRODUCTNAME"]
 
 _RESOURCE_WORKCENTER_SQL_TEMPLATE = """\
 SELECT
@@ -228,6 +234,21 @@ WHERE r.OBJECTCATEGORY = 'ASSEMBLY'
 # real 機型 is a first-class visible dimension (trend grouping + detail column),
 # not just a coarse filter -- same DW_MES_RESOURCE bridge, no extra query.
 _RESOURCE_WORKCENTER_COLUMNS = ["EQUIPMENT_ID", "WORKCENTERNAME", "MODEL"]
+
+# NOTE: `DWH.MES_PRODUCT` (and its PRODUCTNAME/NUMBEROFROWS/NUMBEROFCOLS
+# columns) is an ASSUMPTION -- modeled after the `DWH.MES_WIP_OUTPUTPLAN`
+# naming precedent elsewhere in this codebase. There is no way to verify the
+# real Oracle schema from this repo; fix the schema/table name here if it
+# turns out to be wrong.
+_MES_PRODUCT_SQL_TEMPLATE = """\
+SELECT
+    TRIM(p.PRODUCTNAME) AS PRODUCTNAME,
+    p.NUMBEROFROWS       AS DIE_COUNT,
+    p.NUMBEROFCOLS       AS WIRE_COUNT
+FROM DWH.MES_PRODUCT p
+WHERE p.PRODUCTNAME IN ({placeholders})
+"""
+_MES_PRODUCT_COLUMNS = ["PRODUCTNAME", "DIE_COUNT", "WIRE_COUNT"]
 
 
 def _empty_df(columns: List[str]):
@@ -313,6 +334,33 @@ def _safe_workcenter_df(events_df, timeout_seconds: int):
     return df
 
 
+def _safe_mes_product_df(lot_product_df, timeout_seconds: int):
+    """Best-effort PRODUCTNAME -> DIE_COUNT/WIRE_COUNT lookup frame.
+
+    Unlike _safe_lot_product_df/_safe_workcenter_df (which key off
+    events_df), this bridge keys off lot_product_df["PRODUCTNAME"] -- the
+    PRODUCTNAME is only known once the LOT_ID -> DW_MES_CONTAINER bridge has
+    already resolved it, so this is a second, chained lookup.
+    """
+    try:
+        if (
+            lot_product_df is None
+            or lot_product_df.empty
+            or "PRODUCTNAME" not in lot_product_df.columns
+        ):
+            return _empty_df(_MES_PRODUCT_COLUMNS)
+        return _fetch_dim_df(
+            lot_product_df["PRODUCTNAME"].dropna().unique().tolist(),
+            _MES_PRODUCT_SQL_TEMPLATE, _MES_PRODUCT_COLUMNS, timeout_seconds,
+        )
+    except Exception as exc:
+        logger.warning(
+            "uph_performance_worker: mes_product lookup failed, proceeding without "
+            "die/wire counts: %s", exc,
+        )
+        return _empty_df(_MES_PRODUCT_COLUMNS)
+
+
 def _compute_db_wb_label(workcenter_name: Optional[str]) -> Optional[str]:
     """Map WORKCENTERNAME -> 焊接_DB/焊接_WB via workcenter_groups (UPH-05).
 
@@ -352,10 +400,13 @@ def _build_final_select_sql(coarse_filter_hash: str) -> str:
             lp.PJ_TYPE,
             lp.PJ_BOP,
             lp.PJ_FUNCTION,
+            CAST(mp.DIE_COUNT AS VARCHAR)       AS DIE_COUNT,
+            CAST(mp.WIRE_COUNT AS VARCHAR)      AS WIRE_COUNT,
             '{coarse_filter_hash}'              AS coarse_filter_hash
         FROM events_raw e
         LEFT JOIN lot_product lp   ON lp.LOT_ID = TRIM(e.LOT_ID)
         LEFT JOIN workcenter_info w ON w.EQUIPMENT_ID = TRIM(e.EQUIPMENT_ID)
+        LEFT JOIN mes_product mp   ON mp.PRODUCTNAME = lp.PRODUCTNAME
     """
 
 
@@ -365,7 +416,7 @@ class UphPerformanceJob(BaseChunkedDuckDBJob):
     ChunkStrategy: TIME (<=6h windows). requires_cross_chunk_reduction=False:
     each event row is independent -- no seam-straddling aggregation (unlike
     ProductionAchievementJob's SPECNAME re-aggregation, ADR-0016). post_aggregate
-    is a plain concat of chunk parquets plus the two enrichment bridges.
+    is a plain concat of chunk parquets plus the three enrichment bridges.
     """
 
     namespace = _NAMESPACE
@@ -455,6 +506,7 @@ class UphPerformanceJob(BaseChunkedDuckDBJob):
 
         lot_product_df = _safe_lot_product_df(events_df, UPH_PERFORMANCE_JOB_TIMEOUT_SECONDS)
         workcenter_df = _safe_workcenter_df(events_df, UPH_PERFORMANCE_JOB_TIMEOUT_SECONDS)
+        mes_product_df = _safe_mes_product_df(lot_product_df, UPH_PERFORMANCE_JOB_TIMEOUT_SECONDS)
 
         os.makedirs(os.path.dirname(self._spool_path), exist_ok=True)
 
@@ -463,6 +515,7 @@ class UphPerformanceJob(BaseChunkedDuckDBJob):
             con.register("events_raw", events_df)
             con.register("lot_product", lot_product_df)
             con.register("workcenter_info", workcenter_df)
+            con.register("mes_product", mes_product_df)
 
             final_sql = _build_final_select_sql(self._coarse_filter_hash)
 

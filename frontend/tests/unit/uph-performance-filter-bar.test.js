@@ -9,8 +9,10 @@
  *   selections (family -> model -> workcenter -> equipment)
  * - changing an upstream axis PRUNES downstream selections no longer reachable
  * - handleClear resets every optional dim (incl. models) and emits clear
- * - machine-options / product-options failures render inline warnings while
- *   the rest of the bar stays usable
+ * - machine-options failures render an inline warning while the rest of the
+ *   bar stays usable
+ * - Package/Type are no longer coarse (tier-1) controls here — they moved to
+ *   the fine (tier-2) filter bar (FineFilterBar.vue)
  */
 import { describe, it, expect } from 'vitest';
 import { defineComponent } from 'vue';
@@ -70,10 +72,7 @@ function mountFilterBar(filters, extraProps = {}) {
       machineOptions: MACHINE_OPTIONS,
       machineOptionsLoading: false,
       machineOptionsError: '',
-      productFilterOptions: { pj_types: ['TYPE-A'], product_lines: ['PKG-A'] },
       loading: { querying: false },
-      productOptionsLoading: false,
-      productOptionsError: '',
       ...extraProps,
     },
     global: { stubs: { MultiSelect: MultiSelectStub } },
@@ -166,16 +165,10 @@ describe('FilterBar (redesigned)', () => {
     expect(wrapper.find('[data-testid="start-date"]').attributes('disabled')).toBeUndefined();
   });
 
-  it('shows the inline product-options warning (confirmed #6)', () => {
-    const wrapper = mountFilterBar(makeFilters(), { productOptionsError: 'mock 500' });
-    const warning = wrapper.find('[data-testid="product-options-warning"]');
-    expect(warning.exists()).toBe(true);
-    expect(warning.text()).toContain('mock 500');
-  });
-
-  it('the global Type filter (ctrl-type-select-global) is a distinct element from any ranking control', () => {
+  it('no longer renders the Package/Type coarse controls or their load-failure warning (moved to fine filter)', () => {
     const wrapper = mountFilterBar(makeFilters());
-    expect(wrapper.find('[data-testid="ctrl-type-select-global"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="ctrl-ranking-type-filter"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="ctrl-package-select"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="ctrl-type-select-global"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="product-options-warning"]').exists()).toBe(false);
   });
 });

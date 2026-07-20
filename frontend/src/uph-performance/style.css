@@ -150,14 +150,22 @@
 
 /* ── Trend chart ──────────────────────────────────────────────────────────── */
 
+.theme-uph-performance .trend-chart-card .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p12');
+}
+
 .theme-uph-performance .trend-chart-body {
-  height: 320px;
+  height: 440px;
   position: relative;
 }
 
 .theme-uph-performance .trend-chart {
   width: 100%;
-  height: 300px;
+  height: 420px;
 }
 
 .theme-uph-performance .trend-groupby-toggle {

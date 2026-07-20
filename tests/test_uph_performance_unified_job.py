@@ -93,7 +93,9 @@ class TestUphPerformanceJobPostAggregate:
         chunk_dir = job._make_chunk_parquet_dir(job.job_id)
         pq.write_table(self._make_events_table(), chunk_dir / "chunk-0000-0000.parquet")
 
-        empty_product = pd.DataFrame(columns=["LOT_ID", "PACKAGE", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION"])
+        empty_product = pd.DataFrame(
+            columns=["LOT_ID", "PACKAGE", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION", "PRODUCTNAME"]
+        )
         empty_workcenter = pd.DataFrame(columns=["EQUIPMENT_ID", "WORKCENTERNAME", "MODEL", "DB_WB_LABEL"])
 
         with patch(
@@ -141,3 +143,181 @@ class TestUphPerformanceJobPostAggregate:
 
         table = pq.read_table(spool_path)
         assert table.num_rows == 0
+
+    def test_post_aggregate_bridges_die_wire_counts_via_mes_product(self, tmp_path, monkeypatch):
+        """PRODUCTNAME -> DWH.MES_PRODUCT bridge: DIE_COUNT/WIRE_COUNT populate
+        correctly in the final joined output when the chained Oracle lookup
+        succeeds (mirrors the Package/Type/workcenter bridge assertions above)."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        from mes_dashboard.workers.uph_performance_worker import UphPerformanceJob
+
+        job = UphPerformanceJob("jid-mesprod-happy", params={
+            "date_from": "2026-01-01", "date_to": "2026-01-01",
+        })
+        job.pre_query()
+        job._spool_path = str(tmp_path / "spool.parquet")
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+        pq.write_table(self._make_events_table(), chunk_dir / "chunk-0000-0000.parquet")
+
+        lot_product_df = pd.DataFrame({
+            "LOT_ID": ["LOT001", "LOT002"],
+            "PACKAGE": ["PKG-A", "PKG-B"],
+            "PJ_TYPE": ["TYPE-A", "TYPE-B"],
+            "PJ_BOP": ["BOP-A", "BOP-B"],
+            "PJ_FUNCTION": ["FUNC-A", "FUNC-B"],
+            "PRODUCTNAME": ["PROD-A", "PROD-B"],
+        })
+        empty_workcenter = pd.DataFrame(columns=["EQUIPMENT_ID", "WORKCENTERNAME", "MODEL", "DB_WB_LABEL"])
+
+        def _fake_read_sql_df_slow(sql, params=None, timeout_seconds=None, caller="unknown"):
+            return pd.DataFrame({
+                "PRODUCTNAME": ["PROD-A", "PROD-B"],
+                "DIE_COUNT": [12, 24],
+                "WIRE_COUNT": [4, 8],
+            })
+
+        with patch(
+            "mes_dashboard.workers.uph_performance_worker._safe_lot_product_df",
+            return_value=lot_product_df,
+        ), patch(
+            "mes_dashboard.workers.uph_performance_worker._safe_workcenter_df",
+            return_value=empty_workcenter,
+        ), patch(
+            "mes_dashboard.core.database.read_sql_df_slow",
+            side_effect=_fake_read_sql_df_slow,
+        ), patch(
+            "mes_dashboard.core.query_spool_store.register_spool_file",
+            return_value=True,
+        ):
+            spool_path = job.post_aggregate(None)
+
+        df = pq.read_table(spool_path).to_pandas().sort_values("LOT_ID").reset_index(drop=True)
+        assert df.loc[0, "DIE_COUNT"] == "12"
+        assert df.loc[0, "WIRE_COUNT"] == "4"
+        assert df.loc[1, "DIE_COUNT"] == "24"
+        assert df.loc[1, "WIRE_COUNT"] == "8"
+
+    def test_post_aggregate_mes_product_degrade_path_never_raises_and_is_null(
+        self, tmp_path, monkeypatch,
+    ):
+        """Oracle fetch raises -> empty frame; DIE_COUNT/WIRE_COUNT come out NULL
+        in the final joined output, and the job does NOT raise."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        from mes_dashboard.workers.uph_performance_worker import UphPerformanceJob
+
+        job = UphPerformanceJob("jid-mesprod-degrade", params={
+            "date_from": "2026-01-01", "date_to": "2026-01-01",
+        })
+        job.pre_query()
+        job._spool_path = str(tmp_path / "spool.parquet")
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+        pq.write_table(self._make_events_table(), chunk_dir / "chunk-0000-0000.parquet")
+
+        lot_product_df = pd.DataFrame({
+            "LOT_ID": ["LOT001", "LOT002"],
+            "PACKAGE": ["PKG-A", "PKG-B"],
+            "PJ_TYPE": ["TYPE-A", "TYPE-B"],
+            "PJ_BOP": ["BOP-A", "BOP-B"],
+            "PJ_FUNCTION": ["FUNC-A", "FUNC-B"],
+            "PRODUCTNAME": ["PROD-A", "PROD-B"],
+        })
+        empty_workcenter = pd.DataFrame(columns=["EQUIPMENT_ID", "WORKCENTERNAME", "MODEL", "DB_WB_LABEL"])
+
+        def _raise(*args, **kwargs):
+            raise RuntimeError("ORA-12541: TNS:no listener")
+
+        with patch(
+            "mes_dashboard.workers.uph_performance_worker._safe_lot_product_df",
+            return_value=lot_product_df,
+        ), patch(
+            "mes_dashboard.workers.uph_performance_worker._safe_workcenter_df",
+            return_value=empty_workcenter,
+        ), patch(
+            "mes_dashboard.core.database.read_sql_df_slow",
+            side_effect=_raise,
+        ), patch(
+            "mes_dashboard.core.query_spool_store.register_spool_file",
+            return_value=True,
+        ):
+            spool_path = job.post_aggregate(None)  # must not raise
+
+        df = pq.read_table(spool_path).to_pandas()
+        assert df["DIE_COUNT"].isna().all()
+        assert df["WIRE_COUNT"].isna().all()
+
+
+class TestSafeMesProductDf:
+    """PRODUCTNAME -> DWH.MES_PRODUCT (DIE_COUNT/WIRE_COUNT) bridge, isolated
+    from the rest of post_aggregate -- mirrors _safe_lot_product_df/
+    _safe_workcenter_df's best-effort degrade contract (never raises)."""
+
+    def test_happy_path_resolves_die_wire_counts(self, monkeypatch):
+        from mes_dashboard.workers import uph_performance_worker as uph_mod
+
+        lot_product_df = pd.DataFrame({
+            "LOT_ID": ["LOT001"],
+            "PACKAGE": ["PKG-A"],
+            "PJ_TYPE": ["TYPE-A"],
+            "PJ_BOP": ["BOP-A"],
+            "PJ_FUNCTION": ["FUNC-A"],
+            "PRODUCTNAME": ["PROD-A"],
+        })
+
+        def _fake_read_sql_df_slow(sql, params=None, timeout_seconds=None, caller="unknown"):
+            return pd.DataFrame({
+                "PRODUCTNAME": ["PROD-A"],
+                "DIE_COUNT": [12],
+                "WIRE_COUNT": [4],
+            })
+
+        monkeypatch.setattr(
+            "mes_dashboard.core.database.read_sql_df_slow", _fake_read_sql_df_slow,
+        )
+
+        result = uph_mod._safe_mes_product_df(lot_product_df, timeout_seconds=30)
+
+        assert list(result.columns) == uph_mod._MES_PRODUCT_COLUMNS
+        assert result.loc[0, "PRODUCTNAME"] == "PROD-A"
+        assert result.loc[0, "DIE_COUNT"] == 12
+        assert result.loc[0, "WIRE_COUNT"] == 4
+
+    def test_degrade_path_oracle_failure_returns_empty_frame_without_raising(self, monkeypatch):
+        from mes_dashboard.workers import uph_performance_worker as uph_mod
+
+        lot_product_df = pd.DataFrame({
+            "LOT_ID": ["LOT001"], "PRODUCTNAME": ["PROD-A"],
+        })
+
+        def _raise(*args, **kwargs):
+            raise RuntimeError("ORA-12541: TNS:no listener")
+
+        monkeypatch.setattr(
+            "mes_dashboard.core.database.read_sql_df_slow", _raise,
+        )
+
+        result = uph_mod._safe_mes_product_df(lot_product_df, timeout_seconds=30)
+
+        assert result.empty
+        assert list(result.columns) == uph_mod._MES_PRODUCT_COLUMNS
+
+    def test_missing_lot_product_frame_degrades_without_oracle_call(self, monkeypatch):
+        """No LOT_ID->PRODUCTNAME resolved yet (empty lot_product_df) -> empty
+        frame without ever touching Oracle."""
+        from mes_dashboard.workers import uph_performance_worker as uph_mod
+
+        def _fail_if_called(*args, **kwargs):
+            raise AssertionError("Oracle must not be called when lot_product_df is empty")
+
+        monkeypatch.setattr(
+            "mes_dashboard.core.database.read_sql_df_slow", _fail_if_called,
+        )
+
+        empty_lot_product = pd.DataFrame(
+            columns=["LOT_ID", "PACKAGE", "PJ_TYPE", "PJ_BOP", "PJ_FUNCTION", "PRODUCTNAME"]
+        )
+        result = uph_mod._safe_mes_product_df(empty_lot_product, timeout_seconds=30)
+
+        assert result.empty
+        assert list(result.columns) == uph_mod._MES_PRODUCT_COLUMNS

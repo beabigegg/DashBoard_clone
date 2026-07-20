@@ -94,11 +94,13 @@ export function useUphPerformanceViews() {
 
   // ── Fetch filter options (post-spool, fine-filter axes) ───────────────────
 
-  async function fetchFilterOptions(queryId) {
+  async function fetchFilterOptions(queryId, fineParams = {}) {
     if (!queryId) return null;
     loading.filterOptions = true;
     try {
-      const resp = await apiGet(`/api/uph-performance/filter-options?query_id=${encodeURIComponent(queryId)}`);
+      const params = { query_id: queryId, ...fineParams };
+      const qs = buildQueryParams(params);
+      const resp = await apiGet(`/api/uph-performance/filter-options${qs}`);
       if (resp && resp.success === false) {
         return null;
       }

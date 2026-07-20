@@ -44,9 +44,10 @@ const MOCK_PRODUCT_FILTER_OPTIONS = { pj_types: ['TYPE-A', 'TYPE-B'], product_li
 
 const MOCK_FILTER_OPTIONS = {
   equipment_id_options: ['GDBA-001', 'GWBA-001'],
-  workcenter_name_options: ['焊接_DB_1', '焊接_WB_1'],
   package_options: ['PKG-X'],
   pj_type_options: ['TYPE-A', 'TYPE-B'],
+  die_count_options: ['2', '4'],
+  wire_count_options: ['4', '8'],
 };
 
 const MOCK_TREND = {
@@ -202,19 +203,19 @@ test.describe('uph-performance — state-initial and coarse-options-degraded', (
     expect(layout?.multiSelectBorderStyle).toBe('solid');
   });
 
-  test('state-coarse-options-degraded: product-filter-options 500 shows an inline warning, other filters stay usable', async ({ page }) => {
+  test('state-coarse-options-degraded: machine-options 500 shows an inline warning, dates + submit stay usable', async ({ page }) => {
     await registerCatchAllRoutes(page);
-    await page.route('**/api/uph-performance/product-filter-options**', (route) =>
-      route.fulfill({ status: 500, contentType: 'application/json', body: errorEnvelope('INTERNAL_ERROR', 'product options unavailable') }),
+    await page.route('**/api/uph-performance/machine-options**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: errorEnvelope('INTERNAL_ERROR', 'machine options unavailable') }),
     );
 
     const rendered = await gotoAndWaitForApp(page);
     if (skipIfNotRendered(rendered, 'app not mounted — skipping coarse-options-degraded assertions')) return;
 
-    await expect(page.locator('[data-testid="product-options-warning"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="machine-options-warning"]')).toBeVisible({ timeout: 10_000 });
     // The rest of the filter bar (dates, submit) remains usable.
     await expect(page.locator('[data-testid="start-date"]')).toBeEnabled();
-    await expect(page.locator('[data-testid="ctrl-workcenter-select"]')).toBeEnabled();
+    await expect(page.locator('[data-testid="ctrl-submit"]')).toBeEnabled();
   });
 });
 
@@ -399,7 +400,15 @@ test.describe('uph-performance — empty and error states', () => {
   });
 });
 
-test.describe('uph-performance — the two Type selectors stay independent (highest-risk consistency point)', () => {
+test.describe('uph-performance — the ranking Type filter stays independent (highest-risk consistency point)', () => {
+  // Note: the tier-1 (coarse) global Type control (`ctrl-type-select-global`)
+  // was removed — Package/Type moved to the tier-2 fine filter bar
+  // (`fine-pj-type-select`). The "two Type selectors are visibly distinct"
+  // scenario is moot now that only the fine-filter's pj_type control and the
+  // ranking block's own Type control exist; their non-sharing is proven at
+  // the composable level (uph-performance-filter.test.js §ranking Type filter
+  // independence), so it is not re-tested against a control that no longer
+  // exists in the DOM.
   test('ctrl-ranking-type-filter defaults to none-selected; ranking stays a prompt until a Type is chosen', async ({ page }) => {
     await registerCatchAllRoutes(page);
     const rendered = await gotoAndWaitForApp(page);
@@ -416,26 +425,7 @@ test.describe('uph-performance — the two Type selectors stay independent (high
     await expect(page.locator('[data-testid="ranking-block"]')).toContainText('GDBA-001', { timeout: 10_000 });
   });
 
-  test('ctrl-ranking-type-filter and ctrl-type-select-global are visibly distinct elements', async ({ page }) => {
-    await registerCatchAllRoutes(page);
-    const rendered = await gotoAndWaitForApp(page);
-    if (skipIfNotRendered(rendered, 'app not mounted — skipping distinct-selector assertions')) return;
-
-    await fillDatesAndSubmit(page);
-    await expect(page.locator('[data-testid="ranking-block"]')).toBeVisible({ timeout: 20_000 });
-
-    const globalType = page.locator('[data-testid="ctrl-type-select-global"]');
-    const rankingType = page.locator('[data-testid="ctrl-ranking-type-filter"]');
-    await expect(globalType).toHaveCount(1);
-    await expect(rankingType).toHaveCount(1);
-    // Distinct DOM nodes, distinct labels/placement.
-    const globalBox = await globalType.boundingBox();
-    const rankingBox = await rankingType.boundingBox();
-    expect(globalBox).not.toBeNull();
-    expect(rankingBox).not.toBeNull();
-  });
-
-  test('selecting the ranking Type filter never mutates or reads ctrl-type-select-global', async ({ page }) => {
+  test('selecting the ranking Type filter never mutates or reads the fine-filter Type control (fine-pj-type-select)', async ({ page }) => {
     await registerCatchAllRoutes(page);
     const rendered = await gotoAndWaitForApp(page);
     if (skipIfNotRendered(rendered, 'app not mounted — skipping cross-filter isolation assertions')) return;
@@ -443,32 +433,81 @@ test.describe('uph-performance — the two Type selectors stay independent (high
     await fillDatesAndSubmit(page);
     await expect(page.locator('[data-testid="ranking-block"]')).toBeVisible({ timeout: 20_000 });
 
-    // Global Type filter selection stays untouched before/after the ranking
-    // filter changes (still shows its own unselected placeholder text).
-    const globalBefore = await page.locator('[data-testid="ctrl-type-select-global"]').textContent();
+    // Fine-filter Type control selection stays untouched before/after the
+    // ranking filter changes (still shows its own unselected placeholder text).
+    const fineTypeBefore = await page.locator('[data-testid="fine-pj-type-select"]').textContent();
 
     await page.locator('[data-testid="ctrl-ranking-type-filter"] [data-testid="multiselect-trigger"]').click();
     await page.locator('[data-testid="multiselect-option"]', { hasText: 'TYPE-B' }).click();
     await page.locator('[data-testid="multiselect-close"]').click();
     await expect(page.locator('[data-testid="ranking-prompt"]')).toHaveCount(0, { timeout: 10_000 });
 
-    const globalAfter = await page.locator('[data-testid="ctrl-type-select-global"]').textContent();
-    expect(globalAfter).toBe(globalBefore);
+    const fineTypeAfter = await page.locator('[data-testid="fine-pj-type-select"]').textContent();
+    expect(fineTypeAfter).toBe(fineTypeBefore);
   });
+});
 
-  test('global Type filter populated + ranking Type filter empty renders the ranking prompt, not an error', async ({ page }) => {
+test.describe('uph-performance — fine filter cross-narrowing (filter-options refetch)', () => {
+  test('changing a fine-filter value re-fetches /filter-options (alongside /trend and /detail) with the current selection, and the narrowed options get applied', async ({ page }) => {
     await registerCatchAllRoutes(page);
-    const rendered = await gotoAndWaitForApp(page);
-    if (skipIfNotRendered(rendered, 'app not mounted — skipping mixed-state assertions')) return;
 
-    await page.locator('[data-testid="ctrl-type-select-global"] [data-testid="multiselect-trigger"]').click();
-    await page.locator('[data-testid="multiselect-option"]', { hasText: 'TYPE-A' }).click();
-    await page.locator('[data-testid="multiselect-close"]').click();
+    let filterOptionsCallCount = 0;
+    const filterOptionsUrls: string[] = [];
+    await page.route('**/api/uph-performance/filter-options**', (route) => {
+      filterOptionsCallCount++;
+      filterOptionsUrls.push(route.request().url());
+      // 2nd+ call (post fine-filter change) simulates the backend narrowing
+      // die_count_options down to a single value — proves applyFilterOptions
+      // actually re-renders the fine-filter bar's own MultiSelect options.
+      const payload =
+        filterOptionsCallCount === 1 ? MOCK_FILTER_OPTIONS : { ...MOCK_FILTER_OPTIONS, die_count_options: ['4'] };
+      route.fulfill({ status: 200, contentType: 'application/json', body: envelope(payload) });
+    });
+
+    let trendCallCount = 0;
+    let detailCallCount = 0;
+    await page.route('**/api/uph-performance/trend**', (route) => {
+      trendCallCount++;
+      route.fulfill({ status: 200, contentType: 'application/json', body: envelope(MOCK_TREND) });
+    });
+    await page.route('**/api/uph-performance/detail**', (route) => {
+      detailCallCount++;
+      route.fulfill({ status: 200, contentType: 'application/json', body: envelope(MOCK_DETAIL) });
+    });
+
+    const rendered = await gotoAndWaitForApp(page);
+    if (skipIfNotRendered(rendered, 'app not mounted — skipping fine-filter cross-narrowing assertions')) return;
 
     await fillDatesAndSubmit(page);
+    await expect(page.locator('[data-testid="datatable-row"]').first()).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.locator('[data-testid="ranking-prompt"]')).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('[role="alert"]')).toHaveCount(0);
+    // Post-spool: filter-options fetched exactly once, no fine-filter params.
+    expect(filterOptionsCallCount).toBe(1);
+    expect(filterOptionsUrls[0]).not.toContain('equipment_id');
+    const trendAfterLoad = trendCallCount;
+    const detailAfterLoad = detailCallCount;
+
+    // Change a fine-filter axis (機台 ID / equipment_id).
+    await page.locator('[data-testid="fine-equipment-id-select"] [data-testid="multiselect-trigger"]').click();
+    await page.locator('[data-testid="multiselect-option"]', { hasText: 'GDBA-001' }).click();
+    await page.locator('[data-testid="multiselect-close"]').click();
+
+    // filter-options, trend, and detail all re-fetch together (fix 1: no
+    // debounce, immediate fan-out alongside the existing trend/detail calls).
+    await expect.poll(() => filterOptionsCallCount, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+    expect(trendCallCount).toBeGreaterThan(trendAfterLoad);
+    expect(detailCallCount).toBeGreaterThan(detailAfterLoad);
+
+    // The re-fetch carries the current fine-filter selection as params —
+    // same equipment_id[] param name /trend and /detail already send.
+    const secondCallUrl = filterOptionsUrls[filterOptionsUrls.length - 1];
+    expect(decodeURIComponent(secondCallUrl)).toContain('equipment_id[]=GDBA-001');
+
+    // The resolved (narrowed) options get applied: reopening 晶粒數 now shows
+    // only the single narrowed value from the 2nd filter-options response.
+    await page.locator('[data-testid="fine-die-count-select"] [data-testid="multiselect-trigger"]').click();
+    await expect(page.locator('[data-testid="multiselect-option"]')).toHaveCount(1, { timeout: 5_000 });
+    await expect(page.locator('[data-testid="multiselect-option"]').first()).toHaveText('4');
   });
 });
 

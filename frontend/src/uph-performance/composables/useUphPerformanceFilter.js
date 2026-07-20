@@ -3,14 +3,16 @@
  *
  * Manages coarse filter state (date range + families + workcenter_names +
  * packages + pj_types + equipment_ids; triggers a new spool) and fine filter
- * state (equipment_id/workcenter_name/package/pj_type; re-slices the existing
- * spool via DuckDB-derived views, no re-spool — mirrors useEapAlarmFilter.js).
+ * state (equipment_id/package/pj_type/die_count/wire_count; re-slices the
+ * existing spool via DuckDB-derived views, no re-spool — mirrors
+ * useEapAlarmFilter.js).
  *
  * The ranking block's Type filter (`ctrl-ranking-type-filter`) is intentionally
  * NOT part of either coarseFilter or fineFilter here — interaction-design.md
  * §Confirmed #2/#7 requires it to be a wholly separate widget instance/state
- * that never shares selection with `ctrl-type-select-global`. It defaults to
- * an empty array (none selected) and is exposed as its own `rankingTypeFilter`
+ * that never shares selection with the fine filter's Type control
+ * (`fine-pj-type-select`). It defaults to an empty array (none selected) and
+ * is exposed as its own `rankingTypeFilter`
  * ref so the ranking block stays empty/prompting until the engineer picks a
  * Type — it is never read from or written to `coarseFilter.pj_types` /
  * `fineFilter.pj_type`.
@@ -44,31 +46,22 @@ export function useUphPerformanceFilter() {
   const machineOptionsLoading = ref(false);
   const machineOptionsError = ref('');
 
-  // ── Product filter options (from /api/uph-performance/product-filter-options) ─
-  const productFilterOptions = ref({
-    pj_types: [],
-    product_lines: [],
-  });
-
-  const productOptionsLoading = ref(false);
-  // Confirmed #6: on 500, show an inline warning near Package/Type dropdowns;
-  // other filters stay usable (state-coarse-options-degraded).
-  const productOptionsError = ref('');
-
   // ── Fine filter (DuckDB-derived views only, no Oracle re-query) ────────────
   const FINE_FILTER_PARAM_MAP = {
     equipment_id: 'equipment_id[]',
-    workcenter_name: 'workcenter_name[]',
     package: 'package[]',
     pj_type: 'pj_type[]',
+    die_count: 'die_count[]',
+    wire_count: 'wire_count[]',
   };
   const FINE_FILTER_KEYS = Object.keys(FINE_FILTER_PARAM_MAP);
 
   const fineFilter = reactive({
     equipment_id: [],
-    workcenter_name: [],
     package: [],
     pj_type: [],
+    die_count: [],
+    wire_count: [],
   });
 
   // ── Ranking's OWN independent Type filter (never shared with the above) ───
@@ -77,24 +70,27 @@ export function useUphPerformanceFilter() {
   // ── Fine filter options (populated after spool via GET /filter-options) ───
   const FILTER_OPTION_KEYS = [
     'equipment_id_options',
-    'workcenter_name_options',
     'package_options',
     'pj_type_options',
+    'die_count_options',
+    'wire_count_options',
   ];
 
   const filterOptions = reactive({
     equipment_id_options: [],
-    workcenter_name_options: [],
     package_options: [],
     pj_type_options: [],
+    die_count_options: [],
+    wire_count_options: [],
   });
 
   // ── Snapshot-diff: tracks last committed fine filter to detect changes ───
   let _lastCommitted = {
     equipment_id: [],
-    workcenter_name: [],
     package: [],
     pj_type: [],
+    die_count: [],
+    wire_count: [],
   };
 
   // ── Query state ────────────────────────────────────────────────────────────
@@ -228,28 +224,6 @@ export function useUphPerformanceFilter() {
   }
 
   /**
-   * Load product-filter-options (Package/Type pre-query dropdowns) on mount.
-   * On failure (500), surface an inline warning (state-coarse-options-degraded,
-   * confirmed #6) instead of blocking the rest of the page.
-   */
-  async function loadProductFilterOptions() {
-    productOptionsLoading.value = true;
-    productOptionsError.value = '';
-    try {
-      const result = await apiGet('/api/uph-performance/product-filter-options', { timeout: 30000 });
-      const data = result?.data ?? {};
-      productFilterOptions.value = {
-        pj_types: Array.isArray(data.pj_types) ? data.pj_types : [],
-        product_lines: Array.isArray(data.product_lines) ? data.product_lines : [],
-      };
-    } catch (err) {
-      productOptionsError.value = String(err?.message || '無法載入 Package / Type 選項，其餘篩選器仍可使用');
-    } finally {
-      productOptionsLoading.value = false;
-    }
-  }
-
-  /**
    * Load machine-options (機型 / 工作站 / 機台 cascadable dropdowns) on mount
    * from DW_MES_RESOURCE. On failure, surface an inline warning; the date
    * range + Package/Type filters stay usable (mirrors product-filter-options'
@@ -275,7 +249,6 @@ export function useUphPerformanceFilter() {
   }
 
   onMounted(() => {
-    loadProductFilterOptions();
     loadMachineOptions();
   });
 
@@ -300,9 +273,6 @@ export function useUphPerformanceFilter() {
     fineFilter,
     rankingTypeFilter,
     filterOptions,
-    productFilterOptions,
-    productOptionsLoading,
-    productOptionsError,
     machineOptions,
     machineOptionsLoading,
     machineOptionsError,
@@ -320,7 +290,6 @@ export function useUphPerformanceFilter() {
     buildRankingParams,
     buildCoarseParams,
     parseMultiLineText,
-    loadProductFilterOptions,
     setDefaultDateRange,
   };
 }

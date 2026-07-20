@@ -4,16 +4,18 @@ import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 
 interface FineFilter {
   equipment_id: string[];
-  workcenter_name: string[];
   package: string[];
   pj_type: string[];
+  die_count: string[];
+  wire_count: string[];
 }
 
 interface FilterOptions {
   equipment_id_options: string[];
-  workcenter_name_options: string[];
   package_options: string[];
   pj_type_options: string[];
+  die_count_options: string[];
+  wire_count_options: string[];
 }
 
 const props = defineProps<{
@@ -58,19 +60,6 @@ function handleMultiSelectClose(event: Event): void {
       </div>
 
       <div class="filter-group">
-        <label class="filter-label">工作站</label>
-        <MultiSelect
-          :model-value="fineFilter.workcenter_name"
-          :options="filterOptions.workcenter_name_options"
-          placeholder="全部工作站"
-          searchable
-          data-testid="fine-workcenter-select"
-          @update:model-value="(v: string[]) => onFilterChange('workcenter_name', v)"
-          @dropdown-close="handleMultiSelectClose"
-        />
-      </div>
-
-      <div class="filter-group">
         <label class="filter-label">Package / 封裝</label>
         <MultiSelect
           :model-value="fineFilter.package"
@@ -92,6 +81,32 @@ function handleMultiSelectClose(event: Event): void {
           searchable
           data-testid="fine-pj-type-select"
           @update:model-value="(v: string[]) => onFilterChange('pj_type', v)"
+          @dropdown-close="handleMultiSelectClose"
+        />
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">晶粒數</label>
+        <MultiSelect
+          :model-value="fineFilter.die_count"
+          :options="filterOptions.die_count_options"
+          placeholder="全部晶粒數"
+          searchable
+          data-testid="fine-die-count-select"
+          @update:model-value="(v: string[]) => onFilterChange('die_count', v)"
+          @dropdown-close="handleMultiSelectClose"
+        />
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">打線數</label>
+        <MultiSelect
+          :model-value="fineFilter.wire_count"
+          :options="filterOptions.wire_count_options"
+          placeholder="全部打線數"
+          searchable
+          data-testid="fine-wire-count-select"
+          @update:model-value="(v: string[]) => onFilterChange('wire_count', v)"
           @dropdown-close="handleMultiSelectClose"
         />
       </div>

@@ -28,7 +28,10 @@ from typing import Iterable, Optional
 #             機型 is a visible trend/detail dimension (add-uph-performance-page
 #             redesign). Old v1 spools carry a different key suffix and simply
 #             age out via TTL -- no forced purge needed (ephemeral spool).
-_SCHEMA_VERSION: int = 2
+#   v2 -> v3: added DIE_COUNT/WIRE_COUNT via new MES_PRODUCT (PRODUCTNAME)
+#             bridge. Old v2 spools age out via TTL (version suffix in the
+#             key prevents schema collision) -- no forced purge needed.
+_SCHEMA_VERSION: int = 3
 
 _NAMESPACE = "uph_performance"
 

@@ -26,11 +26,6 @@ interface CoarseFilter {
   equipment_ids: string[];
 }
 
-interface ProductFilterOptions {
-  pj_types: string[];
-  product_lines: string[];
-}
-
 interface LoadingState {
   querying?: boolean;
   [key: string]: unknown;
@@ -41,10 +36,7 @@ const props = defineProps<{
   machineOptions: MachineOptions;
   machineOptionsLoading?: boolean;
   machineOptionsError?: string;
-  productFilterOptions: ProductFilterOptions;
   loading: LoadingState;
-  productOptionsLoading?: boolean;
-  productOptionsError?: string;
 }>();
 
 const emit = defineEmits<{
@@ -232,40 +224,9 @@ const equipmentPlaceholder = computed(() => {
         />
       </div>
 
-      <!-- Package (product_lines) -->
-      <div class="filter-group">
-        <label class="filter-label">Package / 封裝</label>
-        <MultiSelect
-          :model-value="filters.packages"
-          :options="productFilterOptions.product_lines"
-          :disabled="loading.querying || productOptionsLoading"
-          :placeholder="productOptionsLoading ? '載入中...' : '全部 Package'"
-          searchable
-          data-testid="ctrl-package-select"
-          @update:model-value="(v: string[]) => emit('update:filters', { ...filters, packages: v })"
-        />
-      </div>
-
-      <!-- Type (global scope) -->
-      <div class="filter-group">
-        <label class="filter-label">Type / 全域類型</label>
-        <MultiSelect
-          :model-value="filters.pj_types"
-          :options="productFilterOptions.pj_types"
-          :disabled="loading.querying || productOptionsLoading"
-          :placeholder="productOptionsLoading ? '載入中...' : '全部 Type'"
-          searchable
-          data-testid="ctrl-type-select-global"
-          @update:model-value="(v: string[]) => emit('update:filters', { ...filters, pj_types: v })"
-        />
-      </div>
-
-      <!-- Options-load warnings (machine-options / product-options degrade) -->
+      <!-- Options-load warning (machine-options degrade) -->
       <div v-if="machineOptionsError" class="filter-group-full product-options-warning" data-testid="machine-options-warning" role="alert">
         機型 / 工作站 / 機台 選項載入失敗，可改用日期與 Package / Type 篩選：{{ machineOptionsError }}
-      </div>
-      <div v-if="productOptionsError" class="filter-group-full product-options-warning" data-testid="product-options-warning" role="alert">
-        Package / Type 選項載入失敗，其餘篩選器仍可使用：{{ productOptionsError }}
       </div>
 
       <!-- Toolbar -->
@@ -293,7 +254,7 @@ const equipmentPlaceholder = computed(() => {
           </button>
         </div>
         <div class="filter-hint">
-          日期為必填；類別 / 機型 / 工作站 / 機台 / Package / Type 皆為選填（留空代表全部），機型以下逐層連動。
+          日期為必填；類別 / 機型 / 工作站 / 機台 皆為選填（留空代表全部），機型以下逐層連動。
         </div>
       </div>
     </div>

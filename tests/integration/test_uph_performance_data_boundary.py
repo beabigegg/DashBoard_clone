@@ -28,11 +28,14 @@ _SPOOL_SCHEMA = pa.schema([
     pa.field("PARAMETER_NAME", pa.string(), nullable=False),
     pa.field("UPH_VALUE", pa.float64(), nullable=True),
     pa.field("WORKCENTERNAME", pa.string(), nullable=True),
+    pa.field("MODEL", pa.string(), nullable=True),
     pa.field("DB_WB_LABEL", pa.string(), nullable=True),
     pa.field("PACKAGE", pa.string(), nullable=True),
     pa.field("PJ_TYPE", pa.string(), nullable=True),
     pa.field("PJ_BOP", pa.string(), nullable=True),
     pa.field("PJ_FUNCTION", pa.string(), nullable=True),
+    pa.field("DIE_COUNT", pa.string(), nullable=True),
+    pa.field("WIRE_COUNT", pa.string(), nullable=True),
     pa.field("coarse_filter_hash", pa.string(), nullable=False),
 ])
 
@@ -326,9 +329,12 @@ class TestFineFilterAxisNarrowing:
             "PARAMETER_NAME": ["BondUPH", "BondUPH", "fHCM_UPH"],
             "UPH_VALUE": [100.0, 80.0, 60.0],
             "WORKCENTERNAME": ["焊接_DB_1線", "焊接_DB_2線", "焊接_WB_1線"],
+            "MODEL": ["MODEL-A", "MODEL-B", "MODEL-C"],
             "DB_WB_LABEL": ["焊接_DB", "焊接_DB", "焊接_WB"],
             "PACKAGE": ["PKG-A", "PKG-B", "PKG-A"],
             "PJ_TYPE": ["TYPE-1", "TYPE-2", "TYPE-1"],
+            "DIE_COUNT": ["12", "24", "12"],
+            "WIRE_COUNT": ["4", "8", "4"],
         })
         pq.write_table(table, path)
         return path
@@ -408,6 +414,7 @@ class TestFineFilterAxisNarrowing:
             "PACKAGE": ["PKG-A"] * n,
             "PJ_TYPE": ["TYPE-1"] * n,
             "WORKCENTERNAME": ["焊接_DB_1線"] * n,
+            "MODEL": ["MODEL-A"] * n,
         })
         pq.write_table(table, path)
 
@@ -422,6 +429,126 @@ class TestFineFilterAxisNarrowing:
             f"200-row cap, got {len(result['rows'])} rows"
         )
         assert result["meta"]["per_page"] == 200
+
+
+class TestFilterOptionsCrossFilterNarrowing:
+    """Cross-filter narrowing across fine-filter axes, with a mandatory
+    self-exclusion guarantee: selecting a value on axis A narrows every
+    OTHER axis's option list, but must NEVER narrow axis A's own option
+    list down to just what's already selected on A (that would silently
+    break A's own MultiSelect's ability to add more values)."""
+
+    def _write_cross_filter_spool(self, tmp_path) -> str:
+        """4 rows spanning 2 distinct values each on pj_type/package/die_count/
+        wire_count, with L1 the only row matching BOTH pj_type=TYPE-A and
+        package=PKG-1 -- lets a single fixture prove single-axis narrowing,
+        self-exclusion, and 2-axis AND-narrowing all at once."""
+        path = str(tmp_path / "cross_filter_spool.parquet")
+        table = pa.table({
+            "LOT_ID": ["L1", "L2", "L3", "L4"],
+            "EQUIPMENT_ID": ["GDBA-01", "GDBA-02", "GDBA-03", "GDBA-04"],
+            "EQUIPMENT_FAMILY": ["GDBA", "GDBA", "GDBA", "GDBA"],
+            "EVENT_TIME": pd.to_datetime([
+                "2026-01-01 01:00:00", "2026-01-01 02:00:00",
+                "2026-01-01 03:00:00", "2026-01-01 04:00:00",
+            ]),
+            "PARAMETER_NAME": ["BondUPH", "BondUPH", "BondUPH", "BondUPH"],
+            "UPH_VALUE": [100.0, 90.0, 80.0, 70.0],
+            "WORKCENTERNAME": ["WC1", "WC2", "WC3", "WC4"],
+            "PACKAGE": ["PKG-1", "PKG-2", "PKG-1", "PKG-3"],
+            "PJ_TYPE": ["TYPE-A", "TYPE-A", "TYPE-B", "TYPE-B"],
+            "DIE_COUNT": ["12", "24", "12", "36"],
+            "WIRE_COUNT": ["4", "8", "4", "16"],
+        })
+        pq.write_table(table, path)
+        return path
+
+    def test_selecting_pj_type_narrows_other_axes_options(self, tmp_path):
+        """filters={"pj_type": ["TYPE-A"]} -- package/die_count/wire_count
+        option lists must only contain values co-occurring with TYPE-A rows
+        (L1/L2), not the full unfiltered spool-wide set."""
+        import duckdb
+        from mes_dashboard.services.uph_performance_service import get_filter_options
+
+        spool_path = self._write_cross_filter_spool(tmp_path)
+        with patch(
+            "mes_dashboard.services.uph_performance_service._get_duckdb_conn",
+            return_value=duckdb.connect(),
+        ):
+            result = get_filter_options(spool_path, {"pj_type": ["TYPE-A"]})
+
+        assert sorted(result["package_options"]) == ["PKG-1", "PKG-2"], (
+            f"package_options must narrow to TYPE-A's co-occurring packages, "
+            f"got: {result['package_options']}"
+        )
+        assert sorted(result["die_count_options"]) == ["12", "24"], (
+            f"die_count_options must narrow to TYPE-A's co-occurring die counts, "
+            f"got: {result['die_count_options']}"
+        )
+        assert sorted(result["wire_count_options"]) == ["4", "8"], (
+            f"wire_count_options must narrow to TYPE-A's co-occurring wire counts, "
+            f"got: {result['wire_count_options']}"
+        )
+
+    def test_get_filter_options_never_self_narrows(self, tmp_path):
+        """THE critical property this task exists for: filters={"pj_type":
+        ["TYPE-A"]} must NOT collapse pj_type_options down to just
+        ["TYPE-A"] -- the fixture has 2 distinct PJ_TYPE values (TYPE-A,
+        TYPE-B) and both must still be reachable so the pj_type MultiSelect
+        can still add TYPE-B."""
+        import duckdb
+        from mes_dashboard.services.uph_performance_service import get_filter_options
+
+        spool_path = self._write_cross_filter_spool(tmp_path)
+        with patch(
+            "mes_dashboard.services.uph_performance_service._get_duckdb_conn",
+            return_value=duckdb.connect(),
+        ):
+            result = get_filter_options(spool_path, {"pj_type": ["TYPE-A"]})
+
+        assert sorted(result["pj_type_options"]) == ["TYPE-A", "TYPE-B"], (
+            f"pj_type_options must never be narrowed by pj_type's own "
+            f"selection -- got: {result['pj_type_options']}"
+        )
+
+    def test_two_simultaneous_axes_and_narrow_third_but_not_each_other(self, tmp_path):
+        """filters={"pj_type": ["TYPE-A"], "package": ["PKG-1"]}:
+        - die_count_options (a third, unselected axis) is narrowed by BOTH
+          selections combined (AND semantics, only L1 matches both) -> ["12"].
+        - pj_type_options is narrowed only by package's selection (TYPE-A and
+          TYPE-B both have a PKG-1 row: L1, L3) -> NOT narrowed by its own
+          TYPE-A selection.
+        - package_options is narrowed only by pj_type's selection (TYPE-A
+          rows: L1=PKG-1, L2=PKG-2) -> NOT narrowed by its own PKG-1
+          selection.
+        """
+        import duckdb
+        from mes_dashboard.services.uph_performance_service import get_filter_options
+
+        spool_path = self._write_cross_filter_spool(tmp_path)
+        with patch(
+            "mes_dashboard.services.uph_performance_service._get_duckdb_conn",
+            return_value=duckdb.connect(),
+        ):
+            result = get_filter_options(
+                spool_path, {"pj_type": ["TYPE-A"], "package": ["PKG-1"]},
+            )
+
+        assert result["die_count_options"] == ["12"], (
+            f"die_count_options must be AND-narrowed by both pj_type=TYPE-A "
+            f"and package=PKG-1 (only L1 matches both), got: "
+            f"{result['die_count_options']}"
+        )
+        assert sorted(result["pj_type_options"]) == ["TYPE-A", "TYPE-B"], (
+            f"pj_type_options must be narrowed only by package=PKG-1 (not "
+            f"its own pj_type selection) -- both TYPE-A (L1) and TYPE-B (L3) "
+            f"have a PKG-1 row, got: {result['pj_type_options']}"
+        )
+        assert sorted(result["package_options"]) == ["PKG-1", "PKG-2"], (
+            f"package_options must be narrowed only by pj_type=TYPE-A (not "
+            f"its own package selection) -- TYPE-A rows are PKG-1 (L1) and "
+            f"PKG-2 (L2), got: {result['package_options']}"
+        )
 
 
 class TestStateDistinctness:

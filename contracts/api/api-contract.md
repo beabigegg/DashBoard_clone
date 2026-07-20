@@ -267,9 +267,9 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/uph-performance/spool/status | required | ?query_id= | UphPerformanceSpoolStatusResponse | 400/410 | route tests |
 | GET | /api/uph-performance/filter-options | required | ?query_id= | UphPerformanceFilterOptionsResponse | 400/410 | route tests |
 | GET | /api/uph-performance/product-filter-options | required | - | UphPerformanceProductFilterOptionsResponse | 500 | route tests |
-| GET | /api/uph-performance/trend | required | ?query_id=&group_by=(equipment_id/family/model/package, default family; 400 on unknown)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceTrendResponse | 400/410 | route tests |
+| GET | /api/uph-performance/trend | required | ?query_id=&group_by=(equipment_id/family/model/package/die_count/wire_count, default family; 400 on unknown)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt)&die_count[]=(opt)&wire_count[]=(opt) | UphPerformanceTrendResponse | 400/410 | route tests |
 | GET | /api/uph-performance/ranking | required | ?query_id=&pj_type[]=(opt, own filter axis independent of global filters) | UphPerformanceRankingResponse | 400/410 | route tests |
-| GET | /api/uph-performance/detail | required | ?query_id=&page=&per_page=(max 200)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceDetailResponse | 400/410 | route tests |
+| GET | /api/uph-performance/detail | required | ?query_id=&page=&per_page=(max 200)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt)&die_count[]=(opt)&wire_count[]=(opt) | UphPerformanceDetailResponse | 400/410 | route tests |
 | GET | /api/production-achievement/package-lf-map | required | - | ProductionAchievementPackageLfMapResponse | 500 | route tests |
 | PUT | /api/production-achievement/package-lf-map | required | body {raw_package_lf, merged_group}; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
 | DELETE | /api/production-achievement/package-lf-map/{raw} | required | path segment {raw} URL-encoded; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/404/500/503 | route tests |
@@ -1640,6 +1640,8 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 | workcenter_name_options | string[] | yes |  | distinct WORKCENTERNAME values present in the built spool |
 | package_options | string[] | yes |  | distinct PRODUCTLINENAME (Package) values present in the built spool |
 | pj_type_options | string[] | yes |  | distinct PJ_TYPE (Type) values present in the built spool |
+| die_count_options | string[] | yes |  | distinct DIE_COUNT (MES_PRODUCT.NUMBEROFROWS) values present in the built spool |
+| wire_count_options | string[] | yes |  | distinct WIRE_COUNT (MES_PRODUCT.NUMBEROFCOLS) values present in the built spool |
 
 ### UphPerformanceProductFilterOptionsResponse
 | field | type | required | format | notes |
@@ -1673,7 +1675,7 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 |---|---|---|---|---|
 | labels | string[] | yes |  | hourly time-bucket labels (native M[60] granularity) |
 | series | UphPerformanceTrendSeriesItem[] | yes |  | see data-shape-contract.md §3.29 Trend for the full per-item shape |
-| group_by | string | yes |  | closed enum: equipment_id, family, or package (default family) |
+| group_by | string | yes |  | closed enum: equipment_id, family, model, package, die_count, or wire_count (default family) |
 
 ### UphPerformanceRankingResponse
 | field | type | required | format | notes |

@@ -70,12 +70,14 @@ def _parse_list_param(name: str) -> List[str]:
 
 def _parse_fine_filters() -> Dict[str, Any]:
     """Parse the shared fine-filter axes (data-shape §3.29): equipment_id,
-    workcenter_name, package, pj_type."""
+    workcenter_name, package, pj_type, die_count, wire_count."""
     return {
         "equipment_id": _parse_list_param("equipment_id") or None,
         "workcenter_name": _parse_list_param("workcenter_name") or None,
         "package": _parse_list_param("package") or None,
         "pj_type": _parse_list_param("pj_type") or None,
+        "die_count": _parse_list_param("die_count") or None,
+        "wire_count": _parse_list_param("wire_count") or None,
     }
 
 

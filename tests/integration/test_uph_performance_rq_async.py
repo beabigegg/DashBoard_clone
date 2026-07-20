@@ -328,11 +328,14 @@ class TestUphPerformanceWorkerBridges:
 
         lot_product_df = pd.DataFrame({
             "LOT_ID": ["LOT001"], "PACKAGE": ["PKG-A"], "PJ_TYPE": ["TYPE-A"],
-            "PJ_BOP": ["BOP-A"], "PJ_FUNCTION": ["FUNC-A"],
+            "PJ_BOP": ["BOP-A"], "PJ_FUNCTION": ["FUNC-A"], "PRODUCTNAME": ["PROD-A"],
         })
         workcenter_df = pd.DataFrame({
             "EQUIPMENT_ID": ["GDBA-01"], "WORKCENTERNAME": ["焊接_DB_1線"],
             "DB_WB_LABEL": ["焊接_DB"],
+        })
+        mes_product_df = pd.DataFrame({
+            "PRODUCTNAME": ["PROD-A"], "DIE_COUNT": [12], "WIRE_COUNT": [4],
         })
 
         with patch(
@@ -341,6 +344,9 @@ class TestUphPerformanceWorkerBridges:
         ), patch(
             "mes_dashboard.workers.uph_performance_worker._safe_workcenter_df",
             return_value=workcenter_df,
+        ), patch(
+            "mes_dashboard.workers.uph_performance_worker._safe_mes_product_df",
+            return_value=mes_product_df,
         ), patch(
             "mes_dashboard.core.query_spool_store.register_spool_file",
             return_value=True,
@@ -352,6 +358,8 @@ class TestUphPerformanceWorkerBridges:
         assert df.loc[0, "PJ_TYPE"] == "TYPE-A"
         assert df.loc[0, "WORKCENTERNAME"] == "焊接_DB_1線"
         assert df.loc[0, "DB_WB_LABEL"] == "焊接_DB"
+        assert df.loc[0, "DIE_COUNT"] == "12"
+        assert df.loc[0, "WIRE_COUNT"] == "4"
 
     def test_worker_fn_time_chunks_never_exceed_6h(self):
         """Structural: chunk_strategy=TIME + window size (UPH-01)."""

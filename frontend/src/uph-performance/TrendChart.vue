@@ -31,6 +31,8 @@ const GROUP_BY_OPTIONS = Object.freeze([
   { value: 'model', label: '機型' },
   { value: 'equipment_id', label: '機台' },
   { value: 'package', label: 'Package' },
+  { value: 'die_count', label: '晶粒數' },
+  { value: 'wire_count', label: '打線數' },
 ]);
 
 interface TrendSeries {
@@ -62,12 +64,8 @@ const chartOption = computed(() => {
     },
     // Legend clicks toggle series visibility — standard ECharts behavior,
     // confirmed #5. No extra handler needed to enable this.
-    legend: {
-      data: seriesData.map((s) => s.name),
-      bottom: 0,
-      type: 'scroll',
-    },
-    grid: { left: 60, right: 24, top: 20, bottom: 60, containLabel: false },
+    legend: { data: seriesData.map((s) => s.name), top: 4, type: 'scroll' },
+    grid: { left: 60, right: 24, top: 40, bottom: 72, containLabel: true },
     xAxis: {
       type: 'category',
       data: labels,
@@ -106,7 +104,7 @@ const chartOption = computed(() => {
 </script>
 
 <template>
-  <section class="card ui-card">
+  <section class="card ui-card trend-chart-card">
     <div class="card-header ui-card-header">
       <div class="card-title ui-card-title">UPH 趨勢</div>
       <div class="trend-groupby-toggle" data-testid="ctrl-trend-groupby">

@@ -97,6 +97,40 @@ describe('useUphPerformanceViews', () => {
     });
   });
 
+  describe('fetchFilterOptions fine-filter cross-narrowing params', () => {
+    it('with no fineParams (default {}), calls the endpoint with only query_id (unchanged post-spool call site)', async () => {
+      apiGetMock.mockResolvedValueOnce({ data: { equipment_id_options: ['GDBA-001'] } });
+      const result = await views.fetchFilterOptions('q-1');
+      expect(apiGetMock).toHaveBeenCalledTimes(1);
+      const calledUrl = apiGetMock.mock.calls[0][0];
+      expect(calledUrl).toContain('/api/uph-performance/filter-options');
+      expect(calledUrl).toContain('query_id=q-1');
+      expect(calledUrl).not.toContain('equipment_id');
+      expect(result).toEqual({ equipment_id_options: ['GDBA-001'] });
+    });
+
+    it('merges fineParams into the query string, mirroring fetchTrend/fetchDetail', async () => {
+      apiGetMock.mockResolvedValueOnce({ data: {} });
+      await views.fetchFilterOptions('q-1', { 'equipment_id[]': ['GDBA-001'], 'package[]': ['PKG-X'] });
+      const calledUrl = apiGetMock.mock.calls[0][0];
+      expect(calledUrl).toContain('query_id=q-1');
+      expect(calledUrl).toContain('equipment_id%5B%5D=GDBA-001');
+      expect(calledUrl).toContain('package%5B%5D=PKG-X');
+    });
+
+    it('returns null (not throwing) when queryId is falsy, without calling the API', async () => {
+      const result = await views.fetchFilterOptions('', { 'equipment_id[]': ['GDBA-001'] });
+      expect(apiGetMock).not.toHaveBeenCalled();
+      expect(result).toBeNull();
+    });
+
+    it('returns null when the response has success:false', async () => {
+      apiGetMock.mockResolvedValueOnce({ success: false });
+      const result = await views.fetchFilterOptions('q-1', { 'package[]': ['PKG-X'] });
+      expect(result).toBeNull();
+    });
+  });
+
   describe('fetchDetail per_page cap', () => {
     it('clamps per_page to the contract max of 200', async () => {
       apiGetMock.mockResolvedValueOnce({ data: { rows: [], meta: { page: 1, per_page: 200, total_count: 0, total_pages: 1 } } });

@@ -5,11 +5,12 @@ All DuckDB views operate solely on the spool parquet (data-shape §3.29). No
 Oracle re-query after the spool is built -- mirrors eap_alarm_service.py's
 view-derivation pattern (docs/architecture/service-patterns.md).
 
-Spool schema (v1) columns (data-shape §3.29):
+Spool schema (v3) columns (data-shape §3.29):
   LOT_ID, EQUIPMENT_ID, EQUIPMENT_FAMILY, EVENT_TIME, PARAMETER_NAME,
-  UPH_VALUE (nullable), WORKCENTERNAME (nullable), DB_WB_LABEL (nullable),
-  PACKAGE (nullable), PJ_TYPE (nullable), PJ_BOP (nullable),
-  PJ_FUNCTION (nullable), coarse_filter_hash
+  UPH_VALUE (nullable), WORKCENTERNAME (nullable), MODEL (nullable),
+  DB_WB_LABEL (nullable), PACKAGE (nullable), PJ_TYPE (nullable),
+  PJ_BOP (nullable), PJ_FUNCTION (nullable), DIE_COUNT (nullable),
+  WIRE_COUNT (nullable), coarse_filter_hash
 
 Public API:
   validate_uph_performance_params(date_from, date_to, families, equipment_ids) -> raises ValueError
@@ -88,11 +89,23 @@ _EXACT_FILTER_COLUMNS: Dict[str, str] = {
     "workcenter_name": "WORKCENTERNAME",
     "package": "PACKAGE",
     "pj_type": "PJ_TYPE",
+    "die_count": "DIE_COUNT",
+    "wire_count": "WIRE_COUNT",
 }
 
 
-def _build_filter_where(filters: Optional[Dict[str, Any]] = None) -> tuple[str, list]:
-    """Build a WHERE clause from fine filters (never inlines user values)."""
+def _build_filter_where(
+    filters: Optional[Dict[str, Any]] = None,
+    exclude: Optional[str] = None,
+) -> tuple[str, list]:
+    """Build a WHERE clause from fine filters (never inlines user values).
+
+    ``exclude`` optionally omits one axis's own filter from the clause --
+    used by get_filter_options() so narrowing one axis's option list by the
+    OTHER axes' selections never also self-excludes down to just what's
+    already selected on that same axis (which would silently break that
+    axis's own MultiSelect's ability to add more values).
+    """
     clauses: List[str] = []
     params: List[Any] = []
 
@@ -100,6 +113,8 @@ def _build_filter_where(filters: Optional[Dict[str, Any]] = None) -> tuple[str, 
         filters = {}
 
     for key, column in _EXACT_FILTER_COLUMNS.items():
+        if key == exclude:
+            continue
         values = [str(v) for v in (filters.get(key) or []) if v is not None]
         if values:
             placeholders = ", ".join("?" for _ in values)
@@ -116,13 +131,22 @@ def _build_filter_where(filters: Optional[Dict[str, Any]] = None) -> tuple[str, 
 def get_filter_options(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> dict:
     """Distinct fine-filter options derived from the DuckDB spool (data-shape §3.29).
 
+    Cross-filter narrowing: each axis's option list is narrowed by every
+    OTHER axis's currently-selected filter values (e.g. selecting a Type
+    narrows the Package/die_count/wire_count option lists to only values
+    that actually co-occur with that Type in the spool). Self-exclusion
+    guarantee: an axis's own option list is NEVER narrowed by its own
+    current selection -- only by the other axes' selections -- so selecting
+    a value on an axis can never shrink that same axis's own option list
+    down to just what's already selected (which would silently break that
+    axis's MultiSelect's ability to add more values).
+
     NULL column values are excluded from option lists.
     """
     conn = _get_duckdb_conn()
     try:
-        where_sql, where_params = _build_filter_where(filters)
-
-        def _distinct(column: str) -> List[str]:
+        def _distinct(column: str, exclude_key: str) -> List[str]:
+            where_sql, where_params = _build_filter_where(filters, exclude=exclude_key)
             return [
                 row[0]
                 for row in conn.execute(f"""
@@ -135,10 +159,12 @@ def get_filter_options(spool_path: str, filters: Optional[Dict[str, Any]] = None
             ]
 
         return {
-            "equipment_id_options": _distinct("EQUIPMENT_ID"),
-            "workcenter_name_options": _distinct("WORKCENTERNAME"),
-            "package_options": _distinct("PACKAGE"),
-            "pj_type_options": _distinct("PJ_TYPE"),
+            "equipment_id_options": _distinct("EQUIPMENT_ID", "equipment_id"),
+            "workcenter_name_options": _distinct("WORKCENTERNAME", "workcenter_name"),
+            "package_options": _distinct("PACKAGE", "package"),
+            "pj_type_options": _distinct("PJ_TYPE", "pj_type"),
+            "die_count_options": _distinct("DIE_COUNT", "die_count"),
+            "wire_count_options": _distinct("WIRE_COUNT", "wire_count"),
         }
     finally:
         conn.close()
@@ -153,6 +179,8 @@ GROUP_DIMENSIONS: Dict[str, str] = {
     "family": "EQUIPMENT_FAMILY",
     "model": "MODEL",
     "package": "PACKAGE",
+    "die_count": "DIE_COUNT",
+    "wire_count": "WIRE_COUNT",
 }
 
 

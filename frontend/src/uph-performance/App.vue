@@ -24,9 +24,6 @@ const {
   fineFilter,
   rankingTypeFilter,
   filterOptions,
-  productFilterOptions,
-  productOptionsLoading,
-  productOptionsError,
   machineOptions,
   machineOptionsLoading,
   machineOptionsError,
@@ -95,18 +92,23 @@ onMounted(() => {
 watch(
   () => [
     fineFilter.equipment_id,
-    fineFilter.workcenter_name,
     fineFilter.package,
     fineFilter.pj_type,
+    fineFilter.die_count,
+    fineFilter.wire_count,
   ],
   async () => {
     if (!queryId.value) return;
     detailPage.value = 1;
     const params = buildFineFilterParams();
-    await Promise.all([
+    const [, , options] = await Promise.all([
       fetchTrend(queryId.value, params, trendGroupBy.value),
       fetchDetail(queryId.value, params, 1, detailPerPage.value),
+      fetchFilterOptions(queryId.value, params),
     ]);
+    if (options) {
+      applyFilterOptions(options);
+    }
   },
   { deep: true },
 );
@@ -314,9 +316,6 @@ async function handleFineFilterChange(): Promise<void> {
         :machine-options="machineOptions"
         :machine-options-loading="machineOptionsLoading"
         :machine-options-error="machineOptionsError"
-        :product-filter-options="productFilterOptions"
-        :product-options-loading="productOptionsLoading"
-        :product-options-error="productOptionsError"
         :loading="{ querying: queryLoading }"
         @update:filters="(val) => Object.assign(coarseFilter, val)"
         @submit="handleSubmit"
