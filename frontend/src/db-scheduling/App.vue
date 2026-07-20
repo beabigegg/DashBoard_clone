@@ -18,7 +18,22 @@ interface QueueRow {
   eqpUts: string | null;
   targetSpec: string;
   equipment: string;
-  matchSource: 'workflow' | 'bop-fallback' | 'none';
+  // Single-tier BOP+Package+zone match (2026-07 rule rewrite — see
+  // db_scheduling_service.py). 'bop-package-zone' is the only value ever
+  // emitted for a row; there is no more 'workflow'/'bop-fallback' two-tier
+  // distinction, and 'none' is never emitted as a row (unmatched lots simply
+  // produce zero rows).
+  matchSource: 'bop-package-zone';
+  // 'live' = equipment's shown attributes came from its currently-ACTIVE lot;
+  // 'history' = equipment is currently idle, attributes resolved via lookback history.
+  equipmentSource: 'live' | 'history';
+}
+
+// One recommended machine, carrying enough to render both the pill label
+// and its live/history visual treatment.
+interface PillEquipment {
+  equipment: string;
+  equipmentSource: 'live' | 'history';
 }
 
 interface LotEntry {
@@ -30,9 +45,9 @@ interface LotEntry {
   uts: string | null;
   qty: number;
   bop: string | null;
-  matchSource: 'workflow' | 'bop-fallback';
-  // key = priority group id; value = sorted equipment IDs
-  priorityMap: Record<string, string[]>;
+  matchSource: 'bop-package-zone';
+  // key = priority group id; value = sorted equipment entries
+  priorityMap: Record<string, PillEquipment[]>;
 }
 
 type PriorityGroup = 'pkg_type_wl' | 'pkg_type' | 'pkg_wl' | 'pkg' | 'none';
@@ -171,19 +186,19 @@ const lotEntries = computed((): LotEntry[] => {
     const first = lotRows[0];
 
     // Group machines by similarity; within each group sort by eqpUts ASC NULLS LAST.
-    type Item = { equipment: string; eqpUts: string | null };
+    type Item = { equipment: string; eqpUts: string | null; equipmentSource: 'live' | 'history' };
     const temp: Partial<Record<PriorityGroup, Item[]>> = {};
     for (const row of lotRows) {
       const grp = priorityGroup(first.packageLef, first.pjType, first.waferLot, row);
       if (!temp[grp]) temp[grp] = [];
-      temp[grp]!.push({ equipment: row.equipment, eqpUts: row.eqpUts });
+      temp[grp]!.push({ equipment: row.equipment, eqpUts: row.eqpUts, equipmentSource: row.equipmentSource });
     }
 
-    const priorityMap: Record<string, string[]> = {};
+    const priorityMap: Record<string, PillEquipment[]> = {};
     for (const grp in temp) {
       priorityMap[grp] = temp[grp as PriorityGroup]!
         .sort((a, b) => compareNullsLast(a.eqpUts, b.eqpUts))
-        .map(i => i.equipment);
+        .map(i => ({ equipment: i.equipment, equipmentSource: i.equipmentSource }));
     }
 
     return {
@@ -195,7 +210,10 @@ const lotEntries = computed((): LotEntry[] => {
       uts: first.uts,
       qty: first.qty,
       bop: first.bop,
-      matchSource: lotRows.some(r => r.matchSource === 'workflow') ? 'workflow' : 'bop-fallback',
+      // Every row the backend emits for a lot already carries the same
+      // single-tier match value — pass it through rather than re-deriving a
+      // now-nonexistent 'workflow' vs 'bop-fallback' distinction.
+      matchSource: first.matchSource,
       priorityMap,
     };
   });
@@ -221,11 +239,23 @@ function isCellExpanded(lotId: string, groupKey: string): boolean {
 
 const PILL_PREVIEW = 2; // pills shown before "+N" overflow button
 
-function matchSourceLabel(src: 'workflow' | 'bop-fallback'): string {
-  return src === 'workflow' ? 'Workflow' : 'BOP 回退';
+// Single-tier BOP+Package+zone match — every emitted row satisfies the exact
+// same rule (see db_scheduling_service.py), so this badge is informational
+// only; it is no longer a primary/fallback confidence tier and must not use
+// the warning color (that previously signaled "lower-confidence fallback").
+function matchSourceLabel(src: 'bop-package-zone'): string {
+  return 'BOP+Package+區域';
 }
-function matchSourceClass(src: 'workflow' | 'bop-fallback'): string {
-  return src === 'workflow' ? 'match-badge badge-success' : 'match-badge badge-warning';
+function matchSourceClass(src: 'bop-package-zone'): string {
+  return 'match-badge badge-muted';
+}
+
+// Live = equipment is currently ACTIVE running the lot whose attributes are shown;
+// history = equipment is currently idle and was surfaced via lookback history.
+function pillSourceTitle(source: 'live' | 'history'): string | undefined {
+  return source === 'history'
+    ? '此設備目前閒置，依歷史生產紀錄推薦（非現役中）'
+    : undefined;
 }
 
 // ── Pill detail popup ───────────────────────────────────────────────────────
@@ -452,14 +482,17 @@ function e10StatusClass(status: string | null): string {
                 <!-- Preview: always show first PILL_PREVIEW pills -->
                 <div class="pills-preview">
                   <span
-                    v-for="eqp in lot.priorityMap[col.key].slice(0, PILL_PREVIEW)"
-                    :key="eqp"
+                    v-for="item in lot.priorityMap[col.key].slice(0, PILL_PREVIEW)"
+                    :key="item.equipment"
                     class="machine-pill"
+                    :class="{ 'pill-source-history': item.equipmentSource === 'history' }"
+                    :data-equipment-source="item.equipmentSource"
+                    :title="pillSourceTitle(item.equipmentSource)"
                     role="button"
                     tabindex="0"
-                    @click.stop="openPillDetail($event, eqp)"
-                    @keydown.enter.stop="openPillDetail($event, eqp)"
-                  >{{ eqp }}</span>
+                    @click.stop="openPillDetail($event, item.equipment)"
+                    @keydown.enter.stop="openPillDetail($event, item.equipment)"
+                  >{{ item.equipment }}<span v-if="item.equipmentSource === 'history'" class="pill-source-tag">(歷史)</span></span>
                   <!-- Overflow badge when collapsed -->
                   <span
                     v-if="lot.priorityMap[col.key].length > PILL_PREVIEW && !isCellExpanded(lot.lotId, col.key)"
@@ -473,14 +506,17 @@ function e10StatusClass(status: string | null): string {
                   class="pills-grid"
                 >
                   <span
-                    v-for="eqp in lot.priorityMap[col.key].slice(PILL_PREVIEW)"
-                    :key="eqp"
+                    v-for="item in lot.priorityMap[col.key].slice(PILL_PREVIEW)"
+                    :key="item.equipment"
                     class="machine-pill"
+                    :class="{ 'pill-source-history': item.equipmentSource === 'history' }"
+                    :data-equipment-source="item.equipmentSource"
+                    :title="pillSourceTitle(item.equipmentSource)"
                     role="button"
                     tabindex="0"
-                    @click.stop="openPillDetail($event, eqp)"
-                    @keydown.enter.stop="openPillDetail($event, eqp)"
-                  >{{ eqp }}</span>
+                    @click.stop="openPillDetail($event, item.equipment)"
+                    @keydown.enter.stop="openPillDetail($event, item.equipment)"
+                  >{{ item.equipment }}<span v-if="item.equipmentSource === 'history'" class="pill-source-tag">(歷史)</span></span>
                 </div>
               </template>
               <span v-else class="cell-empty" aria-hidden="true">—</span>

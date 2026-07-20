@@ -29,7 +29,11 @@ db_scheduling_bp = Blueprint(
 def get_queue():
     """GET /api/db-scheduling/queue — return DB scheduling queue.
 
-    Returns one row per recommended equipment per D/B-START lot.
+    Returns one row per recommended equipment per 晶片切割-END lot (rewritten
+    2026-07; was D/B-START). Each row now also carries 'equipmentSource'
+    ('live' | 'history') distinguishing currently-ACTIVE equipment from
+    currently-idle equipment resolved via the LOTWIPHISTORY fallback — see
+    services/db_scheduling_service.py module docstring for the full rule.
     No query parameters; auth required (middleware handles 401).
 
     Returns:

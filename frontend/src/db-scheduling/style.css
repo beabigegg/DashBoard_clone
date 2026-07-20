@@ -318,6 +318,30 @@
   outline: none;
 }
 
+/* Equipment recommendation source — live (currently-ACTIVE, default pill look above)
+ * vs history (currently idle, surfaced via lookback history). Dashed border + inline
+ * "(歷史)" tag keeps the two states distinguishable without a full layout change. */
+.theme-db-scheduling .machine-pill.pill-source-history {
+  background: theme('colors.surface.app');
+  border-style: dashed;
+  border-color: theme('colors.state.info');
+  color: theme('colors.text.secondary');
+}
+
+.theme-db-scheduling .machine-pill.pill-source-history:hover,
+.theme-db-scheduling .machine-pill.pill-source-history:focus-visible {
+  border-color: theme('colors.state.info');
+  background: theme('colors.surface.hover');
+  color: theme('colors.text.primary');
+}
+
+.theme-db-scheduling .pill-source-tag {
+  margin-left: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  color: theme('colors.state.info');
+}
+
 .theme-db-scheduling .pill-overflow {
   display: inline-block;
   padding: 2px 7px;

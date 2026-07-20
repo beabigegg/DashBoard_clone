@@ -1,14 +1,26 @@
 # -*- coding: utf-8 -*-
 """Unit tests for db_scheduling_service.get_db_scheduling_queue().
 
+Rewritten 2026-07 for the business-rule change that replaced the
+D/B-START/WORKFLOWNAME matching model with a 晶片切割-END/BOP+PACKAGE+zone
+model (see db_scheduling_service.py module docstring for the full rule).
+
 Tests cover:
-- DB-01: D/B-START lot identification
-- DB-02: Primary WORKFLOWNAME match → matchSource='workflow'
-- DB-03: BOP fallback routing (U/E/P prefixes) → matchSource='bop-fallback'
-- DB-03: Unknown/null BOP → zero rows, no error (matchSource='none')
+- DB-00: SPEC list membership pinned via constant (unchanged)
+- DB-01: 晶片切割-END lot identification (replaces D/B-START)
+- Single-tier match: condition (a) BOP-derived SPEC group, condition (b)
+  PACKAGE equality, condition (c) BOP-derived equipment zone
+  - BOP='U': zone depends on the waiting lot's own PJ_PRODUCEREGION
+    (A棟 → {A,B,C}; D區 → {D}; any other region incl. 'E區'/None → zero rows)
+  - BOP='E': zone fixed to 焊接D區 regardless of the waiting lot's region
+  - BOP='P': zone fixed to 焊接E區 regardless of the waiting lot's region
+  - Unknown/null BOP → zero rows, no error
+  - PACKAGE mismatch → zero candidates
+- Idle-equipment history fallback (equipmentSource='history'):
+  match / no-history-data / spec-not-allowed / package-mismatch / wrong-zone
 - DB-04: Sort order PACKAGE_LEF → PJ_TYPE → WAFERLOT → UTS, NULLS LAST
 - Cache-miss path (get_cached_wip_data returns None)
-- DB-00 SPEC list membership pinned via constant
+- Row shape: 16 required fields including the new 'equipmentSource'
 """
 
 from __future__ import annotations
@@ -25,7 +37,7 @@ from mes_dashboard.services.db_scheduling_service import (
 
 
 # ---------------------------------------------------------------------------
-# DB-00 membership pin
+# DB-00 membership pin (unchanged by the 2026-07 rewrite)
 # ---------------------------------------------------------------------------
 
 class TestDb00SpecList:
@@ -44,10 +56,10 @@ class TestDb00SpecList:
 
     def test_bop_fallback_groups_union_subset_of_db_process_specs(self):
         """Every spec in BOP_FALLBACK_GROUPS must be in DB_PROCESS_SPECS."""
-        all_fallback_specs = set()
+        all_grouped_specs = set()
         for specs in BOP_FALLBACK_GROUPS.values():
-            all_fallback_specs.update(specs)
-        assert all_fallback_specs <= DB_PROCESS_SPECS
+            all_grouped_specs.update(specs)
+        assert all_grouped_specs <= DB_PROCESS_SPECS
 
 
 # ---------------------------------------------------------------------------
@@ -59,15 +71,16 @@ def _make_wip_df(**kwargs):
     defaults = {
         'LOTID': 'LOT001',
         'WORKFLOWNAME': 'WF-A',
-        'PACKAGE_LEF': 'SOT-23',
+        'PACKAGE_LEF': 'PKG-DEFAULT',
         'PJ_TYPE': 'TypeA',
         'WAFERLOT': 'WL-001',
         'UTS': '2026/01/15',
         'QTY': 100,
         'BOP': 'U-Eutectic',
-        'SPECNAME': 'D/B-START',
+        'SPECNAME': '晶片切割-END',
         'STATUS': 'ACTIVE',
         'EQUIPMENTS': None,
+        'PJ_PRODUCEREGION': 'A棟',
     }
     defaults.update(kwargs)
     return defaults
@@ -78,325 +91,408 @@ def _df(*rows):
     return pd.DataFrame(rows)
 
 
+def _resource(name, workcenter='焊接_DB', location='焊接A區'):
+    """Build a resource_cache.get_all_resources()-shaped record."""
+    return {'RESOURCENAME': name, 'WORKCENTERNAME': workcenter, 'LOCATIONNAME': location}
+
+
+def _idle_history_df(**rows_kwargs):
+    """Build a single-row DataFrame shaped like the idle_equipment_history.sql result."""
+    defaults = {
+        'EQUIPMENTNAME': 'EQ-IDLE',
+        'SPECNAME': 'Eutectic D/B',
+        'PACKAGE_LF': 'PKG-DEFAULT',
+        'TRACKOUTTIMESTAMP': pd.Timestamp('2026-07-01'),
+    }
+    defaults.update(rows_kwargs)
+    return pd.DataFrame([defaults])
+
+
+def _run_queue(wip_df, resources=None, idle_history_df=None):
+    """Run get_db_scheduling_queue() with the WIP cache, resource cache, and
+    idle-equipment-history Oracle query all mocked.
+
+    resources: list of resource_cache records (defaults to [] — resource
+        cache unavailable/empty, which is fail-closed: zero zone matches).
+    idle_history_df: DataFrame returned by the idle-equipment-history
+        read_sql_df() call (defaults to None — no idle-history rows).
+    """
+    with patch(
+        'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
+        return_value=wip_df,
+    ), patch(
+        'mes_dashboard.services.resource_cache.get_all_resources',
+        return_value=resources or [],
+    ), patch(
+        'mes_dashboard.services.db_scheduling_service.read_sql_df',
+        return_value=idle_history_df,
+    ):
+        return get_db_scheduling_queue()
+
+
 # ---------------------------------------------------------------------------
-# AC-1: D/B-START lot identification
+# DB-01: 晶片切割-END lot identification
 # ---------------------------------------------------------------------------
 
 class TestStartLotFiltering:
-    """AC-1 / DB-01: only rows with SPECNAME='D/B-START' are start lots."""
+    """DB-01: only rows with SPECNAME='晶片切割-END' are start lots."""
 
     def test_start_lots_filtered_by_specname(self):
-        """Only lots whose SPECNAME == 'D/B-START' appear as candidates."""
+        """Only lots whose SPECNAME == '晶片切割-END' appear as candidates."""
         wip = _df(
-            _make_wip_df(LOTID='LOT-DB-START', SPECNAME='D/B-START', BOP='U-test'),
-            _make_wip_df(LOTID='LOT-OTHER', SPECNAME='1DB', STATUS='ACTIVE',
-                         EQUIPMENTS='EQ-001', WORKFLOWNAME='WF-A'),
+            _make_wip_df(LOTID='LOT-CUT-END', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟',
+                         PACKAGE_LEF='PKG-A'),
+            _make_wip_df(LOTID='LOT-OTHER-SPEC', SPECNAME='其他站', STATUS='ACTIVE'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-001', PACKAGE_LEF='PKG-A'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+        resources = [_resource('EQ-001', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
         lot_ids = {r['lotId'] for r in result}
-        # LOT-DB-START is a start lot (SPECNAME='D/B-START').
-        # LOT-OTHER is a running-eqp candidate, not a start lot.
-        assert 'LOT-OTHER' not in lot_ids
+        assert 'LOT-CUT-END' in lot_ids
+        assert 'LOT-OTHER-SPEC' not in lot_ids
+        # RUN-LOT is a candidate equipment's own lot, never an output lotId
+        assert 'RUN-LOT' not in lot_ids
 
     def test_null_bop_returns_empty_rows(self):
-        """A D/B-START lot with null BOP and no workflow match yields zero rows, no exception."""
+        """A start lot with null BOP yields zero rows, no exception."""
         wip = _df(
-            # Start lot with null BOP and workflow WF-ORPHAN (no match in running pool)
-            _make_wip_df(LOTID='LOT-NULL-BOP', SPECNAME='D/B-START',
-                         BOP=None, WORKFLOWNAME='WF-ORPHAN'),
-            # Running lot in Eutectic group with DIFFERENT workflow → no primary match
-            _make_wip_df(LOTID='EQ-LOT', SPECNAME='Eutectic D/B',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-001', WORKFLOWNAME='WF-A'),
+            _make_wip_df(LOTID='LOT-NULL-BOP', SPECNAME='晶片切割-END',
+                         BOP=None, PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-A'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-001', PACKAGE_LEF='PKG-A'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        lot_ids = {r['lotId'] for r in result}
-        # Null BOP with no workflow match → matchSource='none' → zero rows
-        assert 'LOT-NULL-BOP' not in lot_ids
+        resources = [_resource('EQ-001', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
         assert result == []
 
 
 # ---------------------------------------------------------------------------
-# AC-2: Primary WORKFLOWNAME match
+# Condition (a)+(c): BOP='U' zone depends on the waiting lot's own region
 # ---------------------------------------------------------------------------
 
-class TestWorkflowMatch:
-    """AC-2 / DB-02: primary match on WORKFLOWNAME gives matchSource='workflow'."""
+class TestBopURegionZone:
+    """BOP[0]='U': allowed zone depends on the waiting lot's PJ_PRODUCEREGION."""
 
-    def test_workflow_match_primary(self):
-        """When WORKFLOWNAME matches a running-eqp row, matchSource='workflow'."""
-        wip = _df(
-            _make_wip_df(LOTID='START-LOT', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-ALPHA', BOP='U-test'),
-            _make_wip_df(LOTID='RUN-LOT', SPECNAME='1DB',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-001',
-                         WORKFLOWNAME='WF-ALPHA'),
-        )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        workflow_rows = [r for r in result if r['lotId'] == 'START-LOT']
-        assert len(workflow_rows) >= 1
-        assert all(r['matchSource'] == 'workflow' for r in workflow_rows)
+    def _wip(self, region, eqp_location, spec='Eutectic D/B', package='PKG-U'):
+        return _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION=region, PACKAGE_LEF=package),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME=spec, STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-U', PACKAGE_LEF=package),
+        ), [_resource('EQ-U', location=eqp_location)]
 
-    def test_workflow_match_sets_equipment(self):
-        """The matched equipment from EQUIPMENTS is propagated to 'equipment'."""
-        wip = _df(
-            _make_wip_df(LOTID='START-LOT', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-ALPHA', BOP=None),
-            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Eutectic D/B',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-007',
-                         WORKFLOWNAME='WF-ALPHA'),
-        )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        workflow_rows = [r for r in result if r['lotId'] == 'START-LOT']
-        assert any(r['equipment'] == 'EQ-007' for r in workflow_rows)
+    def test_region_a_dong_allows_zone_abc(self):
+        """PJ_PRODUCEREGION='A棟' → equipment at 焊接B區 (within A/B/C) matches."""
+        wip, resources = self._wip('A棟', '焊接B區')
+        result = _run_queue(wip, resources=resources)
+        assert len(result) == 1
+        assert result[0]['equipment'] == 'EQ-U'
+        assert result[0]['matchSource'] == 'bop-package-zone'
+        assert result[0]['equipmentSource'] == 'live'
 
-    def test_workflow_match_requires_active_status(self):
-        """Running-eqp pool only includes STATUS='ACTIVE' rows."""
-        wip = _df(
-            _make_wip_df(LOTID='START-LOT', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-ALPHA', BOP=None),
-            # This RUN lot has ACTIVE=False — should NOT be in pool
-            _make_wip_df(LOTID='RUN-HOLD', SPECNAME='1DB',
-                         STATUS='HOLD', EQUIPMENTS='EQ-HOLD',
-                         WORKFLOWNAME='WF-ALPHA'),
-        )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        # No match → no rows (null BOP → matchSource=none → zero rows)
+    def test_region_d_qu_allows_only_zone_d(self):
+        """PJ_PRODUCEREGION='D區' → equipment at 焊接D區 matches."""
+        wip, resources = self._wip('D區', '焊接D區')
+        result = _run_queue(wip, resources=resources)
+        assert len(result) == 1
+        assert result[0]['equipment'] == 'EQ-U'
+
+    def test_region_d_qu_rejects_zone_a(self):
+        """PJ_PRODUCEREGION='D區' → equipment at 焊接A區 does NOT match."""
+        wip, resources = self._wip('D區', '焊接A區')
+        result = _run_queue(wip, resources=resources)
         assert result == []
 
-    def test_workflow_match_requires_non_null_equipments(self):
-        """EQUIPMENTS IS NULL rows are excluded from primary match pool."""
-        wip = _df(
-            _make_wip_df(LOTID='START-LOT', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-ALPHA', BOP=None),
-            _make_wip_df(LOTID='RUN-NO-EQ', SPECNAME='1DB',
-                         STATUS='ACTIVE', EQUIPMENTS=None,
-                         WORKFLOWNAME='WF-ALPHA'),
-        )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+    @pytest.mark.parametrize('region', ['E區', None, 'X-unknown-region'])
+    def test_other_regions_yield_zero_candidates(self, region):
+        """Any region other than A棟/D區 (incl. 'E區', None, unknown) → zero rows."""
+        wip, resources = self._wip(region, '焊接A區')
+        result = _run_queue(wip, resources=resources)
         assert result == []
 
 
 # ---------------------------------------------------------------------------
-# AC-3: BOP fallback
+# Condition (c): BOP='E'/'P' fixed zones (independent of the lot's own region)
 # ---------------------------------------------------------------------------
 
-class TestBopFallback:
-    """AC-3 / DB-03: BOP first-char dispatch to equipment groups."""
+class TestBopFixedZones:
+    """BOP[0]='E'/'P': allowed zone is FIXED, regardless of the waiting lot's
+    own PJ_PRODUCEREGION."""
 
-    def _start_lot(self, bop):
-        return _make_wip_df(LOTID='START-LOT', SPECNAME='D/B-START',
-                            WORKFLOWNAME='NO-MATCH-WF', BOP=bop)
-
-    def _running_lot(self, specname, eqp='EQ-RUN'):
-        return _make_wip_df(LOTID=f'RUN-{specname}', SPECNAME=specname,
-                            STATUS='ACTIVE', EQUIPMENTS=eqp,
-                            WORKFLOWNAME='OTHER-WF')
-
-    def test_bop_fallback_U(self):
-        """BOP[0]='U' → equipment from Eutectic/1DB/2DB group, matchSource='bop-fallback'."""
+    def test_bop_e_fixed_zone_d_matches_regardless_of_lot_region(self):
+        """BOP='E', lot region='A棟' (would allow A/B/C under U-rules) — but
+        equipment at 焊接D區 (the FIXED zone for E) still matches."""
         wip = _df(
-            self._start_lot('U-test'),
-            self._running_lot('Eutectic D/B', 'EQ-EUTECTIC'),
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='E-epoxy', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-E'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Epoxy D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-EPOXY', PACKAGE_LEF='PKG-E'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        assert len(result) >= 1
-        assert all(r['matchSource'] == 'bop-fallback' for r in result)
-        assert any(r['equipment'] == 'EQ-EUTECTIC' for r in result)
+        resources = [_resource('EQ-EPOXY', location='焊接D區')]
+        result = _run_queue(wip, resources=resources)
+        assert len(result) == 1
+        assert result[0]['equipment'] == 'EQ-EPOXY'
+        assert result[0]['targetSpec'] == 'Epoxy D/B'
 
-    def test_bop_fallback_E(self):
-        """BOP[0]='E' → equipment from Epoxy D/B group, matchSource='bop-fallback'."""
+    def test_bop_e_rejects_wrong_zone(self):
+        """BOP='E' equipment located outside 焊接D區 does NOT match."""
         wip = _df(
-            self._start_lot('E-epoxy'),
-            self._running_lot('Epoxy D/B', 'EQ-EPOXY'),
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='E-epoxy', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-E'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Epoxy D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-EPOXY', PACKAGE_LEF='PKG-E'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        assert len(result) >= 1
-        assert all(r['matchSource'] == 'bop-fallback' for r in result)
-        assert any(r['equipment'] == 'EQ-EPOXY' for r in result)
-
-    def test_bop_fallback_P(self):
-        """BOP[0]='P' → equipment from DBCB/Solder Paste group, matchSource='bop-fallback'."""
-        wip = _df(
-            self._start_lot('P-paste'),
-            self._running_lot('DBCB', 'EQ-DBCB'),
-        )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        assert len(result) >= 1
-        assert all(r['matchSource'] == 'bop-fallback' for r in result)
-        assert any(r['equipment'] == 'EQ-DBCB' for r in result)
-
-    def test_bop_fallback_unknown(self):
-        """BOP[0] not in U/E/P → matchSource='none', zero rows emitted."""
-        wip = _df(
-            self._start_lot('X-unknown'),
-            self._running_lot('1DB', 'EQ-1DB'),
-        )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+        resources = [_resource('EQ-EPOXY', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
         assert result == []
 
-    def test_bop_fallback_no_match_source_none_is_not_emitted(self):
-        """matchSource='none' rows are never included in output."""
+    def test_bop_p_fixed_zone_e_matches_regardless_of_lot_region(self):
+        """BOP='P', lot region=None — equipment at 焊接E區 (FIXED for P) matches."""
         wip = _df(
-            self._start_lot('Z-other'),
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='P-paste', PJ_PRODUCEREGION=None, PACKAGE_LEF='PKG-P'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='DBCB', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-DBCB', PACKAGE_LEF='PKG-P'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+        resources = [_resource('EQ-DBCB', location='焊接E區')]
+        result = _run_queue(wip, resources=resources)
+        assert len(result) == 1
+        assert result[0]['equipment'] == 'EQ-DBCB'
+
+    def test_bop_p_rejects_wrong_zone(self):
+        """BOP='P' equipment located outside 焊接E區 does NOT match."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='P-paste', PJ_PRODUCEREGION=None, PACKAGE_LEF='PKG-P'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='DBCB', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-DBCB', PACKAGE_LEF='PKG-P'),
+        )
+        resources = [_resource('EQ-DBCB', location='焊接D區')]
+        result = _run_queue(wip, resources=resources)
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Unknown/null BOP prefix
+# ---------------------------------------------------------------------------
+
+class TestUnknownBop:
+    def test_unknown_bop_prefix_zero_rows(self):
+        """BOP[0] not in U/E/P → zero rows, no error."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='X-unknown', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-A'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='1DB', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-1DB', PACKAGE_LEF='PKG-A'),
+        )
+        resources = [_resource('EQ-1DB', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
+        assert result == []
+
+    def test_no_match_source_none_is_ever_emitted(self):
+        """matchSource='none' is never included in output (unmatched lots emit
+        zero rows, not a 'none'-tagged row)."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='Z-other', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-A'),
+        )
+        result = _run_queue(wip)
         none_rows = [r for r in result if r.get('matchSource') == 'none']
         assert none_rows == []
-
-    def test_bop_fallback_only_fires_when_no_workflow_match(self):
-        """If workflow match succeeds, BOP fallback is not applied."""
-        wip = _df(
-            # Start lot with BOP='U-...' AND same WORKFLOWNAME as running lot
-            _make_wip_df(LOTID='START-LOT', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-A', BOP='U-test'),
-            # Running lot: same WORKFLOWNAME → primary match
-            _make_wip_df(LOTID='RUN-1DB', SPECNAME='1DB',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-1DB',
-                         WORKFLOWNAME='WF-A'),
-            # Another lot in Eutectic group: different WORKFLOWNAME
-            _make_wip_df(LOTID='RUN-EUTECTIC', SPECNAME='Eutectic D/B',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-EUTECTIC',
-                         WORKFLOWNAME='WF-B'),
-        )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        # All rows for START-LOT should be 'workflow', not 'bop-fallback'
-        start_rows = [r for r in result if r['lotId'] == 'START-LOT']
-        assert len(start_rows) >= 1
-        assert all(r['matchSource'] == 'workflow' for r in start_rows)
+        assert result == []
 
 
 # ---------------------------------------------------------------------------
-# AC-4: Sort order NULLS LAST
+# Condition (b): PACKAGE equality
+# ---------------------------------------------------------------------------
+
+class TestPackageMatch:
+    def test_package_mismatch_no_candidate(self):
+        """BOP/spec/zone all valid, but PACKAGE differs → zero candidates."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-WAIT'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-001', PACKAGE_LEF='PKG-DIFFERENT'),
+        )
+        resources = [_resource('EQ-001', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
+        assert result == []
+
+    def test_null_package_no_candidate(self):
+        """Start lot with PACKAGE_LEF=None never matches (rule (b) requires equality)."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF=None),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-001', PACKAGE_LEF=None),
+        )
+        resources = [_resource('EQ-001', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Idle-equipment history fallback (equipmentSource='history')
+# ---------------------------------------------------------------------------
+
+class TestIdleEquipmentHistoryFallback:
+    def test_idle_equipment_matches_via_history(self):
+        """Equipment with no live WIP row, resolved via LOTWIPHISTORY, is
+        included as a candidate with equipmentSource='history'."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-B'),
+        )
+        resources = [_resource('EQ-IDLE', workcenter='焊接_DB', location='焊接A區')]
+        idle_df = _idle_history_df(
+            EQUIPMENTNAME='EQ-IDLE', SPECNAME='Eutectic D/B', PACKAGE_LF='PKG-B',
+        )
+        result = _run_queue(wip, resources=resources, idle_history_df=idle_df)
+        assert len(result) == 1
+        row = result[0]
+        assert row['equipment'] == 'EQ-IDLE'
+        assert row['equipmentSource'] == 'history'
+        assert row['matchSource'] == 'bop-package-zone'
+        assert row['targetSpec'] == 'Eutectic D/B'
+        assert row['eqpPackageLef'] == 'PKG-B'
+
+    def test_idle_equipment_no_history_data_yields_no_candidate(self):
+        """Idle equipment with no matching LOTWIPHISTORY rows produces zero
+        candidates, no exception."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-B'),
+        )
+        resources = [_resource('EQ-IDLE', workcenter='焊接_DB', location='焊接A區')]
+        result = _run_queue(wip, resources=resources, idle_history_df=None)
+        assert result == []
+
+    def test_idle_equipment_history_spec_not_in_allowed_group(self):
+        """Idle equipment's most-recent SPECNAME not in BOP-allowed group →
+        excluded even though package/zone match."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-B'),
+        )
+        resources = [_resource('EQ-IDLE', workcenter='焊接_DB', location='焊接A區')]
+        # DBCB is in the 'P' group, not 'U' — should not match a BOP='U' lot.
+        idle_df = _idle_history_df(
+            EQUIPMENTNAME='EQ-IDLE', SPECNAME='DBCB', PACKAGE_LF='PKG-B',
+        )
+        result = _run_queue(wip, resources=resources, idle_history_df=idle_df)
+        assert result == []
+
+    def test_idle_equipment_history_package_mismatch(self):
+        """Idle equipment's most-recent PACKAGE_LF differs from the waiting
+        lot's PACKAGE_LEF → excluded."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-B'),
+        )
+        resources = [_resource('EQ-IDLE', workcenter='焊接_DB', location='焊接A區')]
+        idle_df = _idle_history_df(
+            EQUIPMENTNAME='EQ-IDLE', SPECNAME='Eutectic D/B', PACKAGE_LF='PKG-OTHER',
+        )
+        result = _run_queue(wip, resources=resources, idle_history_df=idle_df)
+        assert result == []
+
+    def test_idle_equipment_wrong_zone_excluded(self):
+        """Idle equipment located outside the BOP-allowed zone → excluded even
+        with matching history spec/package."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='D區', PACKAGE_LEF='PKG-B'),
+        )
+        # D區 lot only allows 焊接D區; this idle equipment is in 焊接A區.
+        resources = [_resource('EQ-IDLE', workcenter='焊接_DB', location='焊接A區')]
+        idle_df = _idle_history_df(
+            EQUIPMENTNAME='EQ-IDLE', SPECNAME='Eutectic D/B', PACKAGE_LF='PKG-B',
+        )
+        result = _run_queue(wip, resources=resources, idle_history_df=idle_df)
+        assert result == []
+
+    def test_active_equipment_excluded_from_idle_universe(self):
+        """An equipment already in the live DB-02 pool is never also queried
+        as an idle candidate (no duplicate 'live' + 'history' rows), and the
+        idle-history Oracle query is skipped entirely when there is nothing
+        idle to resolve."""
+        wip = _df(
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-B'),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-ACTIVE', PACKAGE_LEF='PKG-B'),
+        )
+        # EQ-ACTIVE is both live (has a WIP row) AND listed in the 焊接_DB
+        # resource universe — it must NOT be treated as idle.
+        resources = [_resource('EQ-ACTIVE', workcenter='焊接_DB', location='焊接A區')]
+        with patch(
+            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
+            return_value=wip,
+        ), patch(
+            'mes_dashboard.services.resource_cache.get_all_resources',
+            return_value=resources,
+        ), patch(
+            'mes_dashboard.services.db_scheduling_service.read_sql_df',
+        ) as mock_read_sql:
+            result = get_db_scheduling_queue()
+
+        assert len(result) == 1
+        assert result[0]['equipmentSource'] == 'live'
+        # No idle equipment left to resolve → the history fallback query never runs.
+        mock_read_sql.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# DB-04: Sort order NULLS LAST (unchanged rule; fixtures updated for the new
+# match model)
 # ---------------------------------------------------------------------------
 
 class TestSortOrder:
-    """AC-4 / DB-04: sort PACKAGE_LEF → PJ_TYPE → WAFERLOT → UTS, NULLS LAST."""
+    """DB-04: sort PACKAGE_LEF → PJ_TYPE → WAFERLOT → UTS, NULLS LAST."""
 
     def test_sort_order_nulls_last(self):
-        """Null sort-key values appear after non-null values."""
+        """Null PJ_TYPE/WAFERLOT/UTS sort-key values appear after non-null
+        values (PACKAGE_LEF itself can never be null — rule (b) excludes it)."""
         wip = _df(
-            # Running equipment rows (used by both start lots via BOP fallback)
-            _make_wip_df(LOTID='RUN1', SPECNAME='Eutectic D/B',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-001',
-                         WORKFLOWNAME='WF-NOMATCH'),
-            # Start lots: one with nulls, one fully populated
-            _make_wip_df(LOTID='LOT-FULL', SPECNAME='D/B-START',
-                         PACKAGE_LEF='SOT-23', PJ_TYPE='TypeA',
+            _make_wip_df(LOTID='RUN1', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-001', PACKAGE_LEF='PKG-COMMON'),
+            _make_wip_df(LOTID='LOT-FULL', SPECNAME='晶片切割-END',
+                         PACKAGE_LEF='PKG-COMMON', PJ_TYPE='TypeA',
                          WAFERLOT='WL-A', UTS='2026/01/01',
-                         BOP='U-test', WORKFLOWNAME='WF-NOMATCH'),
-            _make_wip_df(LOTID='LOT-NULL', SPECNAME='D/B-START',
-                         PACKAGE_LEF=None, PJ_TYPE=None,
+                         BOP='U-test', PJ_PRODUCEREGION='A棟'),
+            _make_wip_df(LOTID='LOT-NULLISH', SPECNAME='晶片切割-END',
+                         PACKAGE_LEF='PKG-COMMON', PJ_TYPE=None,
                          WAFERLOT=None, UTS=None,
-                         BOP='U-test', WORKFLOWNAME='WF-NOMATCH'),
+                         BOP='U-test', PJ_PRODUCEREGION='A棟'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+        resources = [_resource('EQ-001', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
 
-        assert len(result) >= 2
-
-        full_idx = next(
-            i for i, r in enumerate(result) if r['lotId'] == 'LOT-FULL'
-        )
-        null_idx = next(
-            i for i, r in enumerate(result) if r['lotId'] == 'LOT-NULL'
-        )
-        # LOT-FULL (non-null keys) must sort BEFORE LOT-NULL (null keys = LAST)
+        assert len(result) == 2
+        full_idx = next(i for i, r in enumerate(result) if r['lotId'] == 'LOT-FULL')
+        null_idx = next(i for i, r in enumerate(result) if r['lotId'] == 'LOT-NULLISH')
         assert full_idx < null_idx
 
     def test_sort_primary_key_is_package_lef(self):
         """PACKAGE_LEF is the first sort key (ASC)."""
         wip = _df(
-            _make_wip_df(LOTID='RUN1', SPECNAME='Eutectic D/B',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-001',
-                         WORKFLOWNAME='WF-NOMATCH'),
-            _make_wip_df(LOTID='LOT-B', SPECNAME='D/B-START',
-                         PACKAGE_LEF='ZZ-LAST', BOP='U-test',
-                         WORKFLOWNAME='WF-NOMATCH'),
-            _make_wip_df(LOTID='LOT-A', SPECNAME='D/B-START',
-                         PACKAGE_LEF='AA-FIRST', BOP='U-test',
-                         WORKFLOWNAME='WF-NOMATCH'),
+            _make_wip_df(LOTID='RUN-A', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-A', PACKAGE_LEF='AA-FIRST'),
+            _make_wip_df(LOTID='RUN-B', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-B', PACKAGE_LEF='ZZ-LAST'),
+            _make_wip_df(LOTID='LOT-B', SPECNAME='晶片切割-END',
+                         PACKAGE_LEF='ZZ-LAST', BOP='U-test', PJ_PRODUCEREGION='A棟'),
+            _make_wip_df(LOTID='LOT-A', SPECNAME='晶片切割-END',
+                         PACKAGE_LEF='AA-FIRST', BOP='U-test', PJ_PRODUCEREGION='A棟'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+        resources = [_resource('EQ-A', location='焊接A區'), _resource('EQ-B', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
 
         lot_ids = [r['lotId'] for r in result]
         assert lot_ids.index('LOT-A') < lot_ids.index('LOT-B')
-
-
-# ---------------------------------------------------------------------------
-# AC-5: matchSource=none emits zero rows
-# ---------------------------------------------------------------------------
-
-class TestNoMatchNoBop:
-    """AC-5 / DB-03 null path: no workflow match + null/unknown BOP → zero rows."""
-
-    def test_no_match_no_bop_returns_none_source(self):
-        """Lot with null BOP and no workflow match produces no output rows."""
-        wip = _df(
-            _make_wip_df(LOTID='START-ORPHAN', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-ORPHAN', BOP=None),
-        )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
-        # matchSource=none → zero rows (not included in output)
-        assert result == []
 
 
 # ---------------------------------------------------------------------------
@@ -407,37 +503,39 @@ class TestCacheMissFallback:
     """Service must not 500 when get_cached_wip_data() returns None."""
 
     def test_cache_miss_returns_empty_list(self):
-        """When cache returns None, result is an empty list (no exception)."""
+        """When cache returns None and Oracle fallback also fails, result is []."""
         with patch(
             'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
             return_value=None,
+        ), patch(
+            'mes_dashboard.services.db_scheduling_service.read_sql_df',
+            return_value=None,
+        ), patch(
+            'mes_dashboard.services.resource_cache.get_all_resources',
+            return_value=[],
         ):
-            # Also patch read_sql_df to return None (simulating CI-without-Oracle)
-            with patch(
-                'mes_dashboard.services.db_scheduling_service.read_sql_df',
-                return_value=None,
-            ):
-                result = get_db_scheduling_queue()
+            result = get_db_scheduling_queue()
         assert result == []
 
     def test_cache_miss_with_oracle_fallback_returns_data(self):
-        """When cache misses, Oracle fallback is attempted and data is returned."""
+        """When cache misses, Oracle fallback is attempted and a list is returned."""
         oracle_df = _df(
-            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Eutectic D/B',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-FBK',
-                         WORKFLOWNAME='WF-FALLBACK'),
-            _make_wip_df(LOTID='START-LOT', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-FALLBACK', BOP=None),
+            _make_wip_df(LOTID='RUN-LOT', SPECNAME='Eutectic D/B', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-FBK', PACKAGE_LEF='PKG-FBK'),
+            _make_wip_df(LOTID='START-LOT', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-FBK'),
         )
         with patch(
             'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
             return_value=None,
+        ), patch(
+            'mes_dashboard.services.db_scheduling_service.read_sql_df',
+            return_value=oracle_df,
+        ), patch(
+            'mes_dashboard.services.resource_cache.get_all_resources',
+            return_value=[],
         ):
-            with patch(
-                'mes_dashboard.services.db_scheduling_service.read_sql_df',
-                return_value=oracle_df,
-            ):
-                result = get_db_scheduling_queue()
+            result = get_db_scheduling_queue()
         assert isinstance(result, list)
 
 
@@ -446,31 +544,28 @@ class TestCacheMissFallback:
 # ---------------------------------------------------------------------------
 
 class TestRowShape:
-    """Each output row has the 15 required fields per §3.22."""
+    """Each output row has the 16 required fields per §3.22 (2026-07 adds
+    'equipmentSource')."""
 
     REQUIRED_FIELDS = {
         # Waiting lot
         'lotId', 'workflowName', 'packageLef', 'pjType', 'waferLot',
         'uts', 'qty', 'bop',
-        # Running lot on candidate equipment (priority-column key)
+        # Candidate equipment's current/most-recent lot attributes
         'eqpPackageLef', 'eqpPjType', 'eqpWaferLot', 'eqpUts',
         # Dispatch metadata
-        'targetSpec', 'equipment', 'matchSource',
+        'targetSpec', 'equipment', 'matchSource', 'equipmentSource',
     }
 
     def test_row_has_all_required_fields(self):
         wip = _df(
-            _make_wip_df(LOTID='START', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-A', BOP=None),
-            _make_wip_df(LOTID='RUN', SPECNAME='1DB',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-001',
-                         WORKFLOWNAME='WF-A'),
+            _make_wip_df(LOTID='START', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-A'),
+            _make_wip_df(LOTID='RUN', SPECNAME='1DB', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-001', PACKAGE_LEF='PKG-A'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+        resources = [_resource('EQ-001', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
         assert len(result) >= 1
         for row in result:
             assert self.REQUIRED_FIELDS <= set(row.keys()), (
@@ -478,47 +573,38 @@ class TestRowShape:
             )
 
     def test_eqp_fields_come_from_running_lot_not_start_lot(self):
-        """eqpPackageLef/eqpPjType/eqpWaferLot/eqpUts must reflect the equipment's
-        running lot, not the waiting start lot."""
+        """eqpPjType/eqpWaferLot/eqpUts reflect the equipment's running lot,
+        not the waiting start lot. eqpPackageLef necessarily equals
+        packageLef now (rule (b) requires PACKAGE equality to match at all)."""
         wip = _df(
-            _make_wip_df(LOTID='START', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-A', BOP=None,
-                         PACKAGE_LEF='WAIT-PKG', PJ_TYPE='WAIT-PJ',
+            _make_wip_df(LOTID='START', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟',
+                         PACKAGE_LEF='PKG-X', PJ_TYPE='WAIT-PJ',
                          WAFERLOT='WAIT-WL', UTS='2026/01/01'),
-            _make_wip_df(LOTID='RUN', SPECNAME='1DB',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-001',
-                         WORKFLOWNAME='WF-A',
-                         PACKAGE_LEF='RUN-PKG', PJ_TYPE='RUN-PJ',
-                         WAFERLOT='RUN-WL', UTS='2026/06/01'),
+            _make_wip_df(LOTID='RUN', SPECNAME='1DB', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-001', PACKAGE_LEF='PKG-X',
+                         PJ_TYPE='RUN-PJ', WAFERLOT='RUN-WL', UTS='2026/06/01'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+        resources = [_resource('EQ-001', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
         assert len(result) == 1
         row = result[0]
-        # Lot fixed columns come from the waiting lot
-        assert row['packageLef'] == 'WAIT-PKG'
+        assert row['packageLef'] == 'PKG-X'
         assert row['pjType'] == 'WAIT-PJ'
-        # Eqp priority key comes from the running lot on the machine
-        assert row['eqpPackageLef'] == 'RUN-PKG'
+        assert row['eqpPackageLef'] == 'PKG-X'
         assert row['eqpPjType'] == 'RUN-PJ'
         assert row['eqpWaferLot'] == 'RUN-WL'
         assert row['eqpUts'] == '2026/06/01'
+        assert row['equipmentSource'] == 'live'
 
     def test_qty_is_integer(self):
         wip = _df(
-            _make_wip_df(LOTID='START', SPECNAME='D/B-START',
-                         WORKFLOWNAME='WF-A', BOP=None, QTY=50),
-            _make_wip_df(LOTID='RUN', SPECNAME='1DB',
-                         STATUS='ACTIVE', EQUIPMENTS='EQ-001',
-                         WORKFLOWNAME='WF-A'),
+            _make_wip_df(LOTID='START', SPECNAME='晶片切割-END',
+                         BOP='U-test', PJ_PRODUCEREGION='A棟', PACKAGE_LEF='PKG-A', QTY=50),
+            _make_wip_df(LOTID='RUN', SPECNAME='1DB', STATUS='ACTIVE',
+                         EQUIPMENTS='EQ-001', PACKAGE_LEF='PKG-A'),
         )
-        with patch(
-            'mes_dashboard.services.db_scheduling_service.get_cached_wip_data',
-            return_value=wip,
-        ):
-            result = get_db_scheduling_queue()
+        resources = [_resource('EQ-001', location='焊接A區')]
+        result = _run_queue(wip, resources=resources)
         for row in result:
             assert isinstance(row['qty'], int)
