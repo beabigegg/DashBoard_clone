@@ -356,12 +356,15 @@ def _build_product_dims_exists(
     pj_types: List[str],
     product_lines: List[str],
     pj_bops: List[str],
+    work_orders: List[str] = (),
 ) -> tuple[List[str], Dict[str, Any]]:
-    """Build per-dim EXISTS clauses + bind params (EA-10, D-3).
+    """Build per-dim EXISTS clauses + bind params (EA-10/EA-11, D-3).
 
     Each supplied dim produces one separate EXISTS semi-join clause (AND-semantics).
     TRIM applied to both column value (NVL) and bind values (CHAR-padding safety).
-    Absent/empty dims produce no clause.
+    Absent/empty dims produce no clause. Four dims: pj_types, product_lines,
+    pj_bops (EA-10), and work_orders (EA-11, bridged via
+    DW_MES_CONTAINER.MFGORDERNAME).
 
     Returns:
         (clauses: list[str], params: dict) — each clause is a standalone EXISTS(...)
@@ -374,6 +377,7 @@ def _build_product_dims_exists(
         ("pjt", "c.PJ_TYPE", pj_types),
         ("pln", "c.PRODUCTLINENAME", product_lines),
         ("bop", "c.PJ_BOP", pj_bops),
+        ("wo", "c.MFGORDERNAME", work_orders),
     ]
     for prefix, col, values in dim_map:
         stripped = [str(v).strip() for v in values if str(v).strip()]
@@ -424,6 +428,7 @@ def run_eap_alarm_query_job(
     pj_types: List[str] = (),
     product_lines: List[str] = (),
     pj_bops: List[str] = (),
+    work_orders: List[str] = (),
     query_mode: str = "date_range",
 ) -> None:
     """RQ worker: Oracle fetch → DuckDB in-memory pairing → parquet write."""
@@ -447,6 +452,7 @@ def run_eap_alarm_query_job(
         spool_key = make_eap_alarm_spool_key(
             date_from, date_to,
             list(eqp_types), list(lot_ids), list(pj_types), list(product_lines), list(pj_bops),
+            list(work_orders),
         )
         spool_path = get_eap_alarm_spool_path(spool_key)
         os.makedirs(os.path.dirname(spool_path), exist_ok=True)
@@ -455,10 +461,10 @@ def run_eap_alarm_query_job(
 
         equipment_filter, eqp_params = _build_equipment_filter(list(eqp_types))
 
-        # Build extra filter clauses for lot_ids and product_dims (EA-09, EA-10)
+        # Build extra filter clauses for lot_ids and product_dims (EA-09, EA-10, EA-11)
         lot_clause, lot_params = _build_lot_ids_filter(list(lot_ids))
         exists_clauses, exists_params = _build_product_dims_exists(
-            list(pj_types), list(product_lines), list(pj_bops)
+            list(pj_types), list(product_lines), list(pj_bops), list(work_orders)
         )
         extra_filter_parts = []
         if lot_clause:
@@ -622,6 +628,7 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
         pj_types = list(self.params.get("pj_types", []))
         product_lines = list(self.params.get("product_lines", []))
         pj_bops = list(self.params.get("pj_bops", []))
+        work_orders = list(self.params.get("work_orders", []))
 
         self._date_from = date_from
         self._date_to = date_to
@@ -630,9 +637,11 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
 
         self._equipment_filter, self._eqp_params = _build_equipment_filter(eqp_types)
 
-        # Build extra filter clauses for lot_ids and product_dims (EA-09, EA-10)
+        # Build extra filter clauses for lot_ids and product_dims (EA-09, EA-10, EA-11)
         lot_clause, lot_params = _build_lot_ids_filter(lot_ids)
-        exists_clauses, exists_params = _build_product_dims_exists(pj_types, product_lines, pj_bops)
+        exists_clauses, exists_params = _build_product_dims_exists(
+            pj_types, product_lines, pj_bops, work_orders
+        )
         extra_filter_parts = []
         if lot_clause:
             extra_filter_parts.append(f"\n  AND {lot_clause}")
@@ -643,7 +652,7 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
 
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key, get_eap_alarm_spool_path
         self._spool_key = make_eap_alarm_spool_key(
-            date_from, date_to, eqp_types, lot_ids, pj_types, product_lines, pj_bops
+            date_from, date_to, eqp_types, lot_ids, pj_types, product_lines, pj_bops, work_orders
         )
         self._spool_path = get_eap_alarm_spool_path(self._spool_key)
         self._machines_hash = hashlib.sha256(self._spool_key.encode("utf-8")).hexdigest()[:8]
@@ -845,6 +854,7 @@ def execute_eap_alarm_unified_job(
     pj_types: list = (),
     product_lines: list = (),
     pj_bops: list = (),
+    work_orders: list = (),
     query_mode: str = "date_range",
 ) -> None:
     """RQ entry point for EapAlarmJob (EAP_ALARM_USE_UNIFIED_JOB=on path).
@@ -869,6 +879,7 @@ def execute_eap_alarm_unified_job(
                 "pj_types": list(pj_types),
                 "product_lines": list(product_lines),
                 "pj_bops": list(pj_bops),
+                "work_orders": list(work_orders),
             },
         )
         spool_path = job.run()

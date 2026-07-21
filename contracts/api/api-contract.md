@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.46.0
+schema-version: 1.47.0
 last-changed: 2026-07-21
 breaking-change-policy: deprecate-2-minors
 ---
@@ -243,7 +243,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/get_table_info | required | — | GenericSuccessResponse | 500 | route tests |
 | POST | /api/get_table_columns | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/query_table | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
-| POST | /api/eap-alarm/spool | required | JSON body {date_from, date_to, eqp_types[] (opt), lot_ids[] (opt, max 200), pj_types[] (opt), product_lines[] (opt), pj_bops[] (opt); at-least-one-of-three: eqp_types/lot_ids/product_dims} | EapAlarmSpoolJobAccepted | 202/400/500 | route tests |
+| POST | /api/eap-alarm/spool | required | JSON body {date_from, date_to, eqp_types[] (opt), lot_ids[] (opt, max 200), pj_types[] (opt), product_lines[] (opt), pj_bops[] (opt), work_orders[] (opt, max 200, refinement-only — never counts toward at-least-one-of-three); at-least-one-of-three: eqp_types/lot_ids/product_dims} | EapAlarmSpoolJobAccepted | 202/400/500 | route tests |
 | GET | /api/eap-alarm/spool/status | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/eap-alarm/filter-options | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/eap-alarm/summary | required | ?query_id=&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt)&lot_id[]=(opt)&pj_type[]=(opt)&product_line[]=(opt)&pj_bop[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
@@ -534,6 +534,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.47.0] — 2026-07-21 (eap-alarm-lot-mode work_orders):** `POST /api/eap-alarm/spool` gains `work_orders[]` (optional, max 200 entries) — bridged via `DW_MES_CONTAINER.MFGORDERNAME` (`CONTAINERNAME = LOT_ID`), same EXISTS-semi-join mechanism as `pj_types`/`product_lines`/`pj_bops` (EA-10/EA-11). Refinement-only: does not count toward the existing at-least-one-of-three (`eqp_types`/`lot_ids`/`product_dims`) requirement. Spool key hash extended to six coarse dims; `_SCHEMA_VERSION` unchanged (WHERE-filter addition, not a parquet column change). Additive; no existing endpoints/fields changed.
 - **[api 1.46.0] — 2026-07-21 (equipment-lookup-page):** New endpoint family `/api/equipment-lookup/*` (2 endpoints: `GET /options`, `GET /list`). New schemas `EquipmentLookupOptionsResponse`, `EquipmentLookupListResponse`. Sync-only, served entirely from the existing `resource_cache` in-memory equipment snapshot — no new Oracle queries, no spool, no RQ worker. Additive; no existing endpoints changed.
 - **[api 1.39.0] — 2026-07-21 (production-achievement-metadata-gated-refresh):** New `GET /api/production-achievement/report/meta` — cheap freshness-only probe (`sync_time`/`latest_data_timestamp` via a direct Redis spool-metadata read, no MySQL/Oracle round-trips, never enqueues). New schema `ProductionAchievementReportMetaResponse`. Additive; no existing endpoint changed. Frontend: `production-achievement` gains metadata-gated auto-refresh (polls this endpoint; only re-fetches `GET /report` when `sync_time` changes), scoped to 今日/前日 modes to match the hourly warmup scheduler's coverage.
 - **[api 1.38.1] — 2026-07-08 (move-target-permissions-panel):** No endpoint/schema/auth change. Consumer-only note: the two admin permission endpoints' frontend consumer moves from `admin-pages` to `admin-dashboard` (see Compatibility Notes above).

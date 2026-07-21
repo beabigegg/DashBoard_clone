@@ -156,6 +156,25 @@ class TestEapAlarmWorkerFnNewDims:
                 )
                 break
 
+    def test_exists_clause_present_in_sql_for_work_orders(self, tmp_path, monkeypatch):
+        """EA-11: work_orders → EXISTS clause on MFGORDERNAME in Oracle SQL."""
+        captured_sql: list = []
+        captured_params: list = []
+        self._base_monkeypatch(monkeypatch, tmp_path, captured_sql, captured_params)
+
+        from mes_dashboard.workers.eap_alarm_worker import run_eap_alarm_query_job
+
+        run_eap_alarm_query_job(
+            job_id="test-exists-wo",
+            date_from="2025-01-01",
+            date_to="2025-01-07",
+            work_orders=["WO-001"],
+        )
+
+        assert any("EXISTS" in sql and "MFGORDERNAME" in sql for sql in captured_sql), (
+            f"EXISTS clause for MFGORDERNAME must appear in SQL. Captured: {captured_sql}"
+        )
+
     def test_route_forwards_lot_ids_per_kwarg(self, monkeypatch):
         """Route forwards lot_ids per-kwarg to enqueue (AC-1 route forwarding)."""
         captured: dict = {}
@@ -188,6 +207,7 @@ class TestEapAlarmWorkerFnNewDims:
                     "pj_types": ["TypeA"],
                     "product_lines": ["LineB"],
                     "pj_bops": ["BopC"],
+                    "work_orders": ["WO-001"],
                 },
                 content_type="application/json",
             )
@@ -205,6 +225,16 @@ class TestEapAlarmWorkerFnNewDims:
         assert captured.get("pj_bops") == ["BopC"], (
             f"pj_bops must be forwarded per-kwarg, got: {captured.get('pj_bops')!r}"
         )
+        assert captured.get("work_orders") == ["WO-001"], (
+            f"work_orders must be forwarded per-kwarg, got: {captured.get('work_orders')!r}"
+        )
+
+        # Enqueued params dict must bind cleanly against the unified worker_fn's
+        # signature (test-discipline: mocked-enqueue shape mismatch only fails
+        # at worker runtime otherwise).
+        import inspect
+        from mes_dashboard.workers.eap_alarm_worker import execute_eap_alarm_unified_job
+        inspect.signature(execute_eap_alarm_unified_job).bind(**captured)
 
 
 # ---------------------------------------------------------------------------

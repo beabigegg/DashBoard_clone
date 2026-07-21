@@ -69,6 +69,27 @@ class TestEapAlarmJobPreQuery:
         assert "LOT_ID IN" in sql
         assert params["lot_0"] == "LOT-001"
 
+    def test_work_orders_produces_exists_clause_in_chunk_sql(self, tmp_path, monkeypatch):
+        """EA-11: work_orders flows through pre_query → build_chunk_sql as an
+        EXISTS clause on MFGORDERNAME (mirrors the lot_ids IN-clause coverage above)."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        from mes_dashboard.workers.eap_alarm_worker import EapAlarmJob
+
+        job = EapAlarmJob("test-wo-001", params={
+            "date_from": "2025-01-01",
+            "date_to": "2025-01-01",
+            "eqp_types": ["EQP001"],
+            "work_orders": ["WO-001"],
+        })
+        with patch("mes_dashboard.services.eap_alarm_cache.make_eap_alarm_spool_key", return_value="wo-key"), \
+             patch("mes_dashboard.services.eap_alarm_cache.get_eap_alarm_spool_path", return_value=str(tmp_path / "wo.parquet")):
+            job.pre_query()
+
+        sql, params = job.build_chunk_sql(job._chunks[0])
+        assert "EXISTS" in sql
+        assert "MFGORDERNAME" in sql
+        assert params["wo_0"] == "WO-001"
+
 
 class TestEapAlarmJobBuildChunkSql:
     """AC-3: build_chunk_sql returns correct SQL per kind."""

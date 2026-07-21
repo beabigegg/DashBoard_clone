@@ -108,6 +108,20 @@ class TestSpoolKeyComposition:
         k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], pj_bops=["BopB"])
         assert k1 != k2
 
+    def test_work_orders_dim_produces_different_key(self):
+        """Changing work_orders → different key (EA-11)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], work_orders=["WO-A"])
+        k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], work_orders=["WO-B"])
+        assert k1 != k2
+
+    def test_work_orders_default_matches_omitted(self):
+        """work_orders defaulting to () must match a call that omits it entirely."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"])
+        k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], work_orders=[])
+        assert k1 == k2
+
     def test_empty_dims_do_not_collide_across_axes(self):
         """Empty lot_ids and empty pj_types should not produce the same key sub-contribution.
         i.e., key(lot_ids=["X"]) != key(pj_types=["X"]) (per-dim label prevents collision)."""
@@ -409,6 +423,60 @@ class TestLotIdNormalization:
         assert k1 == k2
 
 
+# ── TestWorkOrdersValidation ──────────────────────────────────────────────────
+
+class TestWorkOrdersValidation:
+    """EA-11: work_orders strip/dedup/max-200 cap; pure refinement, never
+    satisfies the EA-08 at-least-one-of-three gate by itself."""
+
+    def test_duplicates_deduped_no_error(self):
+        """Validation deduplicates work_orders before they'd reach the key builder."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params(
+            "2025-01-01", "2025-01-07",
+            eqp_types=["GDBA"],
+            work_orders=["WO-A", "WO-A", "WO-B", "WO-A"],
+        )
+
+    def test_whitespace_only_entries_treated_as_empty(self):
+        """Whitespace-only work_order strings are stripped to nothing (no error by
+        themselves, but also do not satisfy EA-08 — see test below)."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params(
+            "2025-01-01", "2025-01-07",
+            eqp_types=["GDBA"],
+            work_orders=["   ", "\t", ""],
+        )
+
+    def test_max_200_cap_exactly_200_ok(self):
+        """Exactly 200 work_orders → no error (boundary is strictly > 200)."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        work_orders = [f"WO-{i:04d}" for i in range(200)]
+        validate_eap_alarm_params(
+            "2025-01-01", "2025-01-07", eqp_types=["GDBA"], work_orders=work_orders
+        )
+
+    def test_max_200_cap_exceeded_201_raises(self):
+        """201 work_orders → ValueError (strictly > 200)."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        work_orders = [f"WO-{i:04d}" for i in range(201)]
+        with pytest.raises(ValueError, match="work_orders exceeds max"):
+            validate_eap_alarm_params(
+                "2025-01-01", "2025-01-07", eqp_types=["GDBA"], work_orders=work_orders
+            )
+
+    def test_work_orders_alone_still_raises_at_least_one_of(self):
+        """CRITICAL EA-08-exclusion regression: work_orders alone (no eqp_types,
+        lot_ids, or product_dims) must NOT satisfy the at-least-one-of-three rule —
+        it is a pure refinement axis, never a standalone qualifying dim."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        with pytest.raises(ValueError, match="at least one of"):
+            validate_eap_alarm_params(
+                "2025-01-01", "2025-01-07",
+                work_orders=["WO-001", "WO-002"],
+            )
+
+
 # ── TestProductDimsFilter ─────────────────────────────────────────────────────
 
 class TestProductDimsFilter:
@@ -473,6 +541,56 @@ class TestProductDimsFilter:
         from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
         _, params = _build_product_dims_exists(["  TypeA  "], [], [])
         assert params["pjt_0"] == "TypeA"
+
+
+# ── TestWorkOrdersFilter ──────────────────────────────────────────────────────
+
+class TestWorkOrdersFilter:
+    """EA-11: _build_product_dims_exists's 4th arg (work_orders) generates a
+    MFGORDERNAME EXISTS clause via DW_MES_CONTAINER, same mechanism as EA-10."""
+
+    def test_work_orders_generates_exists_clause(self):
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists([], [], [], ["WO-001", "WO-002"])
+        assert len(clauses) == 1
+        assert "EXISTS" in clauses[0]
+        assert "MFGORDERNAME" in clauses[0]
+        assert "DWH.DW_MES_CONTAINER" in clauses[0]
+        assert "c.CONTAINERNAME = e.LOT_ID" in clauses[0]
+        assert "NVL(TRIM" in clauses[0]
+        assert "wo_0" in params
+        assert "wo_1" in params
+        assert params["wo_0"] == "WO-001"
+        assert params["wo_1"] == "WO-002"
+
+    def test_empty_work_orders_produces_no_clause(self):
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists([], [], [], [])
+        assert clauses == []
+        assert params == {}
+
+    def test_work_orders_default_produces_no_clause(self):
+        """work_orders defaults to () when omitted entirely."""
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists([], [], [])
+        assert clauses == []
+        assert params == {}
+
+    def test_work_orders_combined_with_pj_types_produces_two_exists_clauses(self):
+        """Combining work_orders with pj_types → 2 separate EXISTS clauses (AND-semantics)."""
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists(["TypeA"], [], [], ["WO-001"])
+        assert len(clauses) == 2, (
+            f"Expected 2 separate EXISTS clauses (pj_types + work_orders), got {len(clauses)}: {clauses}"
+        )
+        assert any("PJ_TYPE" in c for c in clauses)
+        assert any("MFGORDERNAME" in c for c in clauses)
+
+    def test_whitespace_stripped_from_work_order_values(self):
+        """CHAR-padding safety: bind values are stripped."""
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        _, params = _build_product_dims_exists([], [], [], ["  WO-001  "])
+        assert params["wo_0"] == "WO-001"
 
 
 # ── test_equipment_filter_empty_no_op (Round 2 — AC-8, D-6) ──────────────────

@@ -19,6 +19,7 @@ interface CoarseFilter {
   date_to: string;
   machines: string[];
   lot_ids: string[];
+  work_orders: string[];
   pj_types: string[];
   product_lines: string[];
   pj_bops: string[];
@@ -65,10 +66,22 @@ function onLotIdBlur() {
   emit('update:filters', { ...props.filters, lot_ids: parsedIds });
 }
 
+// ── Work order textarea local state ───────────────────────────────────────────
+const workOrderRaw = ref('');
+
+function onWorkOrderBlur() {
+  const parsed = workOrderRaw.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  emit('update:filters', { ...props.filters, work_orders: parsed });
+}
+
 function setQueryMode(mode: 'date_range' | 'lot_ids') {
   if (mode === props.queryMode) return;
   lotIdRaw.value = '';
-  emit('update:filters', { ...props.filters, lot_ids: [] });
+  workOrderRaw.value = '';
+  emit('update:filters', { ...props.filters, lot_ids: [], work_orders: [] });
   emit('update:queryMode', mode);
 }
 
@@ -107,6 +120,12 @@ function handleSubmit() {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // Sync work_orders from textarea before submit (lot_ids mode only)
+  const parsedWorkOrders = workOrderRaw.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   // D-8: a family ("型號") selected without any specific machine ("機台")
   // must not silently drop the family-level filter. Expand `machines` to
   // every name in the already-loaded, family-filtered machineOptions pool
@@ -121,7 +140,8 @@ function handleSubmit() {
   emit('update:filters', {
     ...props.filters,
     lot_ids: props.queryMode === 'lot_ids' ? parsedIds : [],
-    machines: props.queryMode === 'date_range' ? machines : [],
+    work_orders: props.queryMode === 'lot_ids' ? parsedWorkOrders : [],
+    machines,
   });
   // Use nextTick-like approach: emit submit after filter update propagates
   // (parent's Object.assign is synchronous so emit order is sufficient)
@@ -131,10 +151,12 @@ function handleSubmit() {
 function handleClear() {
   cascade.families = [];
   lotIdRaw.value = '';
+  workOrderRaw.value = '';
   emit('update:filters', {
     ...props.filters,
     machines: [],
     lot_ids: [],
+    work_orders: [],
     pj_types: [],
     product_lines: [],
     pj_bops: [],
@@ -191,6 +213,33 @@ const canSubmit = computed(() =>
         </button>
       </div>
 
+      <!-- 型號 cascade filter (shown in both modes) -->
+      <div class="filter-group">
+      <label class="filter-label">型號</label>
+      <MultiSelect
+        :model-value="cascade.families"
+        :options="resourceOptions.families"
+        :disabled="loading.querying"
+        placeholder="全部型號"
+        searchable
+        @update:model-value="updateFamilies"
+      />
+      </div>
+
+      <!-- 機台 (filtered by 型號 + flags; shown in both modes) -->
+      <div class="filter-group filter-group-wide">
+      <label class="filter-label">機台</label>
+      <MultiSelect
+        :model-value="filters.machines"
+        :options="machineOptions"
+        :disabled="loading.querying"
+        placeholder="全部篩選後機台"
+        searchable
+        data-testid="machine-select"
+        @update:model-value="updateMachines"
+      />
+      </div>
+
       <template v-if="queryMode === 'date_range'">
         <div class="filter-group">
           <label class="filter-label" for="eap-date-from">開始日期 <span class="filter-required">*</span></label>
@@ -213,33 +262,6 @@ const canSubmit = computed(() =>
             data-testid="end-date"
             required
           />
-        </div>
-
-        <!-- 型號 cascade filter -->
-        <div class="filter-group">
-        <label class="filter-label">型號</label>
-        <MultiSelect
-          :model-value="cascade.families"
-          :options="resourceOptions.families"
-          :disabled="loading.querying"
-          placeholder="全部型號"
-          searchable
-          @update:model-value="updateFamilies"
-        />
-        </div>
-
-        <!-- 機台 (filtered by 型號 + flags) -->
-        <div class="filter-group filter-group-wide">
-        <label class="filter-label">機台</label>
-        <MultiSelect
-          :model-value="filters.machines"
-          :options="machineOptions"
-          :disabled="loading.querying"
-          placeholder="全部篩選後機台"
-          searchable
-          data-testid="machine-select"
-          @update:model-value="updateMachines"
-        />
         </div>
 
         <!-- Type -->
@@ -285,20 +307,37 @@ const canSubmit = computed(() =>
         </div>
       </template>
 
-      <div v-else class="filter-group filter-group-full">
-        <label class="filter-label" for="eap-lot-id">LOT ID</label>
-        <textarea
-          id="eap-lot-id"
-          v-model="lotIdRaw"
-          class="filter-input filter-textarea"
-          :disabled="loading.querying"
-          placeholder="每行一個 LOT ID / One LOT ID per line"
-          rows="4"
-          data-testid="lot-id-textarea"
-          @blur="onLotIdBlur"
-        />
-        <span class="filter-hint">指定 LOT 查詢不需填寫日期。</span>
-      </div>
+      <template v-else>
+        <div class="filter-group filter-group-full">
+          <label class="filter-label" for="eap-lot-id">LOT ID</label>
+          <textarea
+            id="eap-lot-id"
+            v-model="lotIdRaw"
+            class="filter-input filter-textarea"
+            :disabled="loading.querying"
+            placeholder="每行一個 LOT ID / One LOT ID per line"
+            rows="4"
+            data-testid="lot-id-textarea"
+            @blur="onLotIdBlur"
+          />
+          <span class="filter-hint">指定 LOT 查詢不需填寫日期。</span>
+        </div>
+
+        <div class="filter-group filter-group-full">
+          <label class="filter-label" for="eap-work-order">工單號</label>
+          <textarea
+            id="eap-work-order"
+            v-model="workOrderRaw"
+            class="filter-input filter-textarea"
+            :disabled="loading.querying"
+            placeholder="每行一個工單號 / One work order per line（選填）"
+            rows="3"
+            data-testid="work-order-textarea"
+            @blur="onWorkOrderBlur"
+          />
+          <span class="filter-hint">選填，最多 200 筆。</span>
+        </div>
+      </template>
 
       <!-- Toolbar -->
       <div class="filter-toolbar filter-group-full">

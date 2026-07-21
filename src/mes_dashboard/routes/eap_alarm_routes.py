@@ -186,7 +186,12 @@ def api_eap_alarm_spool():
         pj_bops_raw = [pj_bops_raw] if pj_bops_raw else []
     pj_bops = [str(v).strip() for v in pj_bops_raw if str(v).strip()]
 
-    # Validate params (EA-03, EA-07, EA-08, EA-09)
+    work_orders_raw = body.get("work_orders") or []
+    if not isinstance(work_orders_raw, list):
+        work_orders_raw = [work_orders_raw] if work_orders_raw else []
+    work_orders = [str(v).strip() for v in work_orders_raw if str(v).strip()]
+
+    # Validate params (EA-03, EA-07, EA-08, EA-09, EA-11)
     try:
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         validate_eap_alarm_params(
@@ -196,6 +201,7 @@ def api_eap_alarm_spool():
             pj_types=pj_types,
             product_lines=product_lines,
             pj_bops=pj_bops,
+            work_orders=work_orders,
         )
     except ValueError as exc:
         return validation_error(str(exc))
@@ -204,7 +210,8 @@ def api_eap_alarm_spool():
     try:
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
         spool_key = make_eap_alarm_spool_key(
-            date_from, date_to, eqp_types, lot_ids, pj_types, product_lines, pj_bops
+            date_from, date_to, eqp_types, lot_ids, pj_types, product_lines, pj_bops,
+            work_orders=work_orders,
         )
     except ValueError as exc:
         return validation_error(str(exc))
@@ -242,6 +249,7 @@ def api_eap_alarm_spool():
                     "pj_types": pj_types,
                     "product_lines": product_lines,
                     "pj_bops": pj_bops,
+                    "work_orders": work_orders,
                 },
                 sync_fallback_allowed=False,
                 job_id=job_id,
@@ -269,6 +277,7 @@ def api_eap_alarm_spool():
                     "pj_types": pj_types,
                     "product_lines": product_lines,
                     "pj_bops": pj_bops,
+                    "work_orders": work_orders,
                 },
                 prefix=_JOB_PREFIX,
                 job_timeout=EAP_ALARM_JOB_TIMEOUT_SECONDS,

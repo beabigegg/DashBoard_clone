@@ -702,13 +702,16 @@ test.describe('EAP ALARM — filter panel and two-step flow (fully mocked)', () 
 
   // ── AC-6: New coarse filter controls ──────────────────────────────────────
 
-  // 12. LOT_ID textarea is visible in the filter panel
+  // 12. LOT_ID textarea is visible in the filter panel (指定 LOT mode)
   test('test_lot_id_textarea_visible', async ({ page }) => {
     const reachable = await navigateToEapAlarm(page);
     if (!reachable) {
       test.skip(true, 'EAP ALARM page not reachable in this environment');
       return;
     }
+
+    // LOT ID textarea only renders in 指定 LOT query mode (mode-tab UI).
+    await page.locator('[data-testid="query-mode-lot"]').click();
 
     const textarea = page.locator('[data-testid="lot-id-textarea"]');
     await expect(textarea).toBeVisible({ timeout: 15_000 });
@@ -750,17 +753,15 @@ test.describe('EAP ALARM — filter panel and two-step flow (fully mocked)', () 
       }
     });
 
-    // Fill dates, enter LOT IDs, but do NOT select any machine
-    const startDate = page.locator('[data-testid="start-date"]');
-    const endDate = page.locator('[data-testid="end-date"]');
-    await startDate.fill('2026-06-12');
-    await endDate.fill('2026-06-18');
+    // 指定 LOT mode has no date requirement — switch modes instead of filling dates.
+    await page.locator('[data-testid="query-mode-lot"]').click();
 
     const textarea = page.locator('[data-testid="lot-id-textarea"]');
     if ((await textarea.count()) === 0) {
       test.skip(true, 'LOT ID textarea not found');
       return;
     }
+    await expect(textarea).toBeVisible({ timeout: 10_000 });
     await textarea.fill('LOT-001\nLOT-002');
     await textarea.blur(); // trigger onLotIdBlur to parse lot_ids
 
@@ -827,16 +828,15 @@ test.describe('EAP ALARM — filter panel and two-step flow (fully mocked)', () 
       }
     });
 
-    const startDate = page.locator('[data-testid="start-date"]');
-    const endDate = page.locator('[data-testid="end-date"]');
-    await startDate.fill('2026-06-12');
-    await endDate.fill('2026-06-18');
+    // 指定 LOT mode has no date requirement — switch modes instead of filling dates.
+    await page.locator('[data-testid="query-mode-lot"]').click();
 
     const textarea = page.locator('[data-testid="lot-id-textarea"]');
     if ((await textarea.count()) === 0) {
       test.skip(true, 'LOT ID textarea not found');
       return;
     }
+    await expect(textarea).toBeVisible({ timeout: 10_000 });
     await textarea.fill('MYLOTICA\nMYLOTICB');
     await textarea.blur();
 
@@ -870,11 +870,8 @@ test.describe('EAP ALARM — filter panel and two-step flow (fully mocked)', () 
       }
     });
 
-    // Fill dates
-    const startDate = page.locator('[data-testid="start-date"]');
-    const endDate = page.locator('[data-testid="end-date"]');
-    await startDate.fill('2026-06-12');
-    await endDate.fill('2026-06-18');
+    // 指定 LOT mode has no date requirement — switch modes instead of filling dates.
+    await page.locator('[data-testid="query-mode-lot"]').click();
 
     // Type LOT IDs into textarea
     const textarea = page.locator('[data-testid="lot-id-textarea"]');
@@ -882,6 +879,7 @@ test.describe('EAP ALARM — filter panel and two-step flow (fully mocked)', () 
       test.skip(true, 'LOT ID textarea not found');
       return;
     }
+    await expect(textarea).toBeVisible({ timeout: 10_000 });
     await textarea.focus();
     await textarea.fill('TAB-LOT-001\nTAB-LOT-002');
 

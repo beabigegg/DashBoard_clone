@@ -257,6 +257,7 @@ function handleClear(): void {
   cancelAsyncJob();
   coarseFilter.machines = [];
   coarseFilter.lot_ids = [];
+  coarseFilter.work_orders = [];
   coarseFilter.pj_types = [];
   coarseFilter.product_lines = [];
   coarseFilter.pj_bops = [];

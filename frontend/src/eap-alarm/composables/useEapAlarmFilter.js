@@ -16,6 +16,7 @@ export function useEapAlarmFilter() {
     date_to: '',
     machines: [],    // RESOURCENAME list; populated at submit time from resource filter
     lot_ids: [],     // LOT_ID IN (...) filter; text input parsed by newline
+    work_orders: [], // MFGORDERNAME IN (...) filter via DW_MES_CONTAINER; LOT-mode only, optional refinement
     pj_types: [],    // product dim: PJ type
     product_lines: [], // product dim: package / product line
     pj_bops: [],     // product dim: BOP
@@ -163,6 +164,8 @@ export function useEapAlarmFilter() {
     }
     if (queryMode === 'lot_ids') {
       if (coarseFilter.lot_ids.length > 0) params.lot_ids = coarseFilter.lot_ids;
+      if (coarseFilter.machines.length > 0) params.machines = coarseFilter.machines;
+      if (coarseFilter.work_orders.length > 0) params.work_orders = coarseFilter.work_orders;
       return params;
     }
     if (coarseFilter.machines.length > 0) {

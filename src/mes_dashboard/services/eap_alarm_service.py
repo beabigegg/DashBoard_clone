@@ -37,6 +37,7 @@ _DETAIL_PER_PAGE_MAX = 200
 # ── Validation ────────────────────────────────────────────────────────────────
 
 _LOT_IDS_MAX = 200
+_WORK_ORDERS_MAX = 200
 
 
 def validate_eap_alarm_params(
@@ -47,12 +48,14 @@ def validate_eap_alarm_params(
     pj_types: Optional[list] = None,
     product_lines: Optional[list] = None,
     pj_bops: Optional[list] = None,
+    work_orders: Optional[list] = None,
 ) -> None:
     """Validate EAP ALARM coarse filter params.
 
     Raises:
         ValueError: on incomplete date ranges, non-string/blank eqp_type entries,
-                    all-empty filter axes (EA-08), or lot_ids overflow (EA-09).
+                    all-empty filter axes (EA-08), lot_ids overflow (EA-09), or
+                    work_orders overflow (EA-11).
     """
     if bool(date_from) != bool(date_to):
         raise ValueError("date_from and date_to must be provided together")
@@ -80,6 +83,23 @@ def validate_eap_alarm_params(
     if len(cleaned_lots) > _LOT_IDS_MAX:
         raise ValueError(
             f"lot_ids exceeds max {_LOT_IDS_MAX} entries (EA-09): got {len(cleaned_lots)}"
+        )
+
+    # Normalize work_orders — strip whitespace, drop empties, dedup (EA-11).
+    # Pure optional refinement: intentionally NOT folded into the EA-08
+    # at-least-one-of check below — do not "fix" this by adding cleaned_wo to
+    # that gate, work_orders must never be able to satisfy it by itself.
+    cleaned_wo: list[str] = []
+    if work_orders:
+        seen_wo: set[str] = set()
+        for raw in work_orders:
+            v = str(raw).strip() if raw is not None else ""
+            if v and v not in seen_wo:
+                seen_wo.add(v)
+                cleaned_wo.append(v)
+    if len(cleaned_wo) > _WORK_ORDERS_MAX:
+        raise ValueError(
+            f"work_orders exceeds max {_WORK_ORDERS_MAX} entries: got {len(cleaned_wo)}"
         )
 
     # An explicit LOT query intentionally has no date range. It must be

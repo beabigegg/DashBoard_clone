@@ -251,7 +251,7 @@ describe('useEapAlarmFilter', () => {
       expect(params.lot_ids).toEqual(['LOT001', 'LOT002']);
     });
 
-    it('builds a LOT query without date fields or date-mode dimensions', () => {
+    it('builds a LOT query without date fields or date-mode-only dimensions', () => {
       filter.coarseFilter.lot_ids = ['LOT001', 'LOT002'];
       filter.coarseFilter.machines = ['MACHINE-1'];
       filter.coarseFilter.pj_types = ['TYPE-A'];
@@ -261,7 +261,34 @@ describe('useEapAlarmFilter', () => {
       expect(params).toEqual({
         query_mode: 'lot_ids',
         lot_ids: ['LOT001', 'LOT002'],
+        machines: ['MACHINE-1'],
       });
+    });
+
+    it('forwards work_orders as a separate param in lot_ids mode', () => {
+      filter.coarseFilter.lot_ids = ['LOT001'];
+      filter.coarseFilter.work_orders = ['WO-1', 'WO-2'];
+
+      const params = filter.buildCoarseParams('lot_ids');
+
+      expect(params.work_orders).toEqual(['WO-1', 'WO-2']);
+    });
+
+    it('omits work_orders from params when empty, in lot_ids mode', () => {
+      filter.coarseFilter.lot_ids = ['LOT001'];
+      filter.coarseFilter.work_orders = [];
+
+      const params = filter.buildCoarseParams('lot_ids');
+
+      expect(params).not.toHaveProperty('work_orders');
+    });
+
+    it('does not leak work_orders into a date_range-mode buildCoarseParams call', () => {
+      filter.coarseFilter.work_orders = ['WO-1'];
+
+      const params = filter.buildCoarseParams();
+
+      expect(params).not.toHaveProperty('work_orders');
     });
 
     it('forwards pj_types as separate param', () => {
@@ -372,6 +399,11 @@ describe('useEapAlarmFilter', () => {
       expect(Array.isArray(filter.coarseFilter.pj_bops)).toBe(true);
       expect(filter.coarseFilter.pj_bops).toHaveLength(0);
     });
+
+    it('initializes work_orders as empty array', () => {
+      expect(Array.isArray(filter.coarseFilter.work_orders)).toBe(true);
+      expect(filter.coarseFilter.work_orders).toHaveLength(0);
+    });
   });
 
   describe('productFilterOptions', () => {
@@ -416,6 +448,7 @@ describe('FilterBar handleSubmit family expansion', () => {
       date_to: '2026-06-30',
       machines: [],
       lot_ids: [],
+      work_orders: [],
       pj_types: [],
       product_lines: [],
       pj_bops: [],

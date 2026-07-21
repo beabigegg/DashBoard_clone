@@ -46,6 +46,7 @@ def make_eap_alarm_spool_key(
     pj_types: tuple[str, ...] | list[str] = (),
     product_lines: tuple[str, ...] | list[str] = (),
     pj_bops: tuple[str, ...] | list[str] = (),
+    work_orders: tuple[str, ...] | list[str] = (),
 ) -> str:
     """Build the deterministic spool key for a coarse EAP ALARM query (EA-01).
 
@@ -57,8 +58,8 @@ def make_eap_alarm_spool_key(
     _VALID_ID_RE = r"^[A-Za-z0-9._-]{4,128}$" and can be used directly as
     a Redis metadata key and parquet filename without secondary sanitization.
 
-    The hash covers all 5 coarse dims sorted with fixed per-dim separators:
-      eqp_types | lot_ids (whitespace-stripped) | pj_types | product_lines | pj_bops
+    The hash covers all six coarse dims sorted with fixed per-dim separators:
+      eqp_types | lot_ids (whitespace-stripped) | pj_types | product_lines | pj_bops | work_orders
     Each dim is independently delimited so empty lists cannot collide across dims
     (EA-01 canonical repr, D-1).
 
@@ -78,10 +79,11 @@ def make_eap_alarm_spool_key(
     pjt_part = "pjt:" + ",".join(sorted(str(v).strip() for v in pj_types if str(v).strip()))
     pln_part = "pln:" + ",".join(sorted(str(v).strip() for v in product_lines if str(v).strip()))
     bop_part = "bop:" + ",".join(sorted(str(v).strip() for v in pj_bops if str(v).strip()))
+    wo_part = "wo:" + ",".join(sorted(str(v).strip() for v in work_orders if str(v).strip()))
 
     canonical = "|".join([
         "mode:lot" if lot_query else "mode:date",
-        eqp_part, lot_part, pjt_part, pln_part, bop_part,
+        eqp_part, lot_part, pjt_part, pln_part, bop_part, wo_part,
     ])
     dims_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:8]
 
