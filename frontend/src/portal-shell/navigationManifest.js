@@ -105,6 +105,11 @@ export const routes = Object.freeze({
     order: 6,
     displayName: '原物料用量查詢',
   },
+  '/equipment-lookup': {
+    drawerId: 'query-tools',
+    order: 5,
+    displayName: '機台查詢',
+  },
 
   // ── 追溯工具 (trace-tools, order 5) ─────────────────────────────────────
   // Explicit distinct orders resolve the order-3 tie from current-behavior.md.

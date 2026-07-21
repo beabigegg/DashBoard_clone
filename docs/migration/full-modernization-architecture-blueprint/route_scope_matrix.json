@@ -91,6 +91,10 @@
     {
       "route": "/uph-performance",
       "category": "report"
+    },
+    {
+      "route": "/equipment-lookup",
+      "category": "report"
     }
   ],
   "deferred": []

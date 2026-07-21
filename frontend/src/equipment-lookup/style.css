@@ -1,0 +1,267 @@
+/*
+ * style.css — equipment-lookup (機台查詢) feature styles
+ *
+ * CSS Rule 6: ALL top-level rules MUST be scoped under .theme-equipment-lookup
+ * Verified by: npm run css:check
+ *
+ * Reuses the exact class names/visual patterns already established in
+ * material-consumption/style.css (ui-card/*, filter-panel-wrap, filter-grid,
+ * filter-group, filter-label, multi-select-trigger, pagination, page-info,
+ * empty-state, ui-btn/--primary/--secondary) rather than reinventing them.
+ * `.ui-card`/`.ui-card-header`/`.ui-card-title`/`.ui-card-body` and the base
+ * `.ui-btn`/`.ui-btn--primary`/`.ui-btn--secondary` classes already exist
+ * globally in styles/tailwind.css `@layer components` — the local overrides
+ * below only add the extra flourish (sheen/hover glow) already used by the
+ * other query-tools pages, matching their visual language.
+ */
+
+.theme-equipment-lookup {
+  /* Layout — no extra padding; shell-content already provides 16px */
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p16');
+  min-height: 100vh;
+  background: theme('colors.surface.app');
+}
+
+/* --- Cards: allow focus-ring/hover-glow to spill past the rounded corners --- */
+.theme-equipment-lookup .filter-query-card,
+.theme-equipment-lookup .filter-query-card .ui-card-body {
+  overflow: visible;
+}
+
+/* --- Filter panel --- */
+.theme-equipment-lookup .filter-panel-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p12');
+}
+
+.theme-equipment-lookup .filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: theme('spacing.token.p12');
+}
+
+.theme-equipment-lookup .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p4');
+}
+
+.theme-equipment-lookup .filter-label {
+  font-size: theme('fontSize.xs.0');
+  font-weight: 500;
+  color: theme('colors.text.secondary');
+}
+
+/* --- Filter actions --- */
+.theme-equipment-lookup .filter-actions {
+  display: flex;
+  gap: theme('spacing.token.p8');
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* --- Buttons (ui-btn base — sheen/hover flourish, matches material-consumption) --- */
+.theme-equipment-lookup .ui-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: theme('spacing.token.p6');
+  padding: theme('spacing.token.p6') theme('spacing.token.p16');
+  border-radius: theme('borderRadius.button');
+  font-size: theme('fontSize.sm.0');
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease,
+              transform 100ms ease, box-shadow 150ms ease;
+  white-space: nowrap;
+}
+
+.theme-equipment-lookup .ui-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.theme-equipment-lookup .ui-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Sheen overlay (re-triggered on every hover via transition trick) */
+.theme-equipment-lookup .ui-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.28) 50%, transparent 100%);
+  transform: skewX(-18deg);
+}
+
+.theme-equipment-lookup .ui-btn:hover:not(:disabled)::before {
+  left: 160%;
+  transition: left 0.5s ease;
+}
+
+.theme-equipment-lookup .ui-btn--primary {
+  background: theme('colors.brand.500');
+  color: theme('colors.surface.card');
+  border-color: theme('colors.brand.500');
+}
+
+.theme-equipment-lookup .ui-btn--primary:hover:not(:disabled) {
+  background: theme('colors.brand.600');
+  border-color: theme('colors.brand.600');
+  box-shadow: 0 4px 12px rgba(0,128,200,0.35);
+  transform: translateY(-1px);
+}
+
+.theme-equipment-lookup .ui-btn--secondary {
+  background: theme('colors.surface.card');
+  color: theme('colors.text.primary');
+  border-color: theme('colors.stroke.soft');
+}
+
+.theme-equipment-lookup .ui-btn--secondary:hover:not(:disabled) {
+  background: theme('colors.surface.hover');
+  border-color: theme('colors.brand.400');
+  color: theme('colors.brand.500');
+  box-shadow: 0 2px 8px rgba(0,128,200,0.12);
+  transform: translateY(-1px);
+}
+
+/* Export CSV button — accent glow on hover */
+.theme-equipment-lookup .export-csv-btn {
+  gap: theme('spacing.token.p6');
+}
+
+.theme-equipment-lookup .export-csv-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(0,128,200,0.3);
+}
+
+/* --- MultiSelect visual styles --- */
+.theme-equipment-lookup .multi-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid theme('colors.stroke.input');
+  border-radius: 8px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  font-size: 13px;
+  color: theme('colors.text.primary');
+  background: theme('colors.surface.card');
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.theme-equipment-lookup .multi-select-trigger:focus,
+.theme-equipment-lookup .multi-select-trigger[aria-expanded="true"] {
+  border-color: theme('colors.brand.500');
+  box-shadow: 0 0 0 3px rgba(0,128,200,0.12);
+}
+
+.theme-equipment-lookup .multi-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.theme-equipment-lookup .multi-select-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.theme-equipment-lookup .multi-select-arrow {
+  color: theme('colors.text.subtle');
+  font-size: 11px;
+}
+
+/* --- Results card: no padding so table stretches edge-to-edge --- */
+.theme-equipment-lookup .results-card-body {
+  padding: 0 !important;
+}
+
+/* --- Results table section --- */
+.theme-equipment-lookup .results-table-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  min-height: theme('spacing.token.p80');
+}
+
+.theme-equipment-lookup .results-toolbar {
+  display: flex;
+  gap: theme('spacing.token.p8');
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: theme('spacing.token.p12') theme('spacing.token.p16');
+  border-bottom: 1px solid theme('colors.stroke.soft');
+}
+
+.theme-equipment-lookup .results-count {
+  font-size: theme('fontSize.sm.0');
+  font-weight: 500;
+  color: theme('colors.text.secondary');
+}
+
+.theme-equipment-lookup .results-loading-wrap {
+  position: relative;
+  min-height: 120px;
+  padding: theme('spacing.token.p16');
+}
+
+.theme-equipment-lookup .data-table-container {
+  overflow-x: auto;
+  /* Table is inside a padding-0 card body — no extra offset needed */
+}
+
+/* --- Pagination (classes bled from wip-shared/components/Pagination.vue,
+   which is intentionally unscoped — every theme that reuses it must supply
+   its own styling, per docs/architecture/css-patterns.md rule 4.5) --- */
+.theme-equipment-lookup .pagination {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p8');
+}
+
+.theme-equipment-lookup .page-info {
+  font-size: theme('fontSize.xs.0');
+  color: theme('colors.text.secondary');
+  white-space: nowrap;
+}
+
+/* --- Empty states (pre-query state; DataTable's built-in EmptyState covers
+   the zero-results-after-query case) --- */
+.theme-equipment-lookup .empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: theme('spacing.token.p48') theme('spacing.token.p24');
+  text-align: center;
+  color: theme('colors.text.secondary');
+  font-size: theme('fontSize.base.0');
+  border: 1px dashed theme('colors.stroke.soft');
+  border-radius: theme('borderRadius.card');
+  background: theme('colors.surface.card');
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .theme-equipment-lookup .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-equipment-lookup .results-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

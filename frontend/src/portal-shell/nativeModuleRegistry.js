@@ -94,6 +94,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../material-consumption/App.vue'),
     [() => import('../material-consumption/style.css')],
   ),
+  '/equipment-lookup': createNativeLoader(
+    () => import('../equipment-lookup/App.vue'),
+    [() => import('../equipment-lookup/style.css')],
+  ),
   '/downtime-analysis': createNativeLoader(
     () => import('../downtime-analysis/App.vue'),
     [() => import('../resource-shared/styles.css'), () => import('../downtime-analysis/style.css')],

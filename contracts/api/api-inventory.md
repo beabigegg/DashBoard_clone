@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.6.0
-last-changed: 2026-07-13
+schema-version: 1.7.0
+last-changed: 2026-07-21
 ---
 
 # API Inventory
@@ -46,6 +46,7 @@ last-changed: 2026-07-13
 | `user_auth_routes.py` | `POST /api/auth/login` (public, rate-limited 5/5min, JSON `{username, password}`)、`POST /api/auth/logout`、`GET /api/auth/me`（null if not logged in）、`PATCH /api/auth/heartbeat` (login_required) |
 | `ai_routes.py` | `POST /api/ai/query` — NL query；`AI_MODE` 決定 pipeline；function mode 使用 combined call（select+fill 合一），text2sql mode 注入 chat_history 至 Stage 1；leader mode（leader/subagent 分層）response 額外含 additive `subtasks: [{goal, answer, success}]`；response: `{answer, chart_data, query_used, params_used, suggestions, sql_used, tool_trace, needs_clarification}`；新增三個 AI 函式（production_history_query、resource_history_summary、qc_gate_status）；route surface 不變；gated by `AI_QUERY_ENABLED` |
 | `job_routes.py` | `GET /api/job/<job_id>?prefix=<p>` — async 狀態；`POST /api/job/<job_id>/abandon` — idempotent，rate-limited 30/60s |
+| `equipment_lookup_routes.py` | All JSON API endpoints — new module (機台查詢，查詢工具 drawer)；`GET /api/equipment-lookup/options` → `{locations[], families[], resource_names[]}`（`get_distinct_values()`，non-narrowing full universe，cached 300s）；`GET /api/equipment-lookup/list?locations=&families=&resource_names=&page=&page_size=&sort_by=&sort_dir=` → `{rows[], pagination:{page, page_size, total, total_pages}}`；all three filters exact-match multi-value (repeatable or comma-separated), independent/non-narrowing；`resource_names` applied as Python membership filter on top of `get_resources_by_filter()` (no Oracle re-query); `page_size` max 10000 (supports "fetch all rows" CSV export client-side; no separate export endpoint); sync only, no spool/RQ. Sourced entirely from the existing `resource_cache` in-memory equipment snapshot (24h Oracle sync); no new Oracle queries added by this module (equipment-lookup-page). |
 
 ## Admin Page Routes（非 API）
 
@@ -102,6 +103,7 @@ last-changed: 2026-07-13
 
 ## Compatibility Notes
 
+- **2026-07-21 (equipment-lookup-page):** `equipment_lookup_routes.py` — new module; 2 additive endpoints under `/api/equipment-lookup/*` (機台查詢 quick-lookup page, 查詢工具 drawer). Both endpoints are sync-only, read-only, and served entirely from the existing `resource_cache` in-memory equipment snapshot (`get_distinct_values()` / `get_resources_by_filter()`) — no new Oracle queries, no spool, no RQ worker. Filter axes (`locations`/`families`/`resource_names`) are deliberately independent/non-narrowing (dropdown options never narrow each other, sidestepping the self-narrowing-filter bug class tracked elsewhere in this repo). No existing routes changed.
 - **2026-07-13 (add-uph-performance-page):** `uph_performance_routes.py` — new module; 7 additive endpoints under `/api/uph-performance/*`. `POST /spool` mirrors eap-alarm's spool-hit-200/spool-miss-202 pattern (always-async, no sync fallback). `GET /product-filter-options` mirrors eap-alarm's Oracle-free cross-filter cache pattern. Fine-filter/aggregate views derived from DuckDB spool only. Restricted to `GDBA`/`GWBA` equipment families. Spool namespace `uph_performance`. No existing routes changed.
 
 - **2026-07-02 (production-achievement-kanban):** `production_achievement_routes.py` — new module; 4 additive endpoints under `/api/production-achievement/*` plus 2 admin whitelist endpoints. Reads `DW_MES_LOTWIPHISTORY` via Oracle; writes/reads two new independent MySQL tables directly via `core/mysql_client.py` (target values, edit-permission whitelist) — explicitly NOT via `core/sync_worker.py` SQLite dual-layer sync (that path is one-way/eventually-consistent, max 10-min lag, unsuitable for immediate-consistency permission/target reads). No existing routes changed.

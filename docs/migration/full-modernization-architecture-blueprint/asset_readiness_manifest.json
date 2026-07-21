@@ -68,6 +68,9 @@
     ],
     "/uph-performance": [
       "uph-performance.js"
+    ],
+    "/equipment-lookup": [
+      "equipment-lookup.js"
     ]
   },
   "deferred_routes": []

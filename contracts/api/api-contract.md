@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.45.0
-last-changed: 2026-07-16
+schema-version: 1.46.0
+last-changed: 2026-07-21
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -281,6 +281,8 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/production-achievement/known-workcenter-groups | required | - | ProductionAchievementKnownWorkcenterGroupsResponse | 500 | route tests |
 | GET | /api/production-achievement/permissions/me | required | - | ProductionAchievementOwnPermissionResponse | 500 | route tests |
 | GET | /api/uph-performance/machine-options | required | - | UphPerformanceMachineOptionsResponse | 500 | route tests |
+| GET | /api/equipment-lookup/options | required | - | EquipmentLookupOptionsResponse | 500 | route tests |
+| GET | /api/equipment-lookup/list | required | ?locations=&families=&resource_names= (each repeatable/comma-separated, exact-match)&page=(default 1)&page_size=(default 20, max 10000)&sort_by=(RESOURCENAME/LOCATIONNAME/RESOURCEFAMILYNAME, default RESOURCENAME)&sort_dir=(asc/desc, default asc) | EquipmentLookupListResponse | 400/500 | route tests |
 
 ## 5. Routing & Naming
 
@@ -481,6 +483,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## Compatibility Notes
 
+- **equipment-lookup-page (2026-07-21):** New endpoint family `/api/equipment-lookup/*` (2 endpoints: `GET /options`, `GET /list`) — 機台查詢 quick-lookup page under the 查詢工具 drawer. New schemas `EquipmentLookupOptionsResponse` (`{locations[], families[], resource_names[]}`) and `EquipmentLookupListResponse` (`{rows: [{RESOURCENAME, LOCATIONNAME, RESOURCEFAMILYNAME, VENDORNAME, VENDORMODEL, WORKCENTERNAME}], pagination: {page, page_size, total, total_pages}}`). Both endpoints are sync-only and read entirely from the existing `resource_cache` in-memory equipment snapshot (`get_distinct_values()` / `get_resources_by_filter()`) — no new Oracle queries, no spool, no RQ worker. `locations`/`families`/`resource_names` are independent, non-narrowing, exact-match multi-value filters (repeatable or comma-separated); `resource_names` is applied as a Python membership filter on top of `get_resources_by_filter()` since that shared function intentionally has no RESOURCENAME parameter (near-1:1 cardinality, unsuited to its bucketed index). `page_size` accepts up to 10000 so the frontend can fetch all matching rows in one call for CSV export; there is deliberately no separate export endpoint. Additive; no existing endpoints changed.
 - **production-achievement-oracle-plan-source (2026-07-16):** `GET /api/production-achievement/report` `ProductionAchievementReportResponse` redefined in place again (third breaking redefinition of the same schema name). BREAKING response-shape change under the same endpoint/schema name — no deprecate-2-minors window (same exception precedent as every prior `production-achievement-*` breaking change: sole consumer `frontend/src/production-achievement/` ships in the same atomic PR):
   - Targets are now sourced from Oracle `DWH.MES_WIP_OUTPUTPLAN`/`MES_WIP_OUTPUTPLAN_DETAIL` (business-rules.md PA-11), replacing the Excel-imported `production_achievement_daily_plans` MySQL table (§3.32, deprecated not dropped — existing rollback policy).
   - **Removed endpoints**: `GET/PUT /api/production-achievement/daily-plans`, `POST /api/production-achievement/daily-plans/import/preview`, `POST /api/production-achievement/daily-plans/import/confirm` (4 method+path rows) — all return 404. Removed schemas: `ProductionAchievementDailyPlanRow`/`Response`, `ProductionAchievementDailyPlanMapEntry`, `ProductionAchievementDailyPlanImportRow`/`MissingRow`/`Summary`/`PreviewData`/`PreviewResponse`/`ConfirmData`/`ConfirmResponse`.
@@ -531,6 +534,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.46.0] — 2026-07-21 (equipment-lookup-page):** New endpoint family `/api/equipment-lookup/*` (2 endpoints: `GET /options`, `GET /list`). New schemas `EquipmentLookupOptionsResponse`, `EquipmentLookupListResponse`. Sync-only, served entirely from the existing `resource_cache` in-memory equipment snapshot — no new Oracle queries, no spool, no RQ worker. Additive; no existing endpoints changed.
 - **[api 1.39.0] — 2026-07-21 (production-achievement-metadata-gated-refresh):** New `GET /api/production-achievement/report/meta` — cheap freshness-only probe (`sync_time`/`latest_data_timestamp` via a direct Redis spool-metadata read, no MySQL/Oracle round-trips, never enqueues). New schema `ProductionAchievementReportMetaResponse`. Additive; no existing endpoint changed. Frontend: `production-achievement` gains metadata-gated auto-refresh (polls this endpoint; only re-fetches `GET /report` when `sync_time` changes), scoped to 今日/前日 modes to match the hourly warmup scheduler's coverage.
 - **[api 1.38.1] — 2026-07-08 (move-target-permissions-panel):** No endpoint/schema/auth change. Consumer-only note: the two admin permission endpoints' frontend consumer moves from `admin-pages` to `admin-dashboard` (see Compatibility Notes above).
 - **[api 1.38.0] — 2026-07-08 (production-achievement-async-spool):** `GET /api/production-achievement/report` migrated from a synchronous Oracle-aggregated-row response to the async RQ → DuckDB parquet spool pattern (ADR-0016). Spool-hit → HTTP 200 `{query_id, spool_download_url, spec_workcenter_map, targets_map}` (`ProductionAchievementReportResponse` redefined in place); spool-miss + worker available → HTTP 202 (new `ProductionAchievementJobAccepted`, reuses generic `/api/job/<id>?prefix=production-achievement`); spool-miss + worker unavailable → HTTP 503. `shift_code`/`workcenter_group` no longer affect the server response or spool key. `production_achievement` added to the spool-namespace enum. No deprecation window (pre-launch, atomic-PR consumer). Other 5 endpoints in this family unchanged.
@@ -1866,3 +1870,34 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 | models | UphPerformanceMachineModel[] | yes |  | cascade source (family→model) |
 | workcenters | string[] | yes |  | distinct WORKCENTERNAME (工作站) |
 | equipment | UphPerformanceMachineEquipment[] | yes |  | full per-equipment map for client-side cascade |
+
+### EquipmentLookupOptionsResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| locations | string[] | yes |  | Distinct LOCATIONNAME (機台位置) values; full universe, no cross-filter narrowing |
+| families | string[] | yes |  | Distinct RESOURCEFAMILYNAME (機型) values; full universe, no cross-filter narrowing |
+| resource_names | string[] | yes |  | Distinct RESOURCENAME (編號) values; full universe, no cross-filter narrowing |
+
+### EquipmentLookupListResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| rows | EquipmentLookupRow[] | yes |  | Filtered/sorted/paginated equipment rows |
+| pagination | EquipmentLookupPagination | yes |  |  |
+
+### EquipmentLookupRow
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| RESOURCENAME | string | no |  | 編號 |
+| LOCATIONNAME | string | no |  | 機台位置 |
+| RESOURCEFAMILYNAME | string | no |  | 機型 |
+| VENDORNAME | string | no |  | display-only |
+| VENDORMODEL | string | no |  | display-only |
+| WORKCENTERNAME | string | no |  | display-only |
+
+### EquipmentLookupPagination
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| page | integer | yes |  | 1-based current page |
+| page_size | integer | yes |  | rows per page (max 10000) |
+| total | integer | yes |  | total matching rows across all pages |
+| total_pages | integer | yes |  | max(1, ceil(total / page_size)) |

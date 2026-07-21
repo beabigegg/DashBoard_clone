@@ -19,6 +19,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/downtime-analysis',
   '/eap-alarm',
   '/uph-performance',
+  '/equipment-lookup',
   '/login',
 ]);
 
@@ -266,6 +267,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: '料號用量報表',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/equipment-lookup': buildContract({
+    route: '/equipment-lookup',
+    routeId: 'equipment-lookup',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: '機台查詢',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',
