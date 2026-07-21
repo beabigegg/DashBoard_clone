@@ -1,5 +1,12 @@
 /* EAP ALARM Analysis — all rules scoped under .theme-eap-alarm (css-contract Rule 6) */
 
+/* .theme-eap-alarm isn't in resource-shared's --resource-border-defining :is() group,
+ * so its own .multi-select-trigger / filter-input borders (which reference this var)
+ * resolved to nothing. Define it locally, matching uph-performance's value/name. */
+.theme-eap-alarm {
+  --resource-border: theme('colors.token.hdbe4ef');
+}
+
 /* Override resource-shared's max-width: 1800px — fill the full shell-content area (same as downtime-analysis, resource-status) */
 .theme-eap-alarm .dashboard {
   max-width: none;
@@ -36,7 +43,7 @@
 }
 
 .theme-eap-alarm .mode-tab {
-  border: 1px solid var(--border);
+  border: 1px solid var(--resource-border);
   border-radius: 6px;
   padding: theme('spacing.token.p7') theme('spacing.token.p16');
   background: theme('colors.token.hffffff');
@@ -76,7 +83,7 @@
 .theme-eap-alarm .filter-input {
   height: 36px;
   padding: 0 theme('spacing.token.p10');
-  border: 1px solid var(--border);
+  border: 1px solid var(--resource-border);
   border-radius: 6px;
   font-size: 13px;
   background: theme('colors.token.hffffff');
@@ -245,7 +252,7 @@
 .theme-eap-alarm .detail-params-expand {
   padding: theme('spacing.token.p10') theme('spacing.token.p12');
   background: theme('colors.token.hf8fafc');
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--resource-border);
 }
 
 .theme-eap-alarm .detail-params-pre {
