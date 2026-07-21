@@ -621,6 +621,135 @@ class TestReportRefreshPlan:
 
 
 # ---------------------------------------------------------------------------
+# GET /api/production-achievement/report/meta
+# ---------------------------------------------------------------------------
+
+class TestReportMetaRoute:
+    """Cheap freshness-only probe -- never touches get_targets_map()/
+    get_workcenter_merge_entries()/get_oracle_plan_rows() (only
+    get_spool_file_path + get_spool_metadata, mirroring the spool-hit
+    branch's freshness fields on GET /report), and never enqueues."""
+
+    def test_report_meta_requires_login(self, client):
+        resp = client.get(
+            "/api/production-achievement/report/meta",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 401
+
+    def test_report_meta_requires_date_range(self, auth_client):
+        resp = auth_client.get("/api/production-achievement/report/meta")
+        assert resp.status_code == 400
+        payload = resp.get_json()
+        assert payload["success"] is False
+
+    def test_report_meta_rejects_over_730_day_range(self, auth_client):
+        resp = auth_client.get(
+            "/api/production-achievement/report/meta",
+            query_string={"start_date": "2020-01-01", "end_date": "2022-01-02"},
+        )
+        assert resp.status_code == 400
+
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_metadata",
+        return_value={"created_at": 1750000000, "latest_data_ts": "2026-04-02 07:29:59"},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_spool_hit_returns_sync_time_and_latest_data_timestamp(
+        self, mock_spool, mock_metadata, auth_client
+    ):
+        resp = auth_client.get(
+            "/api/production-achievement/report/meta",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["source"] == "output"
+        assert "query_id" in data
+        assert data["sync_time"] == 1750000000
+        assert data["latest_data_timestamp"] == "2026-04-02 07:29:59"
+        mock_metadata.assert_called_once()
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_metadata")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_spool_miss_returns_null_fields_not_an_error(self, mock_spool, mock_metadata, auth_client):
+        resp = auth_client.get(
+            "/api/production-achievement/report/meta",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["sync_time"] is None
+        assert data["latest_data_timestamp"] is None
+        # A miss must never fall through to a metadata read (get_spool_file_path
+        # already confirmed there's nothing to read) and must never enqueue.
+        mock_metadata.assert_not_called()
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_metadata", return_value=None)
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_dangling_metadata_after_hit_check_returns_null_fields_defensively(
+        self, mock_spool, mock_metadata, auth_client
+    ):
+        """get_spool_file_path() confirming a hit doesn't guarantee
+        get_spool_metadata() still returns non-None a moment later (Redis
+        metadata could expire/evict between the two calls) -- must not 500."""
+        resp = auth_client.get(
+            "/api/production-achievement/report/meta",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["sync_time"] is None
+        assert data["latest_data_timestamp"] is None
+
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_metadata",
+        return_value={"created_at": 1750000000, "latest_data_ts": "2026-04-02 07:29:59"},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_report_meta_never_enqueues(self, mock_spool, mock_metadata, auth_client):
+        with patch(
+            "mes_dashboard.routes.production_achievement_routes.enqueue_query_job"
+        ) as mock_enqueue:
+            resp = auth_client.get(
+                "/api/production-achievement/report/meta",
+                query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+            )
+            assert resp.status_code == 200
+            mock_enqueue.assert_not_called()
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_metadata")
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_report_meta_moveout_source_uses_moveout_namespace(
+        self, mock_spool, mock_metadata, auth_client
+    ):
+        from mes_dashboard.services.production_achievement_service import make_canonical_pa_spool_id
+
+        mock_metadata.return_value = {"created_at": 1, "latest_data_ts": None}
+        resp = auth_client.get(
+            "/api/production-achievement/report/meta",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02", "source": "moveout"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["source"] == "moveout"
+        assert data["query_id"] == make_canonical_pa_spool_id("2026-04-01", "2026-04-02", source="moveout")
+        mock_spool.assert_called_once_with("production_achievement_moveout", data["query_id"])
+
+
+# ---------------------------------------------------------------------------
 # GET /api/production-achievement/filter-options
 # ---------------------------------------------------------------------------
 

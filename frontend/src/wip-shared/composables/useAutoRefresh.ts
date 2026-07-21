@@ -15,6 +15,7 @@ export function useAutoRefresh({
   intervalMs = DEFAULT_REFRESH_INTERVAL_MS,
   autoStart = true,
   refreshOnVisible = true,
+  shouldRefresh,
 }: AutoRefreshOptions = {}) {
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   const controllers = new Map<string, AbortController>();
@@ -35,11 +36,24 @@ export function useAutoRefresh({
     }
   }
 
+  // Gates onRefresh behind shouldRefresh (when provided) so a scheduled tick
+  // or visibility-regain only pays for the expensive refresh once the cheap
+  // check confirms new data actually landed.
+  async function maybeRefresh(): Promise<void> {
+    if (shouldRefresh) {
+      const stale = await shouldRefresh();
+      if (!stale) {
+        return;
+      }
+    }
+    await onRefresh?.();
+  }
+
   function scheduleNextRefresh(): void {
     stopAutoRefresh();
     refreshTimer = setTimeout(() => {
       if (!document.hidden) {
-        void onRefresh?.();
+        void maybeRefresh();
       }
       scheduleNextRefresh();
     }, jitteredInterval(resolveIntervalMs()));
@@ -86,7 +100,7 @@ export function useAutoRefresh({
     if (resetTimer) {
       resetAutoRefresh();
     }
-    await onRefresh?.();
+    await maybeRefresh();
   }
 
   function handleVisibilityChange(): void {

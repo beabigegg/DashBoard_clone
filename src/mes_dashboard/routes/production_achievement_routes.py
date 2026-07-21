@@ -7,6 +7,7 @@ sourced from Oracle MES_WIP_OUTPUTPLAN via
 ``services/production_achievement_plan_service.py``, injected as ``plan_map``
 in ``GET /report``, business-rules.md PA-11):
   GET  /api/production-achievement/report
+  GET  /api/production-achievement/report/meta
   GET  /api/production-achievement/filter-options
   GET  /api/production-achievement/targets
   PUT  /api/production-achievement/targets
@@ -339,6 +340,59 @@ def api_get_report():
         },
         status_code=202,
     )
+
+
+# ============================================================
+# GET /api/production-achievement/report/meta
+# ============================================================
+
+
+@production_achievement_bp.route("/report/meta", methods=["GET"])
+@login_required
+def api_get_report_meta():
+    """Cheap freshness-only probe for what GET /report would otherwise serve.
+
+    Returns just sync_time/latest_data_timestamp via a direct Redis metadata
+    read (get_spool_file_path + get_spool_metadata) -- skips
+    get_targets_map()/get_workcenter_merge_entries()'s uncached MySQL
+    round-trips and plan_map's Oracle-backed lookup that GET /report's
+    spool-hit branch always pays for. Built for frontend polling (
+    production-achievement's metadata-gated auto-refresh, see
+    frontend/src/shared-composables/useFreshnessGate.ts): a poll here that
+    returns an unchanged sync_time skips the expensive GET /report re-fetch
+    entirely.
+
+    Same start_date/end_date/source contract as GET /report. Never enqueues
+    a background job and never errors on a spool miss -- returns null
+    fields (200) so a poll before the first warmup cycle completes is a
+    normal, not exceptional, response.
+    """
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+
+    try:
+        _validate_date_range(start_date, end_date)
+        source = _resolve_source(request.args.get("source"))
+    except ProductionAchievementValidationError as exc:
+        return validation_error(str(exc))
+
+    is_moveout = source == "moveout"
+    spool_namespace = _MOVEOUT_SPOOL_NAMESPACE if is_moveout else _SPOOL_NAMESPACE
+    query_id = make_canonical_pa_spool_id(start_date, end_date, source=source)
+
+    sync_time = None
+    latest_data_timestamp = None
+    if get_spool_file_path(spool_namespace, query_id) is not None:
+        spool_metadata = get_spool_metadata(spool_namespace, query_id)
+        sync_time = spool_metadata.get("created_at") if spool_metadata else None
+        latest_data_timestamp = spool_metadata.get("latest_data_ts") if spool_metadata else None
+
+    return success_response({
+        "query_id": query_id,
+        "source": source,
+        "sync_time": sync_time,
+        "latest_data_timestamp": latest_data_timestamp,
+    })
 
 
 # ============================================================

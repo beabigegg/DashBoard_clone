@@ -264,10 +264,10 @@ test('test_manifest_nav_tree_non_admin_matches_baseline (AC-1)', () => {
   assert.ok(drawerIds.includes('eap-analysis'), 'eap-analysis drawer must be visible');
   assert.ok(drawerIds.includes('production-assist'), 'production-assist drawer must be visible');
 
-  // Drawer order must be 1..5, 7 (dev-tools at 6 excluded for non-admin)
+  // Drawer order must be 1..6 (dev-tools at 7 excluded for non-admin)
   const orders = state.drawers.map((d) => d.order);
   const sortedOrders = [...orders].sort((a, b) => a - b);
-  assert.deepEqual(sortedOrders, [1, 2, 3, 4, 5, 7]);
+  assert.deepEqual(sortedOrders, [1, 2, 3, 4, 5, 6]);
 
   // Page counts per drawer (from current-behavior.md)
   const byId = Object.fromEntries(state.drawers.map((d) => [d.id, d]));

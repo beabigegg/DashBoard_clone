@@ -17,6 +17,8 @@
  * are stubbed. `global.fetch` drives every JSON `/api/...` call.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { defineComponent, h } from 'vue';
+import { mount } from '@vue/test-utils';
 import { useProductionAchievement, resolveMonthPeriod } from '../composables/useProductionAchievement';
 
 vi.mock('../../core/duckdb-activation-policy', () => ({
@@ -714,5 +716,189 @@ describe('useProductionAchievement — checkSettingsAccess (PA-17)', () => {
     );
     const { checkSettingsAccess } = useProductionAchievement();
     await expect(checkSettingsAccess()).resolves.toBe('error');
+  });
+});
+
+describe('useProductionAchievement — metadata-gated auto-refresh (今日/前日 only)', () => {
+  const originalFetch = global.fetch;
+
+  // Mounted inside a real component so useAutoRefresh's internal onMounted
+  // actually fires (production-achievement's own bare-composable test
+  // convention above never mounts, so autoStart never triggers there -- see
+  // useProductionAchievement.ts's autoStart doc comment).
+  function mountComposable() {
+    let api: ReturnType<typeof useProductionAchievement> | null = null;
+    const Comp = defineComponent({
+      setup() {
+        api = useProductionAchievement();
+        return () => h('div');
+      },
+    });
+    const wrapper = mount(Comp);
+    return { wrapper, api: api as unknown as ReturnType<typeof useProductionAchievement> };
+  }
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // jitteredInterval -> zero jitter
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    sessionStorage.clear();
+  });
+
+  it('polls GET /report/meta every 60s in 今日 mode but skips a full re-fetch when sync_time is unchanged', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    let reportCalls = 0;
+    let metaCalls = 0;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/report/meta')) {
+        metaCalls++;
+        return Promise.resolve(
+          jsonResponse({ success: true, data: { sync_time: SYNC_TIME_EPOCH, latest_data_timestamp: LATEST_DATA_TIMESTAMP }, meta: {} }),
+        );
+      }
+      if (u.includes('/production-achievement/report')) {
+        reportCalls++;
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    const { wrapper, api } = mountComposable();
+    await api.runQuery();
+    expect(reportCalls).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(metaCalls).toBeGreaterThanOrEqual(1);
+    // sync_time reported by /report/meta matches the sync_time runQuery()
+    // already rendered -- no full re-fetch should have fired.
+    expect(reportCalls).toBe(1);
+
+    wrapper.unmount();
+  });
+
+  it('re-fetches the full report once /report/meta reports a new sync_time', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    let reportCalls = 0;
+    let metaSyncTime = SYNC_TIME_EPOCH;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/report/meta')) {
+        return Promise.resolve(
+          jsonResponse({ success: true, data: { sync_time: metaSyncTime, latest_data_timestamp: LATEST_DATA_TIMESTAMP }, meta: {} }),
+        );
+      }
+      if (u.includes('/production-achievement/report')) {
+        reportCalls++;
+        return Promise.resolve(
+          jsonResponse({ ...SPOOL_HIT_BODY, data: { ...SPOOL_HIT_BODY.data, sync_time: metaSyncTime } }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    const { wrapper, api } = mountComposable();
+    await api.runQuery();
+    expect(reportCalls).toBe(1);
+
+    // Warmup scheduler landed a fresh cycle between polls.
+    metaSyncTime = SYNC_TIME_EPOCH + 3600;
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(reportCalls).toBe(2);
+    expect(api.syncTime.value).toBe(metaSyncTime);
+
+    wrapper.unmount();
+  });
+
+  it('does not poll /report/meta at all in 當月 mode (backend warmup never covers it)', async () => {
+    sessionStorage.setItem(
+      'production-achievement:last-report-state',
+      JSON.stringify({ mode: 'month', source: 'output', workcenter_group: '焊接_DB' }),
+    );
+    const client = await mockedDuckDbClient();
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValue([]);
+
+    let metaCalls = 0;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/report/meta')) metaCalls++;
+      if (u.includes('/production-achievement/report')) {
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    const { wrapper, api } = mountComposable();
+    expect(api.filters.mode).toBe('month');
+    await api.runQuery();
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(metaCalls).toBe(0);
+    wrapper.unmount();
+  });
+
+  it('setMode into 今日 starts the freshness poll; setMode away from it stops the poll', async () => {
+    sessionStorage.setItem(
+      'production-achievement:last-report-state',
+      JSON.stringify({ mode: 'month', source: 'output', workcenter_group: '焊接_DB' }),
+    );
+    const client = await mockedDuckDbClient();
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValue([]);
+
+    let metaCalls = 0;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/report/meta')) {
+        metaCalls++;
+        return Promise.resolve(
+          jsonResponse({ success: true, data: { sync_time: SYNC_TIME_EPOCH, latest_data_timestamp: LATEST_DATA_TIMESTAMP }, meta: {} }),
+        );
+      }
+      if (u.includes('/production-achievement/report')) {
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    const { wrapper, api } = mountComposable();
+    await api.runQuery(); // initial 當月 load -- no poll started (autoStart was false at mount)
+
+    api.setMode('today');
+    // setMode() fire-and-forgets runQuery() -- flush its promise chain (all
+    // hops resolve via already-mocked promises, no timer involved) before
+    // advancing the auto-refresh timer.
+    for (let i = 0; i < 10; i++) await vi.advanceTimersByTimeAsync(0);
+    expect(api.hasQueried.value).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(metaCalls).toBeGreaterThanOrEqual(1);
+
+    const callsAtToday = metaCalls;
+    api.setMode('range');
+    await vi.advanceTimersByTimeAsync(120_000);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Stopped -- no further /report/meta polls once switched away from 今日/前日.
+    expect(metaCalls).toBe(callsAtToday);
+
+    wrapper.unmount();
   });
 });

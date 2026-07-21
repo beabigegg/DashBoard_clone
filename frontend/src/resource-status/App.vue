@@ -4,6 +4,7 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { apiGet, ensureMesApiAvailable } from '../core/api';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { createFreshnessGate } from '../shared-composables/useFreshnessGate';
 import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import {
@@ -700,9 +701,26 @@ function updatePackageGroups(groups: string[]): void {
   updateField('packageGroups', groups || []);
 }
 
+// Equipment status is a separately-cached (5-min sync worker,
+// realtime_equipment_cache.py) dataset from WIP -- its own /health field
+// (equipment_status_cache.updated_at) is what checkCacheStatus() above
+// already displays as the "last updated" badge; reused here as the cheap
+// freshness token so a scheduled tick only re-fetches the full
+// summary/equipment lists once that sync worker actually wrote new data.
+const freshnessGate = createFreshnessGate(async () => {
+  try {
+    const health = await apiGet('/health', { timeout: 15000, retries: 0, silent: true });
+    const data = health as { equipment_status_cache?: { updated_at?: string | null } } | null | undefined;
+    return data?.equipment_status_cache?.updated_at ?? null;
+  } catch {
+    return null;
+  }
+});
+
 const { resetAutoRefresh } = useAutoRefresh({
   onRefresh: () => loadData(false),
-  intervalMs: 5 * 60 * 1000,
+  shouldRefresh: freshnessGate.shouldRefresh,
+  intervalMs: 60_000,
   autoStart: true,
   refreshOnVisible: true,
 });
@@ -714,6 +732,7 @@ async function initPage(): Promise<void> {
     equipmentError.value = (error as Error)?.message || '載入篩選選項失敗';
   }
   await loadData(true);
+  void freshnessGate.seed();
 }
 
 onMounted(() => {

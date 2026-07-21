@@ -52,6 +52,8 @@ import { computed, reactive, ref } from 'vue';
 import { apiGet, apiPost } from '../../core/api';
 import { unwrapApiData } from '../../core/unwrap-api-result';
 import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
+import { useAutoRefresh } from '../../shared-composables/useAutoRefresh';
+import { createFreshnessGate } from '../../shared-composables/useFreshnessGate';
 import { useProductionAchievementDuckDB } from './useProductionAchievementDuckDB';
 import type {
   SpecWorkcenterMapRow,
@@ -352,6 +354,55 @@ export function useProductionAchievement() {
 
   const duckdb = useProductionAchievementDuckDB();
 
+  // ── Metadata-gated auto-refresh (今日/前日 only — matches the backend's
+  // hourly warmup scheduler coverage, production_achievement_daily_cache.py,
+  // which never warms 當月/自訂區間: outside those two modes there is no
+  // discrete "new data landed" event to poll for). Polls the cheap
+  // GET /report/meta probe every intervalMs; a real runQuery() (full spool
+  // re-fetch) only fires once its sync_time actually diverges from the
+  // active query's own sync_time (see useFreshnessGate.ts) — never a blind
+  // refresh on a fixed timer.
+  async function _fetchFreshnessToken(): Promise<string | null> {
+    if (filters.mode !== 'today' && filters.mode !== 'yesterday') return null;
+    try {
+      const { start_date, end_date } = _resolveSnapshotDates(filters.mode, new Date());
+      const res = await apiGet<{ sync_time?: number | null }>('/api/production-achievement/report/meta', {
+        params: { start_date, end_date, source: filters.source },
+        timeout: 15000,
+        silent: true,
+      });
+      if (!res.success) return null;
+      const value = (res.data ?? {}) as { sync_time?: number | null };
+      return value.sync_time !== null && value.sync_time !== undefined ? String(value.sync_time) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const _freshnessGate = createFreshnessGate(_fetchFreshnessToken);
+
+  // autoStart is captured once here (initial persisted mode) -- gated behind
+  // useAutoRefresh's own onMounted (a no-op outside a real component setup,
+  // e.g. bare composable-call unit tests), matching every other page's
+  // useAutoRefresh({ autoStart: true }) call convention. Later mode changes
+  // are handled explicitly by _syncAutoRefreshForMode below (setMode), not by
+  // re-evaluating this initial value.
+  const { startAutoRefresh: _startAutoRefresh, stopAutoRefresh: _stopAutoRefresh } = useAutoRefresh({
+    onRefresh: () => runQuery(),
+    shouldRefresh: _freshnessGate.shouldRefresh,
+    intervalMs: 60_000,
+    autoStart: filters.mode === 'today' || filters.mode === 'yesterday',
+    refreshOnVisible: true,
+  });
+
+  function _syncAutoRefreshForMode(mode: ProductionAchievementMode): void {
+    if (mode === 'today' || mode === 'yesterday') {
+      _startAutoRefresh();
+    } else {
+      _stopAutoRefresh();
+    }
+  }
+
   async function fetchFilterOptions(): Promise<void> {
     try {
       const res = await apiGet<{ workcenter_groups?: string[] }>('/api/production-achievement/filter-options');
@@ -562,6 +613,7 @@ export function useProductionAchievement() {
   async function _activateAndRender(data: ReportSpoolHit, snapshot: QuerySnapshot): Promise<void> {
     syncTime.value = data.sync_time ?? null;
     latestDataTimestamp.value = data.latest_data_timestamp ?? null;
+    _freshnessGate.markFresh(syncTime.value !== null ? String(syncTime.value) : null);
     _rebuildParentChildren(data.workcenter_merge_map || []);
     await duckdb.activate(
       data.spool_download_url,
@@ -622,6 +674,7 @@ export function useProductionAchievement() {
       if (!filters.end_date) filters.end_date = todayStr;
     }
     persistState(filters.mode, filters.source, filters.workcenter_group);
+    _syncAutoRefreshForMode(filters.mode);
     void runQuery();
   }
 

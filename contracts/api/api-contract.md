@@ -254,6 +254,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
 | GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
 | GET | /api/production-achievement/report | required | ?start_date=&end_date=&shift_code=(opt)&workcenter_group=(opt)&source=(opt,output/moveout,default output)&force_refresh=(opt,bool,clears+re-enqueues the actual-output spool)&refresh_plan=(opt,bool,bypasses the Oracle plan/target cache independently; implied by force_refresh=true) | ProductionAchievementReportResponse | 202/400/500/503 | route tests |
+| GET | /api/production-achievement/report/meta | required | ?start_date=&end_date=&source=(opt,output/moveout,default output) | ProductionAchievementReportMetaResponse | 400/500 | route tests |
 | GET | /api/production-achievement/filter-options | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/production-achievement/targets | required | ?shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementTargetsResponse | 500 | route tests |
 | PUT | /api/production-achievement/targets | required | body {shift_code, workcenter_group, target_qty}; also gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
@@ -530,6 +531,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.39.0] — 2026-07-21 (production-achievement-metadata-gated-refresh):** New `GET /api/production-achievement/report/meta` — cheap freshness-only probe (`sync_time`/`latest_data_timestamp` via a direct Redis spool-metadata read, no MySQL/Oracle round-trips, never enqueues). New schema `ProductionAchievementReportMetaResponse`. Additive; no existing endpoint changed. Frontend: `production-achievement` gains metadata-gated auto-refresh (polls this endpoint; only re-fetches `GET /report` when `sync_time` changes), scoped to 今日/前日 modes to match the hourly warmup scheduler's coverage.
 - **[api 1.38.1] — 2026-07-08 (move-target-permissions-panel):** No endpoint/schema/auth change. Consumer-only note: the two admin permission endpoints' frontend consumer moves from `admin-pages` to `admin-dashboard` (see Compatibility Notes above).
 - **[api 1.38.0] — 2026-07-08 (production-achievement-async-spool):** `GET /api/production-achievement/report` migrated from a synchronous Oracle-aggregated-row response to the async RQ → DuckDB parquet spool pattern (ADR-0016). Spool-hit → HTTP 200 `{query_id, spool_download_url, spec_workcenter_map, targets_map}` (`ProductionAchievementReportResponse` redefined in place); spool-miss + worker available → HTTP 202 (new `ProductionAchievementJobAccepted`, reuses generic `/api/job/<id>?prefix=production-achievement`); spool-miss + worker unavailable → HTTP 503. `shift_code`/`workcenter_group` no longer affect the server response or spool key. `production_achievement` added to the spool-namespace enum. No deprecation window (pre-launch, atomic-PR consumer). Other 5 endpoints in this family unchanged.
 - **[api 1.36.0] — 2026-07-02 (production-achievement-kanban):** New endpoint family `/api/production-achievement/*` (4 endpoints: report, filter-options, targets GET/PUT) + `/admin/api/production-achievement/permissions*` (2 endpoints). New schemas: `ProductionAchievementReportResponse`, `ProductionAchievementTargetsResponse`, `ProductionAchievementPermissionsResponse`. `PUT /api/production-achievement/targets` is permission-gated by a new independent `can_edit_targets` check (not `admin_required`); 403 on unauthorized write. All additive; no existing endpoints changed.
@@ -1371,6 +1373,37 @@ Tier-B — `GET /api/production-achievement/report`. Redefined by `production-ac
             }
           }
         }
+      }
+    },
+    "error": {},
+    "meta": {
+      "type": "object",
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### ProductionAchievementReportMetaResponse
+
+Tier-C — `GET /api/production-achievement/report/meta`. Cheap freshness-only probe added by `production-achievement-metadata-gated-refresh`: reads the same Redis spool metadata pointer `GET /report`'s spool-hit branch uses for `sync_time`/`latest_data_timestamp`, but skips `get_targets_map()`/`get_workcenter_merge_entries()` (uncached MySQL round-trips) and `get_oracle_plan_rows()` (Oracle-backed) entirely — safe for frequent polling. Always HTTP 200; a spool miss returns `sync_time`/`latest_data_timestamp` as `null` (never 202/503 — this endpoint never enqueues a background job). 400 on missing/invalid `start_date`/`end_date` (same `_validate_date_range` as `GET /report`).
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": {
+      "type": ["object", "null"],
+      "properties": {
+        "query_id": { "type": "string" },
+        "source": { "type": "string", "enum": ["output", "moveout"] },
+        "sync_time": { "type": ["integer", "null"] },
+        "latest_data_timestamp": { "type": ["string", "null"] }
       }
     },
     "error": {},

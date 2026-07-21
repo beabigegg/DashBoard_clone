@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
-import { apiPost } from '../core/api';
+import { apiGet, apiPost } from '../core/api';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation';
 import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state';
 import { buildWipOverviewQueryParams } from '../core/wip-derive';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { createFreshnessGate } from '../shared-composables/useFreshnessGate';
 import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 
@@ -251,8 +252,26 @@ const matrixTitle = computed(() => {
   return `${base} - ${activeStatusFilter.value.toUpperCase()} Only`;
 });
 
+// Cheap freshness probe: WIP's full-table cache is written by a background
+// updater (cache_updater.py) roughly every 10 min, not on every request --
+// polling /health's cache.updated_at (same Redis meta:updated_at pointer
+// dataUpdateDate's sys_date sibling comes from) every 60s catches a new
+// cache write soon after it lands, without blindly re-fetching+re-rendering
+// the full summary/matrix on a fixed timer when nothing actually changed.
+const freshnessGate = createFreshnessGate(async () => {
+  try {
+    const health = await apiGet('/health', { timeout: 15000, retries: 0, silent: true });
+    const data = health as { cache?: { updated_at?: string | null } } | null | undefined;
+    return data?.cache?.updated_at ?? null;
+  } catch {
+    return null;
+  }
+});
+
 const { createAbortSignal, triggerRefresh } = useAutoRefresh({
   onRefresh: () => loadAllData(false),
+  shouldRefresh: freshnessGate.shouldRefresh,
+  intervalMs: 60_000,
   autoStart: true,
 });
 
@@ -497,6 +516,7 @@ async function initializePage() {
     loadFilterOptions(filters),
     loadAllData(true),
   ]);
+  void freshnessGate.seed();
 }
 
 onMounted(() => {

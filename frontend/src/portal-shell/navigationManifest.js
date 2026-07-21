@@ -23,11 +23,11 @@
 export const drawers = Object.freeze([
   { id: 'reports',         name: '即時報表', order: 1, admin_only: false },
   { id: 'history-reports', name: '歷史報表', order: 2, admin_only: false },
-  { id: 'query-tools',     name: '查詢工具', order: 3, admin_only: false },
-  { id: 'trace-tools',     name: '追溯工具', order: 4, admin_only: false },
-  { id: 'eap-analysis',    name: 'EAP',      order: 5, admin_only: false },
-  { id: 'dev-tools',          name: '開發工具', order: 6, admin_only: true  },
-  { id: 'production-assist',  name: '生產輔助', order: 7, admin_only: false },
+  { id: 'production-assist',  name: '生產輔助', order: 3, admin_only: false },
+  { id: 'query-tools',     name: '查詢工具', order: 4, admin_only: false },
+  { id: 'trace-tools',     name: '追溯工具', order: 5, admin_only: false },
+  { id: 'eap-analysis',    name: 'EAP',      order: 6, admin_only: false },
+  { id: 'dev-tools',          name: '開發工具', order: 7, admin_only: true  },
 ]);
 
 /**
@@ -79,7 +79,7 @@ export const routes = Object.freeze({
     displayName: '設備停機分析',
   },
 
-  // ── 查詢工具 (query-tools, order 3) ─────────────────────────────────────
+  // ── 查詢工具 (query-tools, order 4) ─────────────────────────────────────
   '/reject-history': {
     drawerId: 'query-tools',
     order: 1,
@@ -106,7 +106,7 @@ export const routes = Object.freeze({
     displayName: '原物料用量查詢',
   },
 
-  // ── 追溯工具 (trace-tools, order 4) ─────────────────────────────────────
+  // ── 追溯工具 (trace-tools, order 5) ─────────────────────────────────────
   // Explicit distinct orders resolve the order-3 tie from current-behavior.md.
   '/query-tool': {
     drawerId: 'trace-tools',
@@ -124,7 +124,7 @@ export const routes = Object.freeze({
     displayName: '原物料追溯查詢',
   },
 
-  // ── 開發工具 (dev-tools, order 6, admin_only) ───────────────────────────
+  // ── 開發工具 (dev-tools, order 7, admin_only) ───────────────────────────
   '/admin/pages': {
     drawerId: 'dev-tools',
     order: 1,
@@ -137,14 +137,14 @@ export const routes = Object.freeze({
     defaultStatus: 'dev',
   },
 
-  // ── EAP (eap-analysis, order 5) ─────────────────────────────────────────
+  // ── EAP (eap-analysis, order 6) ─────────────────────────────────────────
   '/eap-alarm': {
     drawerId: 'eap-analysis',
     order: 1,
     displayName: 'EAP ALARM 分析',
   },
 
-  // ── 生產輔助 (production-assist, order 7) ──────────────────────────────
+  // ── 生產輔助 (production-assist, order 3) ──────────────────────────────
   '/db-scheduling': {
     drawerId: 'production-assist',
     order: 1,

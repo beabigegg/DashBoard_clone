@@ -7,6 +7,7 @@ import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '.
 import { peekHoldNavigationState } from '../core/hold-navigation-state';
 import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { createFreshnessGate } from '../shared-composables/useFreshnessGate';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
@@ -275,8 +276,23 @@ function updateUrlState() {
   replaceRuntimeHistory(`/hold-detail?${params.toString()}`);
 }
 
+// Same WIP full-table cache as wip-overview/hold-overview (get_hold_detail_
+// summary() also reads _get_wip_dataframe()) -- same cheap /health
+// cache.updated_at probe.
+const freshnessGate = createFreshnessGate(async () => {
+  try {
+    const health = await apiGet('/health', { timeout: 15000, retries: 0, silent: true });
+    const data = health as { cache?: { updated_at?: string | null } } | null | undefined;
+    return data?.cache?.updated_at ?? null;
+  } catch {
+    return null;
+  }
+});
+
 const { createAbortSignal, clearAbortController, resetAutoRefresh, triggerRefresh } = useAutoRefresh({
   onRefresh: () => loadAllData(false),
+  shouldRefresh: freshnessGate.shouldRefresh,
+  intervalMs: 60_000,
   autoStart: true,
 });
 
@@ -483,7 +499,7 @@ onMounted(() => {
     return;
   }
   updateUrlState();
-  void loadAllData(true);
+  void loadAllData(true).then(() => freshnessGate.seed());
 });
 </script>
 

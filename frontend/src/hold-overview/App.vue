@@ -7,6 +7,7 @@ import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-nav
 import { storeHoldNavigationState, loadHoldNavigationState } from '../core/hold-navigation-state';
 import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { createFreshnessGate } from '../shared-composables/useFreshnessGate';
 import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
@@ -519,8 +520,23 @@ function updateUrlState() {
   replaceRuntimeHistory(nextUrl);
 }
 
+// Hold data rides the same WIP full-table cache as wip-overview
+// (get_hold_overview_* in wip_service.py all read _get_wip_dataframe()) --
+// same cheap /health cache.updated_at freshness probe, same rationale.
+const freshnessGate = createFreshnessGate(async () => {
+  try {
+    const health = await apiGet('/health', { timeout: 15000, retries: 0, silent: true });
+    const data = health as { cache?: { updated_at?: string | null } } | null | undefined;
+    return data?.cache?.updated_at ?? null;
+  } catch {
+    return null;
+  }
+});
+
 const { createAbortSignal, clearAbortController, triggerRefresh } = useAutoRefresh({
   onRefresh: () => loadAllData(false),
+  shouldRefresh: freshnessGate.shouldRefresh,
+  intervalMs: 60_000,
   autoStart: true,
 });
 
@@ -888,6 +904,7 @@ async function initializePage() {
     loadFilterOptions(filters),
     loadAllData(true),
   ]);
+  void freshnessGate.seed();
 }
 
 onMounted(() => {

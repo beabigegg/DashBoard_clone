@@ -11,6 +11,14 @@ export interface AutoRefreshOptions {
   intervalMs?: number | (() => number);
   autoStart?: boolean;
   refreshOnVisible?: boolean;
+  /**
+   * Optional cheap freshness check run before every automatic refresh
+   * (scheduled tick and visibility-regain alike). When provided, `onRefresh`
+   * only fires if this resolves `true` — `intervalMs` becomes a check
+   * cadence instead of a blind refresh cadence. Omit to keep unconditional
+   * refresh-on-tick behavior.
+   */
+  shouldRefresh?: () => boolean | Promise<boolean>;
   [key: string]: unknown;
 }
 

@@ -7,6 +7,7 @@ import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-nav
 import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state';
 import { buildWipDetailQueryParams, buildWipOverviewQueryParams } from '../core/wip-derive';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { createFreshnessGate } from '../shared-composables/useFreshnessGate';
 import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 
@@ -273,8 +274,22 @@ function showRefreshSuccess() {
   }, 1500);
 }
 
+// Same WIP full-table cache as wip-overview (get_wip_detail() also reads
+// _get_wip_dataframe()) -- same cheap /health cache.updated_at probe.
+const freshnessGate = createFreshnessGate(async () => {
+  try {
+    const health = await apiGet('/health', { timeout: 15000, retries: 0, silent: true });
+    const data = health as { cache?: { updated_at?: string | null } } | null | undefined;
+    return data?.cache?.updated_at ?? null;
+  } catch {
+    return null;
+  }
+});
+
 const { createAbortSignal, triggerRefresh, startAutoRefresh } = useAutoRefresh({
   onRefresh: () => loadAllData(false),
+  shouldRefresh: freshnessGate.shouldRefresh,
+  intervalMs: 60_000,
   autoStart: false,
 });
 
@@ -536,6 +551,7 @@ async function initializePage() {
     loadFilterOptions(filters),
     loadAllData(true),
   ]);
+  void freshnessGate.seed();
   startAutoRefresh();
 }
 
