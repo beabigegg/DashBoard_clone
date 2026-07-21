@@ -152,7 +152,11 @@ def get_filter_options(
         "pj_functions": [...], "updated_at": <iso>,
         "schema_version": int}``. Each value list is sorted ascending,
         deduplicated. When ``selected`` is empty/missing, returns the full
-        ``indices`` set (AC-1).
+        ``indices`` set (AC-1). A dimension's own current selection never
+        narrows its own returned option list — only the OTHER three
+        dimensions narrow it (self-exclusion) — so the user can keep
+        adding values to the same multi-select instead of every
+        not-yet-selected sibling vanishing the moment one value is picked.
     """
     _ensure_loaded()
     with _CACHE_LOCK:
@@ -189,32 +193,38 @@ def get_filter_options(
         # All selections were unknown — fall back to full set.
         return base_result
 
-    # Single-pass tuple scan, union per field.
-    out_types: set[str] = set()
-    out_packages: set[str] = set()
-    out_bops: set[str] = set()
-    out_functions: set[str] = set()
+    # Field index within each tuple: (PJ_TYPE, PRODUCTLINENAME, PJ_BOP, PJ_FUNCTION).
+    _PJ_TYPES, _PACKAGES, _BOPS, _PJ_FUNCTIONS = 0, 1, 2, 3
 
-    for (t_type, t_pkg, t_bop, t_fn) in tuples:
-        if sel_pj_types and t_type not in sel_pj_types:
-            continue
-        if sel_packages and t_pkg not in sel_packages:
-            continue
-        if sel_bops and t_bop not in sel_bops:
-            continue
-        if sel_pj_functions and (t_fn or "") not in sel_pj_functions:
-            continue
-        out_types.add(t_type)
-        out_packages.add(t_pkg)
-        out_bops.add(t_bop)
-        if t_fn:
-            out_functions.add(t_fn)
+    def _narrow(field: int) -> set[str]:
+        # Narrow `field`'s option list by every OTHER dimension's current
+        # selection, but never by its own (self-exclusion) — otherwise
+        # picking one value would immediately hide every other value from
+        # the same multi-select.
+        out: set[str] = set()
+        for tup in tuples:
+            if sel_pj_types and field != _PJ_TYPES and tup[_PJ_TYPES] not in sel_pj_types:
+                continue
+            if sel_packages and field != _PACKAGES and tup[_PACKAGES] not in sel_packages:
+                continue
+            if sel_bops and field != _BOPS and tup[_BOPS] not in sel_bops:
+                continue
+            if (
+                sel_pj_functions
+                and field != _PJ_FUNCTIONS
+                and (tup[_PJ_FUNCTIONS] or "") not in sel_pj_functions
+            ):
+                continue
+            value = tup[field]
+            if value:
+                out.add(value)
+        return out
 
     return {
-        "pj_types": sorted(out_types),
-        "packages": sorted(out_packages),
-        "bops": sorted(out_bops),
-        "pj_functions": sorted(out_functions),
+        "pj_types": sorted(_narrow(_PJ_TYPES)),
+        "packages": sorted(_narrow(_PACKAGES)),
+        "bops": sorted(_narrow(_BOPS)),
+        "pj_functions": sorted(_narrow(_PJ_FUNCTIONS)),
         "updated_at": updated_at,
         "schema_version": SCHEMA_VERSION,
     }

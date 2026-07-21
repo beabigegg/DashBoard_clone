@@ -212,7 +212,9 @@ class TestSchemaV2Payload:
         assert sorted(opts["pj_functions"]) == ["FN_1"]
 
     def test_cross_filter_pairwise_narrowing_package_and_type(self):
-        """Pairwise selection (packages + pj_types) intersects: both must match.
+        """Pairwise selection (packages + pj_types) intersects: both must match
+        for OTHER dimensions (bops/pj_functions), but a dimension never narrows
+        its own returned option list by its own selection (self-exclusion).
 
         Coverage gap previously: only single-field narrowing was tested. This
         test exercises the AND semantics across multiple selected fields, which
@@ -228,13 +230,40 @@ class TestSchemaV2Payload:
                 with patch.object(cache_mod, "_write_to_redis"):
                     cache_mod.init()
 
-        # PKG_A ∩ TYPE_X: only the (TYPE_X, PKG_A, BOP_1, FN_1) tuple matches.
+        # PKG_A ∩ TYPE_X: only the (TYPE_X, PKG_A, BOP_1, FN_1) tuple matches
+        # for bops/pj_functions (narrowed by BOTH other selections).
         opts = cache_mod.get_filter_options(
             {"packages": ["PKG_A"], "pj_types": ["TYPE_X"]}
         )
         assert sorted(opts["bops"]) == ["BOP_1"]
-        assert sorted(opts["pj_types"]) == ["TYPE_X"]
         assert sorted(opts["pj_functions"]) == ["FN_1"]
+        # pj_types must NOT be narrowed by its own selection — only by
+        # packages=PKG_A, which also co-occurs with TYPE_Y (tuple 3), so
+        # TYPE_Y must still be selectable alongside the already-picked TYPE_X.
+        assert sorted(opts["pj_types"]) == ["TYPE_X", "TYPE_Y"]
+
+    def test_selecting_one_pj_type_does_not_hide_other_pj_types_from_own_dropdown(self):
+        """Regression: a dimension's own current selection must never narrow
+        its own returned option list, or the user could never add a second
+        value to the same multi-select. Confirmed live on production-history's
+        1st-tier prefilters, reject-history's primary prefilters, and
+        mid-section-defect's Type/Package filters — all share this cache.
+        """
+        import mes_dashboard.services.container_filter_cache as cache_mod
+
+        with patch.object(cache_mod, "_read_from_redis", return_value=None):
+            with patch(
+                "mes_dashboard.services.container_filter_cache.read_sql_df",
+                return_value=_sample_tuple_df(),
+            ):
+                with patch.object(cache_mod, "_write_to_redis"):
+                    cache_mod.init()
+
+        # Selecting only pj_types=TYPE_X must return the FULL pj_types set
+        # unchanged (no other dimension is selected to narrow it, and it must
+        # not narrow itself).
+        opts = cache_mod.get_filter_options({"pj_types": ["TYPE_X"]})
+        assert sorted(opts["pj_types"]) == ["TYPE_X", "TYPE_Y"]
 
     def test_cross_filter_three_way_narrowing(self):
         """Three-field selection further narrows to single tuple intersections."""
@@ -260,7 +289,14 @@ class TestSchemaV2Payload:
         assert opts["pj_functions"] == ["FN_2"]
 
     def test_cross_filter_empty_when_contradictory_selections(self):
-        """Mutually exclusive selections → all fields empty (no co-occurrence)."""
+        """Mutually exclusive selections (packages=PKG_A, bops=BOP_2 never
+        co-occur) → dimensions with NO selection of their own (pj_types,
+        pj_functions) see the strict intersection and go empty. But packages
+        and bops each self-exclude, so they still show what's reachable via
+        the OTHER selected field alone — surfacing the fix the user needs
+        (e.g. "bops" still offers BOP_1, which is what actually pairs with the
+        already-selected PKG_A) rather than collapsing everything to empty.
+        """
         import mes_dashboard.services.container_filter_cache as cache_mod
 
         with patch.object(cache_mod, "_read_from_redis", return_value=None):
@@ -271,15 +307,19 @@ class TestSchemaV2Payload:
                 with patch.object(cache_mod, "_write_to_redis"):
                     cache_mod.init()
 
-        # PKG_A only appears with BOP_1; selecting PKG_A + BOP_2 → no rows.
+        # PKG_A only appears with BOP_1; selecting PKG_A + BOP_2 → no rows
+        # satisfy both simultaneously.
         opts = cache_mod.get_filter_options({
             "packages": ["PKG_A"],
             "bops": ["BOP_2"],
         })
+        # No selection on these two -> strict intersection of packages+bops -> empty.
         assert opts["pj_types"] == []
-        assert opts["packages"] == []
-        assert opts["bops"] == []
         assert opts["pj_functions"] == []
+        # Self-excluded: packages narrowed only by bops=BOP_2 -> PKG_B (tuple 2).
+        assert opts["packages"] == ["PKG_B"]
+        # Self-excluded: bops narrowed only by packages=PKG_A -> BOP_1 (tuples 1,3).
+        assert opts["bops"] == ["BOP_1"]
 
     def test_cross_filter_csv_multi_value_per_field(self):
         """Multi-value within a single field is a union (OR semantics)."""

@@ -488,3 +488,38 @@ class TestEquipmentFilterEmptyNoOp:
         assert sql_fragment == "1=1"
         assert params == {}
         assert "IN ()" not in sql_fragment
+
+
+class TestGetFilterOptionsSelfExclusion:
+    """Regression: get_filter_options() must not narrow a dimension's own
+    returned option list by that same dimension's own current selection —
+    currently dormant (no live UI path calls this with a selection yet), but
+    a real defect that would fire the moment a "narrow options as the user
+    picks fine filters" feature is wired up. Only sibling dimensions should
+    narrow a given dropdown; a dimension never narrows itself."""
+
+    def _make_fixture(self, tmp_path):
+        import pandas as pd
+
+        parquet_path = tmp_path / "eap-alarm.parquet"
+        pd.DataFrame([
+            {"ALARM_TEXT": "Alarm A", "EQP_ID": "GDBA-001", "LOT_ID": "LOT001",
+             "PJ_TYPE": "T1", "PRODUCT_LINE": "L1", "PJ_BOP": "B1"},
+            {"ALARM_TEXT": "Alarm B", "EQP_ID": "GDBA-002", "LOT_ID": "LOT002",
+             "PJ_TYPE": "T1", "PRODUCT_LINE": "L1", "PJ_BOP": "B1"},
+        ]).to_parquet(parquet_path, index=False)
+        return str(parquet_path)
+
+    def test_equipment_id_selection_does_not_hide_other_equipment_ids(self, tmp_path):
+        import duckdb
+        from mes_dashboard.services import eap_alarm_service as svc
+
+        parquet_path = self._make_fixture(tmp_path)
+        with patch.object(svc, "_get_duckdb_conn", new=lambda: duckdb.connect(database=":memory:")):
+            result = svc.get_filter_options(parquet_path, {"equipment_id": ["GDBA-001"]})
+
+        assert set(result["equipment_id_options"]) == {"GDBA-001", "GDBA-002"}, (
+            "equipment_id's own selection must not narrow equipment_id's own option list"
+        )
+        # Sibling dimension IS correctly narrowed by the equipment_id selection.
+        assert result["lot_id_options"] == ["LOT001"]

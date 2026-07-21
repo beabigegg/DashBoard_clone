@@ -1025,58 +1025,74 @@ def get_filter_options(
             if info.get('group')
         })
 
-        # Apply cross-narrow filters
-        filtered = resources
-        if workcenter_groups:
-            allowed_wcs = {
-                wc for wc, info in wc_mapping.items()
-                if info.get('group') in workcenter_groups
-            }
-            filtered = [r for r in filtered if r.get('WORKCENTERNAME') in allowed_wcs]
+        def _cross_narrow(exclude_dim: Optional[str] = None) -> list:
+            """Apply all cross-narrow filters to `resources`, except the
+            dimension named by `exclude_dim`. A dimension must never narrow
+            its own returned option list by its own current selection
+            (self-exclusion), or a user could never add a second value to
+            the same multi-select — only the OTHER dimensions narrow it."""
+            filtered = resources
+            if workcenter_groups and exclude_dim != 'workcenter_groups':
+                allowed_wcs = {
+                    wc for wc, info in wc_mapping.items()
+                    if info.get('group') in workcenter_groups
+                }
+                filtered = [r for r in filtered if r.get('WORKCENTERNAME') in allowed_wcs]
 
-        if families:
-            filtered = [r for r in filtered if r.get('RESOURCEFAMILYNAME') in families]
+            if families and exclude_dim != 'families':
+                filtered = [r for r in filtered if r.get('RESOURCEFAMILYNAME') in families]
 
-        # resource_ids contains resource names (RESOURCENAME), not IDs
-        if resource_ids:
-            name_set = {str(x).strip() for x in resource_ids}
-            filtered = [r for r in filtered if str(r.get('RESOURCENAME', '')).strip() in name_set]
+            # resource_ids contains resource names (RESOURCENAME), not IDs
+            if resource_ids and exclude_dim != 'resources':
+                name_set = {str(x).strip() for x in resource_ids}
+                filtered = [r for r in filtered if str(r.get('RESOURCENAME', '')).strip() in name_set]
 
-        if package_groups:
-            pg_set = set(package_groups)
-            filtered_pg = []
-            for r in filtered:
-                pg_name = get_package_group_name(r.get('PACKAGEGROUPID'))
-                if pg_name in pg_set:
-                    filtered_pg.append(r)
-            filtered = filtered_pg
+            if package_groups and exclude_dim != 'package_groups':
+                pg_set = set(package_groups)
+                filtered_pg = []
+                for r in filtered:
+                    pg_name = get_package_group_name(r.get('PACKAGEGROUPID'))
+                    if pg_name in pg_set:
+                        filtered_pg.append(r)
+                filtered = filtered_pg
 
-        if locations:
-            loc_set = set(locations)
-            filtered = [r for r in filtered if r.get('LOCATIONNAME') in loc_set]
+            if locations and exclude_dim != 'locations':
+                loc_set = set(locations)
+                filtered = [r for r in filtered if r.get('LOCATIONNAME') in loc_set]
 
-        # Equipment type flags
-        if is_production:
-            filtered = [r for r in filtered if r.get('PJ_ISPRODUCTION') == 1]
-        if is_key:
-            filtered = [r for r in filtered if r.get('PJ_ISKEY') == 1]
-        if is_monitor:
-            filtered = [r for r in filtered if r.get('PJ_ISMONITOR') == 1]
+            # Equipment type flags — booleans, not multi-select dimensions
+            # with their own returned option list, so no self-narrowing risk.
+            if is_production:
+                filtered = [r for r in filtered if r.get('PJ_ISPRODUCTION') == 1]
+            if is_key:
+                filtered = [r for r in filtered if r.get('PJ_ISKEY') == 1]
+            if is_monitor:
+                filtered = [r for r in filtered if r.get('PJ_ISMONITOR') == 1]
 
-        fam_list = sorted({r.get('RESOURCEFAMILYNAME') or '' for r in filtered if r.get('RESOURCEFAMILYNAME')})
+            return filtered
+
+        fam_list = sorted({
+            r.get('RESOURCEFAMILYNAME') or ''
+            for r in _cross_narrow(exclude_dim='families')
+            if r.get('RESOURCEFAMILYNAME')
+        })
         # Return resource names for display
-        res_list = sorted({str(r.get('RESOURCENAME', '')).strip() for r in filtered if r.get('RESOURCENAME')})
+        res_list = sorted({
+            str(r.get('RESOURCENAME', '')).strip()
+            for r in _cross_narrow(exclude_dim='resources')
+            if r.get('RESOURCENAME')
+        })
 
         # Package groups from filtered resources
         pg_list = sorted({
             get_package_group_name(r.get('PACKAGEGROUPID'))
-            for r in filtered
+            for r in _cross_narrow(exclude_dim='package_groups')
             if get_package_group_name(r.get('PACKAGEGROUPID'))
         })
 
         # Locations from filtered resources (guard against NaN from Oracle NULL via pandas)
         loc_list = sorted({
-            v for r in filtered
+            v for r in _cross_narrow(exclude_dim='locations')
             if isinstance(v := r.get('LOCATIONNAME'), str) and v
         })
 

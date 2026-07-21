@@ -119,7 +119,11 @@ _EXACT_FILTER_COLUMNS: Dict[str, str] = {
 }
 
 
-def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> tuple[str, list]:
+def _build_filter_where(
+    filters: Optional[Dict[str, Any]],
+    alias: str = "",
+    exclude_key: Optional[str] = None,
+) -> tuple[str, list]:
     """Build WHERE clause from fine filters.
 
     User-supplied values are NEVER inlined — the clause carries ``?``
@@ -133,6 +137,10 @@ def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> t
       pj_type (list[str])       — exact match on PJ_TYPE (product dim)
       product_line (list[str])  — exact match on PRODUCT_LINE (product dim)
       pj_bop (list[str])        — exact match on PJ_BOP (product dim)
+
+    ``exclude_key``, when set, omits that key's own clause — used by
+    get_filter_options() so a dimension's own selection never narrows its
+    own returned option list (self-exclusion), only sibling dimensions do.
     """
     prefix = f"{alias}." if alias else ""
     clauses: List[str] = []
@@ -141,15 +149,18 @@ def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> t
     if filters is None:
         filters = {}
 
-    alarm_texts = [str(t) for t in (filters.get("alarm_text") or []) if t is not None]
-    if alarm_texts:
-        like_parts = " OR ".join(
-            f"{prefix}ALARM_TEXT ILIKE '%' || ? || '%'" for _ in alarm_texts
-        )
-        clauses.append(f"({like_parts})")
-        params.extend(alarm_texts)
+    if exclude_key != "alarm_text":
+        alarm_texts = [str(t) for t in (filters.get("alarm_text") or []) if t is not None]
+        if alarm_texts:
+            like_parts = " OR ".join(
+                f"{prefix}ALARM_TEXT ILIKE '%' || ? || '%'" for _ in alarm_texts
+            )
+            clauses.append(f"({like_parts})")
+            params.extend(alarm_texts)
 
     for key, column in _EXACT_FILTER_COLUMNS.items():
+        if key == exclude_key:
+            continue
         values = [str(v) for v in (filters.get(key) or []) if v is not None]
         if values:
             placeholders = ", ".join("?" for _ in values)
@@ -178,9 +189,10 @@ def get_filter_options(spool_path: str, filters: Optional[Dict[str, Any]] = None
     """
     conn = _get_duckdb_conn()
     try:
-        where_sql, where_params = _build_filter_where(filters)
-
-        def _distinct(column: str) -> List[str]:
+        def _distinct(column: str, exclude_key: str) -> List[str]:
+            # Exclude this dimension's own filter key so its own selection
+            # never narrows its own returned option list (self-exclusion).
+            where_sql, where_params = _build_filter_where(filters, exclude_key=exclude_key)
             return [
                 row[0]
                 for row in conn.execute(f"""
@@ -193,12 +205,12 @@ def get_filter_options(spool_path: str, filters: Optional[Dict[str, Any]] = None
             ]
 
         return {
-            "alarm_text_options": _distinct("ALARM_TEXT"),
-            "equipment_id_options": _distinct("EQP_ID"),
-            "lot_id_options": _distinct("LOT_ID"),
-            "pj_type_options": _distinct("PJ_TYPE"),
-            "product_line_options": _distinct("PRODUCT_LINE"),
-            "pj_bop_options": _distinct("PJ_BOP"),
+            "alarm_text_options": _distinct("ALARM_TEXT", "alarm_text"),
+            "equipment_id_options": _distinct("EQP_ID", "equipment_id"),
+            "lot_id_options": _distinct("LOT_ID", "lot_id"),
+            "pj_type_options": _distinct("PJ_TYPE", "pj_type"),
+            "product_line_options": _distinct("PRODUCT_LINE", "product_line"),
+            "pj_bop_options": _distinct("PJ_BOP", "pj_bop"),
         }
     finally:
         conn.close()

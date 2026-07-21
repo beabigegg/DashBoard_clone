@@ -614,6 +614,101 @@ class TestFilterCrossNarrowing:
     @patch('mes_dashboard.services.resource_cache.get_all_resources')
     @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
     @patch('mes_dashboard.services.resource_cache.get_package_group_name')
+    def test_families_filter_does_not_self_narrow(
+        self, mock_pg, mock_wc_map, mock_resources
+    ):
+        """Regression: selecting one family must not hide the other families
+        from the SAME families dropdown — only sibling dimensions (workcenter,
+        resources, package_groups, locations) should narrow it.
+        """
+        from mes_dashboard.services.downtime_analysis_service import get_filter_options
+
+        mock_resources.return_value = [
+            {'RESOURCEID': 'R1', 'RESOURCENAME': 'Machine-A', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
+            {'RESOURCEID': 'R2', 'RESOURCENAME': 'Machine-B', 'WORKCENTERNAME': 'WC_B', 'RESOURCEFAMILYNAME': 'FAM2', 'PACKAGEGROUPID': None},
+        ]
+        mock_wc_map.return_value = {
+            'WC_A': {'group': 'GRP_A', 'sequence': 1},
+            'WC_B': {'group': 'GRP_B', 'sequence': 2},
+        }
+        mock_pg.return_value = None
+
+        opts = get_filter_options(families=['FAM1'])
+        assert set(opts['families']) == {'FAM1', 'FAM2'}, (
+            "families' own selection must not narrow families' own option list"
+        )
+        # Sibling dimension IS narrowed by the families selection.
+        assert opts['resources'] == ['Machine-A']
+
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_cache.get_package_group_name')
+    def test_resources_filter_does_not_self_narrow(
+        self, mock_pg, mock_wc_map, mock_resources
+    ):
+        """Regression: selecting one equipment/resource must not hide other
+        resources from the SAME resources dropdown."""
+        from mes_dashboard.services.downtime_analysis_service import get_filter_options
+
+        mock_resources.return_value = [
+            {'RESOURCEID': 'R1', 'RESOURCENAME': 'Machine-A', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
+            {'RESOURCEID': 'R2', 'RESOURCENAME': 'Machine-B', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
+        ]
+        mock_wc_map.return_value = {'WC_A': {'group': 'GRP_A', 'sequence': 1}}
+        mock_pg.return_value = None
+
+        opts = get_filter_options(resource_ids=['Machine-A'])
+        assert set(opts['resources']) == {'Machine-A', 'Machine-B'}, (
+            "resources' own selection must not narrow resources' own option list"
+        )
+
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_cache.get_package_group_name')
+    def test_locations_filter_does_not_self_narrow(
+        self, mock_pg, mock_wc_map, mock_resources
+    ):
+        """Regression: selecting one location must not hide other locations
+        from the SAME locations dropdown."""
+        from mes_dashboard.services.downtime_analysis_service import get_filter_options
+
+        mock_resources.return_value = [
+            {'RESOURCEID': 'R1', 'RESOURCENAME': 'Machine-A', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None, 'LOCATIONNAME': 'L1'},
+            {'RESOURCEID': 'R2', 'RESOURCENAME': 'Machine-B', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None, 'LOCATIONNAME': 'L2'},
+        ]
+        mock_wc_map.return_value = {'WC_A': {'group': 'GRP_A', 'sequence': 1}}
+        mock_pg.return_value = None
+
+        opts = get_filter_options(locations=['L1'])
+        assert set(opts['locations']) == {'L1', 'L2'}, (
+            "locations' own selection must not narrow locations' own option list"
+        )
+
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_cache.get_package_group_name')
+    def test_package_groups_filter_does_not_self_narrow(
+        self, mock_pg, mock_wc_map, mock_resources
+    ):
+        """Regression: selecting one package group must not hide other
+        package groups from the SAME package_groups dropdown."""
+        from mes_dashboard.services.downtime_analysis_service import get_filter_options
+
+        mock_resources.return_value = [
+            {'RESOURCEID': 'R1', 'RESOURCENAME': 'Machine-A', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': 'PG1'},
+            {'RESOURCEID': 'R2', 'RESOURCENAME': 'Machine-B', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': 'PG2'},
+        ]
+        mock_wc_map.return_value = {'WC_A': {'group': 'GRP_A', 'sequence': 1}}
+        mock_pg.side_effect = lambda pgid: {'PG1': 'PkgGroup-1', 'PG2': 'PkgGroup-2'}.get(pgid)
+
+        opts = get_filter_options(package_groups=['PkgGroup-1'])
+        assert set(opts['package_groups']) == {'PkgGroup-1', 'PkgGroup-2'}, (
+            "package_groups' own selection must not narrow package_groups' own option list"
+        )
+
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_cache.get_package_group_name')
     def test_big_categories_always_returns_all_nine(
         self, mock_pg, mock_wc_map, mock_resources
     ):
