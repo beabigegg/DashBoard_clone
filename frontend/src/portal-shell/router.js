@@ -38,8 +38,15 @@ export const router = createRouter({
     {
       path: '/',
       name: 'shell-home',
-      component: ShellHomeView,
-      meta: { title: 'MES Portal Shell' }
+      component: NativeRouteView,
+      props: {
+        targetRoute: '/',
+        pageName: '首頁',
+        drawerName: '',
+        owner: '',
+        renderMode: 'native',
+      },
+      meta: { title: '首頁' }
     },
     {
       path: '/:pathMatch(.*)*',

@@ -1,0 +1,214 @@
+/* Locally replicated instead of adding `.theme-dashboard-home` to
+   wip-shared/styles.css's and resource-shared/styles.css's enumerated
+   `:is(...)` theme lists — same precedent as admin-pages/material-consumption
+   (see docs/architecture/css-patterns.md rule 4.5). */
+.theme-dashboard-home {
+  --bg: theme('colors.surface.app');
+  --card-bg: theme('colors.surface.card');
+  --text: theme('colors.token.h222222');
+  --muted: theme('colors.token.h666666');
+  --border: theme('colors.token.he2e6ef');
+  --primary: theme('colors.brand.500');
+  --primary-dark: theme('colors.brand.700');
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  --shadow-strong: 0 4px 15px rgba(0, 128, 200, 0.2);
+  --success: theme('colors.state.success');
+  --danger: theme('colors.state.danger');
+  --warning: theme('colors.state.warning');
+  --resource-border: theme('colors.token.hdbe4ef');
+  --resource-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+
+  font-family: 'Microsoft JhengHei', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.theme-dashboard-home .dashboard {
+  max-width: 1900px;
+  margin: 0 auto;
+  padding: theme('spacing.5');
+}
+
+.theme-dashboard-home .dh-sections {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.5');
+}
+
+.theme-dashboard-home .dh-wip-top-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: theme('spacing.4');
+  margin-bottom: theme('spacing.4');
+}
+
+/* Clickable section headers — navigate to the corresponding full page */
+.theme-dashboard-home .dh-card-header--nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.theme-dashboard-home .dh-card-header--nav:hover,
+.theme-dashboard-home .dh-card-header--nav:focus-visible {
+  background: theme('colors.token.hf1f5f9');
+}
+
+.theme-dashboard-home .dh-card-header--nav:focus-visible {
+  outline: 2px solid theme('colors.brand.500');
+  outline-offset: -2px;
+}
+
+.theme-dashboard-home .dh-nav-arrow {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--muted);
+  line-height: 1;
+}
+
+@media (max-width: 768px) {
+  .theme-dashboard-home .dashboard {
+    padding: theme('spacing.4');
+  }
+
+  .theme-dashboard-home .dh-wip-top-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Shared section helpers — WorkcenterOuRings.vue's own template
+   hardcodes these class names (.section-title / .empty-hint), copied
+   verbatim from resource-status/style.css's .theme-resource override.
+   ============================================================ */
+
+.theme-dashboard-home .section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: theme('colors.token.h0f172a');
+  margin: 0 0 theme('spacing.token.p12');
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-dashboard-home .empty-hint {
+  font-size: 13px;
+  color: theme('colors.token.h94a3b8');
+  padding: theme('spacing.token.p16') 0;
+  text-align: center;
+}
+
+/* ============================================================
+   Workcenter OU% Rings — copied verbatim from resource-status/style.css
+   (.theme-resource -> .theme-dashboard-home), consumed by the reused
+   WorkcenterOuRings.vue component which ships no <style> of its own.
+   ============================================================ */
+
+.theme-dashboard-home .rings-section {
+  border: 1px solid var(--resource-border);
+  border-radius: 10px;
+  background: theme('colors.token.hffffff');
+  padding: theme('spacing.token.p16');
+  box-shadow: var(--resource-shadow);
+  margin-bottom: theme('spacing.token.p16');
+  margin-top: theme('spacing.token.p16');
+}
+
+.theme-dashboard-home .rings-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.theme-dashboard-home .ring-card {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: theme('spacing.token.p10') theme('spacing.token.p8');
+  border: 1px solid var(--resource-border);
+  border-radius: 10px;
+  background: theme('colors.token.hf8fafc');
+}
+
+.theme-dashboard-home .ring-chart-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+}
+
+.theme-dashboard-home .ring-chart {
+  width: 140px;
+  height: 140px;
+}
+
+.theme-dashboard-home .ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.theme-dashboard-home .ring-pct {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+.theme-dashboard-home .ring-ou-label {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.65;
+  letter-spacing: 0.5px;
+}
+
+.theme-dashboard-home .ring-group-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme('colors.token.h334155');
+  text-align: center;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.theme-dashboard-home .ring-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  justify-content: center;
+}
+
+.theme-dashboard-home .legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: theme('colors.token.h475569');
+}
+
+.theme-dashboard-home .legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.theme-dashboard-home .legend-abbr {
+  color: theme('colors.token.h64748b');
+}
+
+.theme-dashboard-home .legend-num {
+  font-weight: 700;
+  color: theme('colors.token.h0f172a');
+}

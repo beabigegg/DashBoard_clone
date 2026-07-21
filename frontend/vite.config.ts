@@ -39,6 +39,7 @@ const INPUT_MAP: Record<string, string> = {
   'production-achievement': resolve(__dirname, 'src/production-achievement/index.html'),
   'production-achievement-settings': resolve(__dirname, 'src/production-achievement-settings/index.html'),
   'uph-performance':      resolve(__dirname, 'src/uph-performance/index.html'),
+  'dashboard-home':       resolve(__dirname, 'src/dashboard-home/index.html'),
 };
 
 // After each bundle write (including --watch rebuilds), copy HTML entry points

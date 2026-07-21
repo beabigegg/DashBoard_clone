@@ -18,6 +18,14 @@ function createNativeLoader(componentLoader, styleLoaders = []) {
 }
 
 const NATIVE_MODULE_LOADERS = Object.freeze({
+  '/': createNativeLoader(
+    () => import('../dashboard-home/App.vue'),
+    [
+      () => import('../wip-shared/styles.css'),
+      () => import('../wip-shared/pareto-styles.css'),
+      () => import('../dashboard-home/style.css'),
+    ],
+  ),
   '/wip-overview': createNativeLoader(
     () => import('../wip-overview/App.vue'),
     [() => import('../wip-overview/style.css')],

@@ -6,7 +6,7 @@
  *
  * Acceptance criteria covered:
  *   AC-1: button exists (UI, covered by Playwright)
- *   AC-3: 13 columns, header row, display order
+ *   AC-3: 15 columns, header row, display order
  *   AC-4: UTF-8 BOM prefix (﻿)
  *   AC-5: RFC 4180 escaping (comma, quote, newline); null → empty string; empty → header-only
  */
@@ -25,13 +25,15 @@ const EXPECTED_HEADERS = [
   'Hold Reason',
   'Spec',
   'Age',
+  'Hold Time',
+  'Hold Duration (Hours)',
   'Hold By',
   'Dept',
   'Hold Comment',
   'Future Hold Comment',
 ];
 
-// Sample lot with all 13 fields populated
+// Sample lot with all 15 fields populated
 const SAMPLE_LOT = {
   lotId: 'LOT001',
   workorder: 'WO-9999',
@@ -42,6 +44,8 @@ const SAMPLE_LOT = {
   holdReason: 'QUALITY',
   spec: 'SPEC-X',
   age: 3,
+  holdTime: '2026-07-18T08:30:00',
+  holdDurationHours: 12.5,
   holdBy: 'engineer1',
   dept: 'QC',
   holdComment: 'normal comment',
@@ -51,7 +55,7 @@ const SAMPLE_LOT = {
 // ── Header row ───────────────────────────────────────────────────────────────
 
 describe('_buildCsv_produces_header_row', () => {
-  it('first line is all 13 column headers in display order', () => {
+  it('first line is all 15 column headers in display order', () => {
     const csv = _buildCsv([]);
     const firstLine = csv.split('\n')[0];
     expect(firstLine).toBe(EXPECTED_HEADERS.join(','));
@@ -61,17 +65,17 @@ describe('_buildCsv_produces_header_row', () => {
 // ── Column count ─────────────────────────────────────────────────────────────
 
 describe('_buildCsv_produces_correct_column_count', () => {
-  it('data row has 13 comma-separated fields', () => {
+  it('data row has 15 comma-separated fields', () => {
     const csv = _buildCsv([SAMPLE_LOT]);
     const lines = csv.split('\n');
     // lines[0] = header, lines[1] = first data row
     expect(lines.length).toBe(2);
     // Count commas + 1 = fields, but must handle quoted commas, so parse header
     const headerFields = lines[0].split(',');
-    expect(headerFields.length).toBe(13);
-    // Data row should also have 13 fields (no commas in SAMPLE_LOT values)
+    expect(headerFields.length).toBe(15);
+    // Data row should also have 15 fields (no commas in SAMPLE_LOT values)
     const dataFields = lines[1].split(',');
-    expect(dataFields.length).toBe(13);
+    expect(dataFields.length).toBe(15);
   });
 });
 

@@ -83,11 +83,6 @@ function getPageIcon(routePath) {
   return Circle;
 }
 
-function isPortalShellRootPath() {
-  const path = String(window.location.pathname || '').replace(/\/+$/, '');
-  return path === '/portal-shell' || path === '';
-}
-
 const isLoginPage = computed(() => route.path === '/login');
 
 const breadcrumb = computed(() => {
@@ -172,14 +167,6 @@ async function loadNavigation() {
       } else {
         navigationNotice.value = `路由 ${route.path} 不在可用清單，已返回首頁。`;
         await router.replace('/');
-      }
-    }
-
-    if (route.path === '/' && isPortalShellRootPath()) {
-      const firstRoute = state?.drawers?.[0]?.pages?.[0]?.route;
-      const defaultShellPath = firstRoute ? normalizeRoutePath(firstRoute) : '/';
-      if (defaultShellPath !== '/') {
-        await router.replace(defaultShellPath);
       }
     }
 

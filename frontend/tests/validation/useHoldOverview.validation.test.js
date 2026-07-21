@@ -289,7 +289,7 @@ describe('HOLD_OVERVIEW_TREEMAP_SCHEMA — assertShape direct', () => {
 // ---------------------------------------------------------------------------
 // Export mode — CSV helper schema validation (AC-2, AC-3)
 //
-// Verifies that the exportLots() helper chain produces the right 13 columns
+// Verifies that the exportLots() helper chain produces the right 15 columns
 // from a mock export response payload matching the /api/hold-overview/lots
 // data-shape-contract §3.15 column set.
 // ---------------------------------------------------------------------------
@@ -308,23 +308,25 @@ describe('hold-overview export mode — _buildCsv with lots response shape', () 
     holdReason: 'EXP-REASON',
     spec: 'SPEC-EXP',
     age: 7,
+    holdTime: '2026-07-18T09:15:00',
+    holdDurationHours: 6.25,
     holdBy: 'eng001',
     dept: 'QC',
     holdComment: 'export comment',
     futureHoldComment: 'future export comment',
   };
 
-  it('export response shape produces 13-column CSV row', () => {
+  it('export response shape produces 15-column CSV row', () => {
     const csv = _buildCsv([EXPORT_LOT]);
     const lines = csv.split('\n');
     expect(lines.length).toBe(2);
-    // header must have 13 columns
-    expect(lines[0].split(',').length).toBe(13);
-    // data row must have 13 columns (no commas in EXPORT_LOT values)
-    expect(lines[1].split(',').length).toBe(13);
+    // header must have 15 columns
+    expect(lines[0].split(',').length).toBe(15);
+    // data row must have 15 columns (no commas in EXPORT_LOT values)
+    expect(lines[1].split(',').length).toBe(15);
   });
 
-  it('CSV contains all 13 required field values from export response', () => {
+  it('CSV contains all 15 required field values from export response', () => {
     const csv = _buildCsv([EXPORT_LOT]);
     expect(csv).toContain('LOT-EXP-001');
     expect(csv).toContain('WO-EXP-999');
@@ -335,6 +337,8 @@ describe('hold-overview export mode — _buildCsv with lots response shape', () 
     expect(csv).toContain('EXP-REASON');
     expect(csv).toContain('SPEC-EXP');
     expect(csv).toContain('7');
+    expect(csv).toContain('2026-07-18T09:15:00');
+    expect(csv).toContain('6.25');
     expect(csv).toContain('eng001');
     expect(csv).toContain('QC');
     expect(csv).toContain('export comment');
@@ -347,14 +351,14 @@ describe('hold-overview export mode — _buildCsv with lots response shape', () 
     const csv = _buildCsv([{ ...EXPORT_LOT, export: true }]);
     const headerLine = csv.split('\n')[0];
     expect(headerLine).not.toContain('export');
-    // Still 13 columns despite the extra key
-    expect(headerLine.split(',').length).toBe(13);
+    // Still 15 columns despite the extra key
+    expect(headerLine.split(',').length).toBe(15);
   });
 
   it('empty lots array from export response produces header-only CSV (AC-5)', () => {
     const csv = _buildCsv([]);
     const lines = csv.split('\n');
     expect(lines.length).toBe(1);
-    expect(lines[0].split(',').length).toBe(13);
+    expect(lines[0].split(',').length).toBe(15);
   });
 });

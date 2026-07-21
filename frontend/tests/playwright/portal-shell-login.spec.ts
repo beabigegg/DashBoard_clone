@@ -5,7 +5,7 @@
  *   page renders     — /portal-shell/login shows form, username, password, submit
  *   auth guard       — unauthenticated access to protected route → redirect to /login
  *   validation       — empty submit shows "請輸入帳號和密碼"
- *   bad credentials  — /api/auth/login 失敗 → .login-error visible
+ *   bad credentials  — /api/auth/login 失敗 → .lp-error visible
  *   successful login — /api/auth/login 成功 → redirect away from /login
  *
  * Network strategy:
@@ -39,11 +39,11 @@ test('test_login_page_renders_form', async ({ page }) => {
 
   await expect(page.locator('#username')).toBeVisible();
   await expect(page.locator('#password')).toBeVisible();
-  await expect(page.locator('button.login-btn')).toBeVisible();
+  await expect(page.locator('button.lp-btn')).toBeVisible();
 
   // Branding text
-  const cardText = await page.locator('.login-card').textContent();
-  expect(cardText).toContain('MES 報表系統');
+  const cardText = await page.locator('.lp-card').textContent();
+  expect(cardText).toContain('MES DASHBOARD');
   expect(cardText).toContain('帳號（工號）');
   expect(cardText).toContain('密碼');
 });
@@ -66,9 +66,9 @@ test('test_empty_submit_shows_validation_error', async ({ page }) => {
   await gotoLoginPageDirectly(page);
 
   // Click submit without filling fields
-  await page.locator('button.login-btn').click();
+  await page.locator('button.lp-btn').click();
 
-  const errorEl = page.locator('.login-error');
+  const errorEl = page.locator('.lp-error');
   await expect(errorEl).toBeVisible({ timeout: 5_000 });
   expect(await errorEl.textContent()).toContain('請輸入帳號和密碼');
 });
@@ -88,9 +88,9 @@ test('test_bad_credentials_shows_error', async ({ page }) => {
 
   await page.locator('#username').fill('wrong_user');
   await page.locator('#password').fill('wrong_pass');
-  await page.locator('button.login-btn').click();
+  await page.locator('button.lp-btn').click();
 
-  const errorEl = page.locator('.login-error');
+  const errorEl = page.locator('.lp-error');
   await expect(errorEl).toBeVisible({ timeout: 10_000 });
   expect(await errorEl.textContent()).toContain('帳號或密碼錯誤');
 });
@@ -140,7 +140,7 @@ test('test_successful_login_redirects_away_from_login', async ({ page }) => {
 
   await page.locator('#username').fill('testuser');
   await page.locator('#password').fill('testpass');
-  await page.locator('button.login-btn').click();
+  await page.locator('button.lp-btn').click();
 
   // After successful login, router.push('/') is called — URL should leave /login
   await page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 15_000 });
