@@ -218,9 +218,21 @@
   font-size: 14px;
 }
 
+.theme-eap-alarm .trend-header-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p8');
+  margin-top: theme('spacing.token.p8');
+}
+
 .theme-eap-alarm .trend-granularity-toggle {
   display: flex;
   gap: theme('spacing.token.p4');
+}
+
+.theme-eap-alarm .trend-granularity-toggle--day-hour {
+  margin-left: auto;
 }
 
 /* ── Detail table ─────────────────────────────────────────────────────────── */

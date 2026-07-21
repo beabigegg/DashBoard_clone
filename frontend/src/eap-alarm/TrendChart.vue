@@ -75,6 +75,13 @@ const chartOption = computed(() => {
       data: seriesData.map((s) => seriesName(s)),
       bottom: 0,
       type: 'scroll',
+      // Long alarm_text names otherwise get clipped mid-word by the scroll
+      // pager (◄ n/m ►); cap item width via truncation, not left/right
+      // margins (those shift the clip boundary but don't remove it).
+      formatter(name: string) {
+        return name.length > 12 ? `${name.slice(0, 12)}...` : name;
+      },
+      tooltip: { show: true },
     },
     grid: { left: 60, right: 24, top: 20, bottom: 80, containLabel: false },
     xAxis: {
@@ -116,32 +123,34 @@ const chartOption = computed(() => {
   <section class="card ui-card">
     <div class="card-header ui-card-header">
       <div class="card-title ui-card-title">ALARM 趨勢</div>
-      <div class="trend-granularity-toggle" data-testid="trend-group-by-toggle">
-        <button
-          v-for="opt in GROUP_BY_OPTIONS"
-          :key="opt.value"
-          type="button"
-          :class="['ui-btn ui-btn--sm', (groupBy ?? 'alarm_text') === opt.value ? 'ui-btn--primary' : 'ui-btn--ghost']"
-          @click="emit('group-by-change', opt.value)"
-        >
-          {{ opt.label }}
-        </button>
-      </div>
-      <div class="trend-granularity-toggle">
-        <button
-          type="button"
-          :class="['ui-btn ui-btn--sm', granularity === 'day' ? 'ui-btn--primary' : 'ui-btn--ghost']"
-          @click="emit('granularity-change', 'day')"
-        >
-          日
-        </button>
-        <button
-          type="button"
-          :class="['ui-btn ui-btn--sm', granularity === 'hour' ? 'ui-btn--primary' : 'ui-btn--ghost']"
-          @click="emit('granularity-change', 'hour')"
-        >
-          時
-        </button>
+      <div class="trend-header-row">
+        <div class="trend-granularity-toggle" data-testid="trend-group-by-toggle">
+          <button
+            v-for="opt in GROUP_BY_OPTIONS"
+            :key="opt.value"
+            type="button"
+            :class="['ui-btn ui-btn--sm', (groupBy ?? 'alarm_text') === opt.value ? 'ui-btn--primary' : 'ui-btn--ghost']"
+            @click="emit('group-by-change', opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <div class="trend-granularity-toggle trend-granularity-toggle--day-hour">
+          <button
+            type="button"
+            :class="['ui-btn ui-btn--sm', granularity === 'day' ? 'ui-btn--primary' : 'ui-btn--ghost']"
+            @click="emit('granularity-change', 'day')"
+          >
+            日
+          </button>
+          <button
+            type="button"
+            :class="['ui-btn ui-btn--sm', granularity === 'hour' ? 'ui-btn--primary' : 'ui-btn--ghost']"
+            @click="emit('granularity-change', 'hour')"
+          >
+            時
+          </button>
+        </div>
       </div>
     </div>
     <div class="card-body ui-card-body trend-chart-body">
