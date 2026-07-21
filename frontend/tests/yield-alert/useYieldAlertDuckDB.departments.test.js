@@ -143,4 +143,42 @@ describe('useYieldAlertDuckDB — queryFilterOptions workcenter_groups (WASM par
 
     expect(result.filter_options.workcenter_groups).toEqual(['重工站A']);
   });
+
+  it('test_build_dimension_where_departments_resolves_raw_department_name_to_group — a raw DEPARTMENT_NAME selection (not just canonical DEPARTMENT_GROUP labels) must still match via a DEPARTMENT_NAME-derived subquery', async () => {
+    // Regression for the 站別群組 filter silently matching zero rows: workcenter_groups
+    // options are raw DEPARTMENT_NAME values (see test above), but the filter-apply
+    // column is the normalized DEPARTMENT_GROUP. buildDimensionWhere's `departments`
+    // condition must resolve a raw name to the group it belongs to, not just exact-match
+    // DEPARTMENT_GROUP directly.
+    const mockClient = buildMockClient([]);
+    const { getDuckDBClient } = await import('../../src/core/duckdb-client.js');
+    getDuckDBClient.mockReturnValue(mockClient);
+
+    const { useYieldAlertDuckDB } = await import('../../src/yield-alert-center/useYieldAlertDuckDB');
+    const { activate, computeView } = useYieldAlertDuckDB();
+    await activate('/spool/data.parquet');
+
+    await computeView({
+      filters: { departments: ['重工站A'] },
+      granularity: 'day',
+      riskThreshold: 98,
+      minScrapQty: 1,
+      sortBy: 'date_bucket',
+      sortDir: 'desc',
+      page: 1,
+      perPage: 20,
+    });
+
+    const departmentFilterCalls = mockClient.sendQuery.mock.calls.filter(([sql]) =>
+      sql.includes('"DEPARTMENT_GROUP" IN') && sql.includes("'重工站A'"),
+    );
+    expect(departmentFilterCalls.length).toBeGreaterThan(0);
+    for (const [sql] of departmentFilterCalls) {
+      // Direct-match branch (value already a canonical DEPARTMENT_GROUP label)...
+      expect(sql).toContain('"DEPARTMENT_GROUP" IN (\'重工站A\')');
+      // ...OR'd with a subquery resolving a raw DEPARTMENT_NAME to its DEPARTMENT_GROUP.
+      expect(sql).toContain('SELECT DISTINCT "DEPARTMENT_GROUP"');
+      expect(sql).toContain('WHERE "DEPARTMENT_NAME" IN (\'重工站A\')');
+    }
+  });
 });

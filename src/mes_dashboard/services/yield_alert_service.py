@@ -187,9 +187,16 @@ def expand_workcenter_groups_to_departments(workcenter_groups: list[str] | None)
     expanded: list[str] = []
     seen: set[str] = set()
     for raw in workcenter_groups:
-        group = str(raw or "").strip()
-        if not group:
+        text = str(raw or "").strip()
+        if not text:
             continue
+        # Selections may be either canonical group labels (mount-time
+        # get_yield_workcenter_group_options()) or raw DEPARTMENT_NAME values
+        # (view/cross-filter-options, YA-10) — normalize through the same
+        # function that computed the DEPARTMENT_GROUP column so either form
+        # resolves to a value that actually matches it. Normalizing an
+        # already-canonical label is a no-op.
+        group = _normalize_yield_department_group(text)
         candidates = [group]
         if group == "焊接_WB":
             candidates.append("焊接_DW")

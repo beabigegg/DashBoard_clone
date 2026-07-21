@@ -264,6 +264,44 @@ class TestCrossFilterOptions:
         assert result is not None
         assert result["workcenter_groups"] == ["焊接_WB_1線", "焊接_WB_2線"]
 
+    def test_selecting_one_workcenter_does_not_hide_other_groups_own_stations(self, tmp_path, monkeypatch):
+        """Regression: selecting one 站別群組 (workcenter) value must NOT narrow the
+        workcenter_groups dropdown's OWN option list down to only its own group's
+        siblings, or the user could never add a station from a different group to
+        the same multi-select — it would appear to "vanish" the moment one is picked.
+
+        _common_filters() derives `departments` FROM the current `workcenter_groups`
+        selection (expand_workcenter_groups_to_departments()), so `departments` must be
+        excluded from workcenter_groups' own other_filter_keys in dim_specs — including
+        it would self-narrow the dimension by its own selection under a different key.
+        """
+        parquet_path = _make_cross_filter_fixture(tmp_path)
+
+        monkeypatch.setattr(
+            "mes_dashboard.services.yield_alert_sql_runtime.get_spool_file_path",
+            lambda namespace, query_id: str(parquet_path),
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.core.duckdb_runtime.create_heavy_query_connection",
+            lambda: duckdb.connect(database=":memory:"),
+        )
+
+        # Simulate what _common_filters() builds after the user selects ONE raw
+        # DEPARTMENT_NAME station belonging to the "焊接_WB" group.
+        result = compute_cross_filter_options(
+            query_id="qid-001",
+            filters={
+                "workcenter_groups": ["焊接_WB_1線"],
+                "departments": ["焊接_WB"],
+            },
+        )
+
+        assert result is not None
+        assert set(result["workcenter_groups"]) == {"焊接_WB_1線", "焊接_WB_2線", "切割_A線"}, (
+            "selecting one station must not hide a different group's station from "
+            "the same multi-select's own dropdown"
+        )
+
     def test_workcenter_groups_change_with_process_type_query_id(self, tmp_path, monkeypatch):
         """AC-6: workcenter_groups is scoped to the current query_id's spool — a
         different query_id (e.g. a different process_type) with a different spool

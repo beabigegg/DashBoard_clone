@@ -849,12 +849,19 @@ def compute_cross_filter_options(
     # alongside the pre-existing "departments" (normalized DEPARTMENT_GROUP) filter-apply
     # key — it is not a rename/repurpose of "departments". See YA-10 / implementation-plan
     # Pitfall #1 and #2.
+    #
+    # "departments" is EXCLUDED from workcenter_groups' own other_keys deliberately:
+    # _common_filters() derives "departments" FROM the current "workcenter_groups"
+    # selection (expand_workcenter_groups_to_departments()), so including it here would
+    # self-narrow the workcenter_groups dropdown by its own selection under a different
+    # key name — selecting one station would immediately hide every other station that
+    # doesn't share its normalized group, before the user can pick a second one.
     dim_specs = [
         ("LINE_NAME",       "lines",             ["departments", "packages", "types", "functions", "workcenter_groups"]),
         ("PACKAGE_NAME",    "packages",          ["departments", "lines",    "types", "functions", "workcenter_groups"]),
         ("TYPE_NAME",       "types",             ["departments", "lines",    "packages", "functions", "workcenter_groups"]),
         ("FUNCTION_NAME",   "functions",         ["departments", "lines",    "packages", "types", "workcenter_groups"]),
-        ("DEPARTMENT_NAME", "workcenter_groups", ["departments", "lines",    "packages", "types", "functions"]),
+        ("DEPARTMENT_NAME", "workcenter_groups", ["lines",       "packages", "types",    "functions"]),
     ]
     exclude_values: Set[str] = {"(NA)", "-1", ""}
 

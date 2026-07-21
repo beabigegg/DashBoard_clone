@@ -249,6 +249,25 @@ def test_expand_workcenter_groups_to_departments_merges_dw_into_wb():
     assert "成型" in expanded
 
 
+def test_expand_workcenter_groups_to_departments_normalizes_raw_department_name():
+    """Regression for the yield-alert-center 站別群組 filter silently no-op'ing.
+
+    workcenter_groups filter-options (from /view and /cross-filter-options,
+    YA-10) are raw DEPARTMENT_NAME values, not the normalized DEPARTMENT_GROUP
+    labels the mount-time /filter-options endpoint returns. A raw department
+    name selected from that list must still expand to the DEPARTMENT_GROUP
+    value it actually belongs to, or the DEPARTMENT_GROUP IN (...) filter
+    clause matches zero rows.
+    """
+    expanded = yield_alert_service.expand_workcenter_groups_to_departments(["焊_DB_料"])
+    assert expanded == ["焊接_DB"]
+
+    # A raw name with no known group pattern passes through unchanged, matching
+    # _normalize_yield_department_group's own fallback for unmatched values.
+    expanded_unknown = yield_alert_service.expand_workcenter_groups_to_departments(["隨機站名XYZ"])
+    assert expanded_unknown == ["隨機站名XYZ"]
+
+
 def test_get_yield_workcenter_group_options_applies_dw_merge(monkeypatch):
     monkeypatch.setattr(
         yield_alert_service,

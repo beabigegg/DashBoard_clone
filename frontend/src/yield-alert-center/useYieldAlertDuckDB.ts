@@ -180,7 +180,24 @@ function granularityExpr(granularity: string, col = 'DATE_BUCKET'): string {
 
 function buildDimensionWhere(filters: Record<string, unknown>, deptProcOnly = false): string {
   const conditions = [];
-  const colMap = { departments: 'DEPARTMENT_GROUP', process_category: 'PROCESS_CATEGORY' };
+
+  // departments: selections may be canonical DEPARTMENT_GROUP labels OR raw
+  // DEPARTMENT_NAME values (workcenter_groups filter-options are sourced from
+  // DISTINCT DEPARTMENT_NAME — see queryFilterOptions below, mirroring
+  // yield_alert_sql_runtime.py's _query_filter_options). Match either domain
+  // directly, or via the DEPARTMENT_NAME -> DEPARTMENT_GROUP mapping already
+  // present in this row's own data, so a raw name selection still resolves
+  // to the group it actually belongs to.
+  const deptValues = (filters.departments || []).filter(v => String(v).trim());
+  if (deptValues.length) {
+    const inList = deptValues.map(v => qs(v)).join(', ');
+    conditions.push(
+      `(${qid('DEPARTMENT_GROUP')} IN (${inList}) OR ${qid('DEPARTMENT_GROUP')} IN (` +
+      `SELECT DISTINCT ${qid('DEPARTMENT_GROUP')} FROM ${qid(TABLE_NAME)} WHERE ${qid('DEPARTMENT_NAME')} IN (${inList})))`
+    );
+  }
+
+  const colMap: Record<string, string> = { process_category: 'PROCESS_CATEGORY' };
   if (!deptProcOnly) {
     Object.assign(colMap, {
       lines: 'LINE_NAME', packages: 'PACKAGE_NAME',
