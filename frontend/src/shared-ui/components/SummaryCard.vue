@@ -73,6 +73,7 @@ const formattedValue = computed(() => {
     const sign = n < 0 ? '-' : ''
     if (abs >= 1e6) return dec === 0 ? `${sign}${Math.round(abs / 1e6)}KK` : `${sign}${(abs / 1e6).toFixed(dec)}KK`
     if (abs >= 1e3) return dec === 0 ? `${sign}${Math.round(abs / 1e3)}K` : `${sign}${(abs / 1e3).toFixed(dec)}K`
+    if (props.precision != null) return n.toFixed(props.precision)
     return Math.round(n).toLocaleString('zh-TW')
   }
   if (props.format === 'percent') return `${n.toFixed(dec)}%`

@@ -161,6 +161,31 @@ class TestHoldViewSqlDateResolution:
         result = cache_svc.apply_view(query_id="hold-none-qid")
         assert result is None
 
+    def test_apply_view_forwards_day_filter_to_sql_runtime(self, monkeypatch):
+        """apply_view passes day_filter through to try_compute_view_from_spool per-kwarg."""
+        captured = {}
+
+        def _fake_sql_runtime(**kwargs):
+            captured.update(kwargs)
+            return None, {"view_sql_fallback_reason": "hold_history_sql_spool_miss"}
+
+        monkeypatch.setattr(
+            "mes_dashboard.services.hold_history_sql_runtime.try_compute_view_from_spool",
+            _fake_sql_runtime,
+        )
+        monkeypatch.setattr(
+            cache_svc,
+            "_get_query_dates",
+            lambda _qid: {"start": "2026-03-01", "end": "2026-03-31"},
+        )
+
+        cache_svc.apply_view(
+            query_id="qid-day-filter",
+            day_filter="2026-01-03:new",
+        )
+
+        assert captured.get("day_filter") == "2026-01-03:new"
+
 
 class TestHoldStoreDf:
     """_store_df writes to spool and sets L1 marker."""

@@ -291,11 +291,13 @@ def _query_reason_pareto(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     duration_range: Optional[str] = None,
+    day_filter: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Compute reason Pareto: GROUP BY HOLDREASONNAME, DESC by count."""
     type_clause = _build_hold_type_clause(hold_type)
     record_clause = _build_record_type_clause(record_type, start_date, end_date)
     duration_clause = _build_duration_clause(duration_range)
+    day_filter_clause = _build_day_filter_clause(day_filter)
 
     where_parts = []
     if type_clause:
@@ -304,6 +306,8 @@ def _query_reason_pareto(
         where_parts.append(record_clause)
     if duration_clause:
         where_parts.append(duration_clause)
+    if day_filter_clause:
+        where_parts.append(day_filter_clause)
     where_sql = "WHERE " + " AND ".join(where_parts) if where_parts else ""
 
     sql = f"""
@@ -470,6 +474,7 @@ def _query_list(
     end_date: Optional[str] = None,
     sort_col: str = _DEFAULT_SORT_COL,
     sort_dir: str = _DEFAULT_SORT_DIR,
+    day_filter: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Paginated hold list: filter by hold_type + reason.
 
@@ -488,6 +493,7 @@ def _query_list(
     type_clause = _build_hold_type_clause(hold_type)
     record_clause = _build_record_type_clause(record_type, start_date, end_date)
     duration_clause = _build_duration_clause(duration_range)
+    day_filter_clause = _build_day_filter_clause(day_filter)
 
     where_parts = []
     params: List[Any] = []
@@ -500,6 +506,8 @@ def _query_list(
         params.append(reason.strip())
     if duration_clause:
         where_parts.append(duration_clause)
+    if day_filter_clause:
+        where_parts.append(day_filter_clause)
 
     where_sql = "WHERE " + " AND ".join(where_parts) if where_parts else ""
 
@@ -682,6 +690,31 @@ def _build_duration_clause(duration_range: Optional[str]) -> str:
     return ""
 
 
+def _build_day_filter_clause(day_filter: Optional[str]) -> str:
+    """Build SQL WHERE clause for the Daily Trend bar-click day_filter.
+
+    Mirrors the exact predicates _query_trend uses to compute newHoldQty
+    ("hold_day" = day AND RN_HOLD_DAY = 1) and releaseQty ("release_day" = day)
+    so the filtered Pareto/list count matches the bar the user clicked.
+    """
+    if not day_filter:
+        return ""
+    parts = str(day_filter).split(":")
+    if len(parts) != 2:
+        return ""
+    day_str, day_type = parts[0].strip(), parts[1].strip().lower()
+    if not _is_iso_date(day_str):
+        return ""
+    if day_type == "new":
+        return (
+            f"(CAST(\"hold_day\" AS DATE) = CAST({_sql_str_literal(day_str)} AS DATE) "
+            f"AND \"RN_HOLD_DAY\" = 1)"
+        )
+    if day_type == "release":
+        return f"CAST(\"release_day\" AS DATE) = CAST({_sql_str_literal(day_str)} AS DATE)"
+    return ""
+
+
 # ── Task 4.1 + 4.6: Entry point ───────────────────────────────────────────────
 
 def try_compute_view_from_spool(
@@ -698,6 +731,7 @@ def try_compute_view_from_spool(
     export_mode: bool = False,
     sort_col: str = _DEFAULT_SORT_COL,
     sort_dir: str = _DEFAULT_SORT_DIR,
+    day_filter: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """Try to compute the full view result via DuckDB over the Parquet spool.
 
@@ -748,6 +782,7 @@ def try_compute_view_from_spool(
             start_date=resolved_start,
             end_date=resolved_end,
             duration_range=duration_range,
+            day_filter=day_filter,
         )
         duration = _query_duration(
             conn,
@@ -769,6 +804,7 @@ def try_compute_view_from_spool(
             end_date=resolved_end,
             sort_col=sort_col,
             sort_dir=sort_dir,
+            day_filter=day_filter,
         )
 
         latency_s = round(time.time() - started_at, 3)

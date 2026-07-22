@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import datetime
 
 from mes_dashboard.config.constants import (
@@ -131,6 +132,7 @@ _HOLD_HISTORY_VIEW_RATE_LIMIT = configured_rate_limit(
 _VALID_HOLD_TYPES = {'quality', 'non-quality', 'all'}
 _VALID_RECORD_TYPES = {'new', 'on_hold', 'released'}
 _VALID_DURATION_RANGES = {'<4h', '4-24h', '1-3d', '>3d'}
+_DAY_FILTER_RE = re.compile(r'^\d{4}-\d{2}-\d{2}:(new|release)$')
 
 
 # ============================================================
@@ -300,6 +302,10 @@ def api_hold_history_view():
     if raw_duration and raw_duration not in _VALID_DURATION_RANGES:
         return validation_error('Invalid duration_range')
 
+    raw_day_filter = request.args.get('day_filter', '').strip() or None
+    if raw_day_filter is not None and not _DAY_FILTER_RE.match(raw_day_filter):
+        return validation_error('Invalid day_filter')
+
     # Shared facade: silent-default + clamp (page>=1, per_page in [1,200]).
     page, per_page = parse_pagination(default_per_page=50, max_per_page=200)
     export_mode = request.args.get('export', '0') == '1'
@@ -321,6 +327,7 @@ def api_hold_history_view():
             export_mode=export_mode,
             sort_col=raw_sort_col,
             sort_dir=raw_sort_dir,
+            day_filter=raw_day_filter,
         )
     except Exception as exc:
         logger.error("Hold history view failed: %s", exc)

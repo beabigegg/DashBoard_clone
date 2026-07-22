@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.53.0
+schema-version: 1.54.0
 last-changed: 2026-07-21
 breaking-change-policy: deprecate-2-minors
 ---
@@ -58,6 +58,8 @@ breaking-change-policy: deprecate-2-minors
 | HOLD-01 | Future hold cumulative decay | 「累計 Future Hold」數值邏輯正確，但 MES 釋放 lot 後會清 `FUTUREHOLDCOMMENTS`，造成歷史數值衰減 | — (known limitation) |
 | HOLD-02 | Today-snapshot endpoint | `POST /api/hold-history/today-snapshot` 單次 call 返回當日 snapshot；cache namespace `hold_today:*` TTL 60s；no trend field | e2e tests |
 | HOLD-03 | Duration payload shape | `duration` 結構為 `{ items: [{range, count, qty, pct}], avgReleasedHours, avgOnHoldHours, maxReleasedHours, maxOnHoldHours }` | contract tests |
+| HOLD-04 | Range-mode average-count KPI cards | The "平均新增" (avg new-hold count) and "平均RELEASE" (avg release count) cards on the date-range summary row are computed 100% client-side in App.vue's existing summary computed as newHoldQty / days.length and releaseQty / days.length respectively (days.length = every calendar day in the queried range, including zero-activity days). No backend change, no new API field - trend.days[] already carries per-day newHoldQty/releaseQty, exactly as the existing 累計新增/累計Release cards already sum. | frontend unit test |
+| HOLD-05 | Daily Trend click-to-filter (day_filter) | Clicking a specific day's Release or New Hold bar on the Daily Trend chart (date-range mode only) sets an additional fine filter, GET /api/hold-history/view?day_filter=YYYY-MM-DD:new or ...:release (also supported by the browser DuckDB-WASM local-compute path with identical semantics). It is additive with the existing reason/duration fine filters (does not clear them) and is itself cleared whenever hold_type, record_type, or the date range changes - same dependency-clearing pattern as reasonFilter/durationFilter. It applies ONLY to reason_pareto and list (Reason Pareto chart + Detail table) - it must NOT alter the trend response (the chart the bars come from stays full-range) and does NOT apply to duration. 'new' matches rows where hold_day = the clicked date AND RN_HOLD_DAY = 1 (first-hold-only, mirrors the existing newHoldQty predicate in _query_trend); 'release' matches rows where release_day = the clicked date (mirrors the existing releaseQty predicate). Clicking the same bar twice toggles the filter off. | backend + frontend tests |
 
 ## Query/Spool Rules
 
@@ -496,6 +498,10 @@ The 焊接_DB workcenter group contains the following 12 DB process SPECs (autho
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.54.0] - 2026-07-21
+### Added
+- hold-history-daily-trend-click-filter: Added HOLD-04 (range-mode avg-new/avg-release KPI cards, frontend-only computation) and HOLD-05 (Daily Trend bar click-to-filter via new day_filter param on GET /api/hold-history/view and the DuckDB-WASM local-compute path; additive with existing reason/duration filters, scoped to reason_pareto + list only). Additive; no existing rules removed.
 
 ## [business 1.53.0] - 2026-07-21
 ### Added

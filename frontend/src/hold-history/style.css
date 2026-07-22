@@ -134,6 +134,13 @@
   margin-bottom: theme('spacing.token.p14');
 }
 
+/* DailyTrend is a standalone top-level child of .dashboard (not wrapped in a
+ * hold-history-specific row div like SummaryCards/chart-grid are), so it needs
+ * its own bottom margin -- otherwise it sits flush against RecordTypeFilter. */
+.theme-hold-history .hh-daily-trend-card {
+  margin-bottom: theme('spacing.token.p14');
+}
+
 /*
  * Grid columns are controlled by SummaryCardGroup's :columns prop (inline style).
  * Range mode uses 9 columns, today/current mode uses 8. We only keep
@@ -214,6 +221,17 @@
 .theme-hold-history .filter-chip.duration {
   background: theme('colors.token.hf3e8ff');
   color: theme('colors.token.h581c87');
+}
+
+.theme-hold-history .filter-chip.day {
+  display: inline-flex;
+  align-items: center;
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: theme('colors.token.hdcfce7');
+  color: theme('colors.token.h166534');
 }
 
 .theme-hold-history .clear-reason-btn {

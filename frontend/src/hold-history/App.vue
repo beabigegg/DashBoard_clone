@@ -157,11 +157,14 @@ const orchestrator = useFilterOrchestrator({
     recordType: { trigger: 'immediate', initial: ['new'] },
     reasonFilter: { trigger: 'immediate', initial: '' },
     durationFilter: { trigger: 'immediate', initial: '' },
+    dayFilter: { trigger: 'immediate', initial: '' },
   },
   dependencies: [
     { when: 'holdType', then: ['reasonFilter', 'durationFilter'], action: 'clear' },
+    { when: 'holdType', then: ['dayFilter'], action: 'clear' },
     { when: 'holdType', then: ['recordType'], action: 'reset', value: ['new'] },
     { when: 'recordType', then: ['reasonFilter', 'durationFilter'], action: 'clear' },
+    { when: 'recordType', then: ['dayFilter'], action: 'clear' },
   ],
   pagination: { resetOn: ['*'] },
   urlSync: { enabled: false },
@@ -186,6 +189,7 @@ const committed = orchestrator.committed as {
   recordType: string | string[];
   reasonFilter: string;
   durationFilter: string;
+  dayFilter: string;
 };
 const draft = orchestrator.draft as typeof committed;
 
@@ -273,6 +277,7 @@ function updateUrlState() {
     if (committed.holdType) params.set('hold_type', committed.holdType);
     if (committed.reasonFilter) params.set('reason', committed.reasonFilter);
     if (committed.durationFilter) params.set('duration_range', committed.durationFilter);
+    if (committed.dayFilter) params.set('day_filter', committed.dayFilter);
     if (page.value > 1) params.set('page', String(page.value));
   } else {
     if (committed.holdType) params.set('hold_type', committed.holdType);
@@ -554,6 +559,7 @@ async function refreshView({ listOnly = false } = {}): Promise<void> {
             : [committed.recordType || 'new'],
           reason: committed.reasonFilter || null,
           durationRange: committed.durationFilter || null,
+          dayFilter: committed.dayFilter || null,
           page: page.value,
           perPage: DEFAULT_PER_PAGE,
           sortCol: sortCol.value,
@@ -579,6 +585,7 @@ async function refreshView({ listOnly = false } = {}): Promise<void> {
 
     if (committed.reasonFilter) params.reason = committed.reasonFilter;
     if (committed.durationFilter) params.duration_range = committed.durationFilter;
+    if (committed.dayFilter) params.day_filter = committed.dayFilter;
 
     const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT }) as Record<string, unknown>;
     if (isStaleRequest(requestId)) return;
@@ -620,6 +627,7 @@ async function refreshViewPage(): Promise<void> {
             : [committed.recordType || 'new'],
           reason: committed.reasonFilter || null,
           durationRange: committed.durationFilter || null,
+          dayFilter: committed.dayFilter || null,
           page: page.value,
           perPage: DEFAULT_PER_PAGE,
           sortCol: sortCol.value,
@@ -645,6 +653,7 @@ async function refreshViewPage(): Promise<void> {
 
     if (committed.reasonFilter) params.reason = committed.reasonFilter;
     if (committed.durationFilter) params.duration_range = committed.durationFilter;
+    if (committed.dayFilter) params.day_filter = committed.dayFilter;
 
     const resp = await apiGet('/api/hold-history/view', { params, timeout: API_TIMEOUT });
     if (isStaleRequest(requestId)) return;
@@ -681,6 +690,8 @@ function handleModeChange(newMode: string): void {
     draft.reasonFilter = '';
     committed.durationFilter = '';
     draft.durationFilter = '';
+    committed.dayFilter = '';
+    draft.dayFilter = '';
     page.value = 1;
     mode.value = 'today';
     todaySnapshotData.value = null;
@@ -695,6 +706,8 @@ function handleModeChange(newMode: string): void {
     draft.reasonFilter = '';
     committed.durationFilter = '';
     draft.durationFilter = '';
+    committed.dayFilter = '';
+    draft.dayFilter = '';
     page.value = 1;
     mode.value = 'current';
     currentSnapshotData.value = null;
@@ -711,6 +724,8 @@ function handleModeChange(newMode: string): void {
     draft.reasonFilter = '';
     committed.durationFilter = '';
     draft.durationFilter = '';
+    committed.dayFilter = '';
+    draft.dayFilter = '';
     page.value = 1;
     if (!committed.startDate || !committed.endDate) {
       setDefaultDateRange();
@@ -761,6 +776,9 @@ const summary = computed(() => {
   const lastDay = pastDays.length > 0 ? pastDays[pastDays.length - 1] : null;
   const stillOnHoldCount = Number(lastDay?.holdQty || 0);
 
+  const avgNewHoldQty = pastDays.length > 0 ? newHoldQty / pastDays.length : 0;
+  const avgReleaseQty = pastDays.length > 0 ? releaseQty / pastDays.length : 0;
+
   const dur = durationData.value || {};
 
   return {
@@ -770,6 +788,8 @@ const summary = computed(() => {
     repeatQualityHoldQty,
     stillOnHoldCount,
     netChange,
+    avgNewHoldQty,
+    avgReleaseQty,
     avgReleasedHours: Number(dur.avgReleasedHours || 0),
     avgOnHoldHours: Number(dur.avgOnHoldHours || 0),
     maxReleasedHours: Number(dur.maxReleasedHours || 0),
@@ -879,6 +899,8 @@ function handleApply(next: { startDate?: string; endDate?: string } | null): voi
   draft.reasonFilter = '';
   committed.durationFilter = '';
   draft.durationFilter = '';
+  committed.dayFilter = '';
+  draft.dayFilter = '';
   committed.recordType = ['new'];
   draft.recordType = ['new'];
   orchestrator.applyDraft();
@@ -969,6 +991,18 @@ function clearDurationFilter() {
     updateUrlState();
     void executeCurrentSnapshot();
   }
+}
+
+function handleDayToggle(value: string): void {
+  const next = String(value || '').trim();
+  if (!next) return;
+  const current = committed.dayFilter;
+  orchestrator.updateField('dayFilter', current === next ? '' : next);
+}
+
+function clearDayFilter() {
+  if (!committed.dayFilter) return;
+  orchestrator.updateField('dayFilter', '');
 }
 
 function handleSort(payload: { key: string; direction: string }): void {
@@ -1098,6 +1132,8 @@ async function manualRefresh() {
   draft.reasonFilter = '';
   committed.durationFilter = '';
   draft.durationFilter = '';
+  committed.dayFilter = '';
+  draft.dayFilter = '';
   updateUrlState();
   if (mode.value === 'today') {
     await executeTodaySnapshot();
@@ -1165,6 +1201,10 @@ onMounted(async () => {
   committed.durationFilter = initDuration;
   draft.durationFilter = initDuration;
 
+  const initDayFilter = getUrlParam('day_filter');
+  committed.dayFilter = initDayFilter;
+  draft.dayFilter = initDayFilter;
+
   const parsedPage = Number.parseInt(getUrlParam('page'), 10);
   if (Number.isFinite(parsedPage) && parsedPage > 0) {
     page.value = parsedPage;
@@ -1228,7 +1268,12 @@ onMounted(async () => {
     </div>
 
     <!-- DailyTrend hidden in today mode -->
-    <DailyTrend v-if="mode === 'range'" :days="selectedTrendDays" />
+    <DailyTrend
+      v-if="mode === 'range'"
+      :days="selectedTrendDays"
+      :active-day-filter="committed.dayFilter"
+      @toggle-day="handleDayToggle"
+    />
 
     <RecordTypeFilter
       v-model="recordTypeModel"
@@ -1253,8 +1298,10 @@ onMounted(async () => {
     <FilterIndicator
       :reason="committed.reasonFilter"
       :duration-range="committed.durationFilter"
+      :day-filter="committed.dayFilter"
       @clear-reason="clearReasonFilter"
       @clear-duration="clearDurationFilter"
+      @clear-day="clearDayFilter"
     />
 
     <EmptyState

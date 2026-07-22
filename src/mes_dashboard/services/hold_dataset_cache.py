@@ -332,6 +332,7 @@ def apply_view(
     export_mode: bool = False,
     sort_col: str = "holdDate",
     sort_dir: str = "desc",
+    day_filter: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Read cache -> apply filters -> return derived data. Returns None if expired (→ route returns 410).
 
@@ -369,6 +370,7 @@ def apply_view(
             export_mode=export_mode,
             sort_col=sort_col,
             sort_dir=sort_dir,
+            day_filter=day_filter,
         )
         if sql_result is not None:
             return {**sql_result, "_meta": sql_meta}

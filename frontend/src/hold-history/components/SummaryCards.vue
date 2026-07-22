@@ -59,7 +59,7 @@ const props = withDefaults(defineProps<Props>(), {
 <template>
   <!-- Range mode: 9-card layout -->
   <template v-if="mode === 'range'">
-    <SummaryCardGroup :columns="9">
+    <SummaryCardGroup :columns="11">
       <SummaryCard
         label="累計新增"
         :value="summary.newHoldQty ?? 0"
@@ -68,11 +68,27 @@ const props = withDefaults(defineProps<Props>(), {
         :sub-value="rawFor(summary.newHoldQty)"
       />
       <SummaryCard
+        label="日均新增"
+        :value="summary.avgNewHoldQty ?? 0"
+        format="number"
+        :precision="1"
+        accent="neutral"
+        :sub-value="rawFor(summary.avgNewHoldQty)"
+      />
+      <SummaryCard
         label="累計 Release"
         :value="summary.releaseQty ?? 0"
         format="number"
         accent="success"
         :sub-value="rawFor(summary.releaseQty)"
+      />
+      <SummaryCard
+        label="日均 Release"
+        :value="summary.avgReleaseQty ?? 0"
+        format="number"
+        :precision="1"
+        accent="neutral"
+        :sub-value="rawFor(summary.avgReleaseQty)"
       />
       <SummaryCard
         label="累計 FH"

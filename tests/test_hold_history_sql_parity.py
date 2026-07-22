@@ -359,3 +359,100 @@ class TestRepeatQualityHoldQtyParity:
         result = self._run_trend()
         for day in result["days"]:
             assert day["all"]["repeatQualityHoldQty"] == day["quality"]["repeatQualityHoldQty"]
+
+
+class TestDayFilterClause:
+    """day_filter param on _query_reason_pareto / _query_list mirrors the exact
+    predicates _query_trend uses for the Daily Trend bars (newHoldQty / releaseQty),
+    so clicking a bar produces a matching Pareto/list count."""
+
+    @classmethod
+    def setup_class(cls):
+        import tempfile
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.raw_rows = _build_sample_rows(30)
+        df = pd.DataFrame(cls.raw_rows)
+        cls.parquet_path = _write_parquet(df, cls.tmp.name)
+
+    @classmethod
+    def teardown_class(cls):
+        cls.tmp.cleanup()
+
+    def _run(self, day_filter=None):
+        import duckdb
+        from mes_dashboard.services.hold_history_sql_runtime import (
+            _attach_spool_view, _query_reason_pareto, _query_list,
+        )
+        conn = duckdb.connect(database=":memory:")
+        try:
+            _attach_spool_view(conn, self.parquet_path)
+            # hold_type="all" + record_type spanning all three buckets means
+            # type_clause/record_clause are both empty, so day_filter is the
+            # only restriction being exercised.
+            pareto = _query_reason_pareto(
+                conn, hold_type="all", record_type="new,on_hold,released",
+                start_date=_START_DATE, end_date=_END_DATE, day_filter=day_filter,
+            )
+            lst = _query_list(
+                conn, hold_type="all", record_type="new,on_hold,released",
+                start_date=_START_DATE, end_date=_END_DATE, per_page=200,
+                day_filter=day_filter,
+            )
+            return pareto, lst
+        finally:
+            conn.close()
+
+    def test_new_day_filter_matches_hold_day_and_rn_hold_day(self):
+        day = "2026-01-03"
+        expected = [
+            r for r in self.raw_rows
+            if r["hold_day"] == day and r["RN_HOLD_DAY"] == 1
+        ]
+        assert expected, "fixture must contain at least one matching row"
+        pareto, lst = self._run(day_filter=f"{day}:new")
+        assert lst["pagination"]["total"] == len(expected)
+        assert sum(item["count"] for item in pareto["items"]) == len(expected)
+        assert sum(item["qty"] for item in pareto["items"]) == sum(r["QTY"] for r in expected)
+
+    def test_release_day_filter_matches_release_day(self):
+        day = "2026-01-05"
+        expected = [r for r in self.raw_rows if r["release_day"] == day]
+        assert expected, "fixture must contain at least one matching row"
+        pareto, lst = self._run(day_filter=f"{day}:release")
+        assert lst["pagination"]["total"] == len(expected)
+        assert sum(item["count"] for item in pareto["items"]) == len(expected)
+        assert sum(item["qty"] for item in pareto["items"]) == sum(r["QTY"] for r in expected)
+
+    def test_empty_or_absent_day_filter_is_noop(self):
+        total_all = len(self.raw_rows)
+        pareto_none, lst_none = self._run(day_filter=None)
+        pareto_empty, lst_empty = self._run(day_filter="")
+        pareto_omitted, lst_omitted = self._run()
+        assert lst_none["pagination"]["total"] == total_all
+        assert lst_empty["pagination"]["total"] == total_all
+        assert lst_omitted["pagination"]["total"] == total_all
+        assert pareto_none == pareto_empty == pareto_omitted
+
+    def test_malformed_day_filter_produces_noop_clause(self):
+        from mes_dashboard.services.hold_history_sql_runtime import _build_day_filter_clause
+
+        for bad in ("not-a-date:new", "2026-01-03:bogus", "2026-01-03", "", None):
+            assert _build_day_filter_clause(bad) == ""
+
+        total_all = len(self.raw_rows)
+        pareto_bad, lst_bad = self._run(day_filter="not-a-date:new")
+        pareto_none, lst_none = self._run(day_filter=None)
+        assert lst_bad["pagination"]["total"] == total_all
+        assert lst_none["pagination"]["total"] == total_all
+        assert pareto_bad == pareto_none
+
+
+def test_query_trend_signature_has_no_day_filter_param():
+    """_query_trend must always return the full unfiltered range: bars must not
+    filter themselves when clicked, so it never accepts day_filter."""
+    import inspect
+
+    from mes_dashboard.services.hold_history_sql_runtime import _query_trend
+
+    sig = inspect.signature(_query_trend)
+    assert "day_filter" not in sig.parameters

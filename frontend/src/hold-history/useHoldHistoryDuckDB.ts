@@ -118,6 +118,7 @@ export interface ComputeViewParams {
   recordTypes?: string[];
   reason?: string | null;
   durationRange?: string | null;
+  dayFilter?: string | null;
   page?: number;
   perPage?: number;
   sortCol?: string;
@@ -187,6 +188,27 @@ function buildDurationCondition(durationRange: string | null | undefined): strin
   if (durationRange === '4-24h') return `${h} >= 4 AND ${h} < 24`;
   if (durationRange === '1-3d')  return `${h} >= 24 AND ${h} < 72`;
   if (durationRange === '>3d')   return `${h} >= 72`;
+  return null;
+}
+
+/**
+ * Build a WHERE clause fragment for the Daily Trend click-to-filter feature.
+ * dayFilter is "YYYY-MM-DD:new" or "YYYY-MM-DD:release"; mirrors the exact
+ * column references/predicates queryTrend() uses for newHoldQty/releaseQty
+ * so the filtered result matches the bar the user clicked.
+ */
+export function buildDayFilterCondition(dayFilter: string | null | undefined): string | null {
+  if (!dayFilter) return null;
+  const parts = String(dayFilter).split(':');
+  if (parts.length !== 2) return null;
+  const [dayStr, dayType] = parts;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayStr)) return null;
+  if (dayType === 'new') {
+    return `(CAST(${qid('HOLD_DAY')} AS DATE) = DATE ${qs(dayStr)} AND ${qid('RN_HOLD_DAY')} = 1)`;
+  }
+  if (dayType === 'release') {
+    return `CAST(${qid('RELEASE_DAY')} AS DATE) = DATE ${qs(dayStr)}`;
+  }
   return null;
 }
 
@@ -533,6 +555,7 @@ export function useHoldHistoryDuckDB() {
     recordTypes = ['new'],
     reason = null,
     durationRange = null,
+    dayFilter = null,
     page = 1,
     perPage = 20,
     sortCol,
@@ -540,17 +563,22 @@ export function useHoldHistoryDuckDB() {
   }: ComputeViewParams): Promise<ComputeViewResult> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
 
-    // Trend: full DF (no record_type/reason/duration — all hold_types)
+    // Trend: full DF (no record_type/reason/duration/day filter — all hold_types, full range)
     const trendPromise = queryTrend(_client, startDate, endDate);
 
     // Base conditions for pareto, duration, list (record_type + hold_type)
     const baseConditions = buildBaseConditions({ holdType, recordTypes, startDate, endDate });
 
+    // Daily Trend click-to-filter: additive day condition for pareto/list only
+    // (never trend — it's the source of the bars being clicked; never duration — out of scope)
+    const dayCond = buildDayFilterCondition(dayFilter);
+    const conditionsWithDay = dayCond ? [...baseConditions, dayCond] : baseConditions;
+
     const [trend, reasonPareto, duration, list] = await Promise.all([
       trendPromise,
-      queryReasonPareto(_client, baseConditions),
+      queryReasonPareto(_client, conditionsWithDay),
       queryDuration(_client, baseConditions),
-      queryList(_client, baseConditions, {
+      queryList(_client, conditionsWithDay, {
         reason,
         durationRange,
         page,

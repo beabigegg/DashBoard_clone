@@ -349,6 +349,7 @@ class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
         self.assertEqual(kw['reason'], '品質確認')
         self.assertEqual(kw['record_type'], 'new')
         self.assertIsNone(kw['duration_range'])
+        self.assertIsNone(kw['day_filter'])
         self.assertEqual(kw['page'], 2)
         self.assertEqual(kw['per_page'], 20)
         self.assertFalse(kw['export_mode'])
@@ -385,6 +386,32 @@ class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
 
         call_kwargs = mock_view.call_args[1]
         self.assertEqual(call_kwargs['duration_range'], '<4h')
+
+    def test_view_invalid_day_filter_returns_400(self):
+        response = self.client.get(
+            '/api/hold-history/view?query_id=abc123&day_filter=garbage'
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload['success'])
+        self.assertEqual(payload['error']['code'], 'VALIDATION_ERROR')
+
+    @patch('mes_dashboard.routes.hold_history_routes.apply_view')
+    def test_view_passes_day_filter(self, mock_view):
+        mock_view.return_value = {
+            'trend': {'days': []},
+            'reason_pareto': {'items': []},
+            'duration': {'items': []},
+            'list': {'items': [], 'pagination': {}},
+        }
+
+        self.client.get(
+            '/api/hold-history/view?query_id=abc123&day_filter=2026-01-03:new'
+        )
+
+        call_kwargs = mock_view.call_args.kwargs
+        self.assertEqual(call_kwargs['day_filter'], '2026-01-03:new')
 
     @patch('mes_dashboard.routes.hold_history_routes.apply_view')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 5))
